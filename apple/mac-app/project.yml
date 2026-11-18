@@ -1,0 +1,54 @@
+name: Xdesk
+options:
+  bundleIdPrefix: vn.xox
+  deploymentTarget:
+    macOS: "14.0"
+packages:
+  XdeskKit:
+    path: ../Packages/XdeskKit
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    DEVELOPMENT_TEAM: 4DU4BTV46U
+    CODE_SIGN_STYLE: Automatic
+targets:
+  Xdesk-mac:
+    type: application
+    platform: macOS
+    sources: [Sources]
+    dependencies:
+      - package: XdeskKit
+        product: XdeskWire
+      - package: XdeskKit
+        product: XdeskCrypto
+      - package: XdeskKit
+        product: XdeskTransport
+      - package: XdeskKit
+        product: XdeskMedia
+      - package: XdeskKit
+        product: XdeskInput
+      - package: XdeskKit
+        product: XdeskAgent
+    info:
+      path: Sources/Info.plist
+      properties:
+        CFBundleDisplayName: Xdesk
+        LSUIElement: true
+        LSMinimumSystemVersion: "14.0"
+        NSLocalNetworkUsageDescription: Xdesk dùng mạng nội bộ để tìm và kết nối thiết bị của bạn.
+        NSBonjourServices: [_xdesk._tcp]
+    entitlements:
+      path: Sources/Xdesk.entitlements
+      properties:
+        com.apple.security.app-sandbox: false
+    settings:
+      base:
+        PRODUCT_NAME: Xdesk
+        PRODUCT_BUNDLE_IDENTIFIER: vn.xox.xdesk
+        ENABLE_HARDENED_RUNTIME: true
+        GENERATE_INFOPLIST_FILE: false
+schemes:
+  Xdesk-mac:
+    build:
+      targets:
+        Xdesk-mac: all

@@ -1,0 +1,22 @@
+.DS_Store
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+.gradle/
+local.properties
+*.apk
+*.aab
+*.ipa
+*.dmg
+.env
+
+# Xdesk
+apple/**/*.xcodeproj
+.build/
+.swiftpm/
+android/**/build/
+android/.kotlin/
+*.jks
+*.p12
+*.keystore
