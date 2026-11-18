@@ -6,7 +6,8 @@ let modules = ["XdeskWire", "XdeskCrypto", "XdeskTransport", "XdeskMedia", "Xdes
 let moduleDependencies: [String: [String]] = [
     "XdeskTransport": ["XdeskWire"],
     "XdeskMedia": ["XdeskWire"],
-    "XdeskViewer": ["XdeskWire", "XdeskTransport", "XdeskMedia"],
+    "XdeskInput": ["XdeskWire"],
+    "XdeskViewer": ["XdeskWire", "XdeskTransport", "XdeskMedia", "XdeskInput"],
 ]
 
 let package = Package(

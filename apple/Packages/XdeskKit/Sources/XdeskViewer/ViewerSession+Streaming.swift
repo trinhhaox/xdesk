@@ -38,7 +38,8 @@ extension ViewerSession {
             switch event {
             case .frame(let frame): render(frame)
             case .keyframeNeeded: await requestKeyframe()
-            case .peerConnected, .packet: break
+            case .packet(let packet): handleInputAck(packet)
+            case .peerConnected: break
             }
         }
     }

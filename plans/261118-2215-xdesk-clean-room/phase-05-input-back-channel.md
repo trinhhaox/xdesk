@@ -41,11 +41,11 @@ Host:  UDP → [InputDecoder] → [StuckInputGuard] → [CoordinateMapper(displa
 5. Quy trình xin quyền Accessibility có hướng dẫn rõ ràng.
 
 ## Todo
-- [ ] HidKeyMap + test
-- [ ] CoordinateMapper + test
-- [ ] Injector + guard
-- [ ] Capture Mac viewer
-- [ ] iOS touch/keyboard/text
+- [x] HidKeyMap + test
+- [x] CoordinateMapper + test
+- [x] Injector + guard (host; 05a)
+- [ ] Capture Mac viewer (code + unit test xong, bật bằng tay: chưa thử chuột/phím thật qua cửa sổ viewer)
+- [ ] iOS touch/keyboard/text (code + test xong, đã cài iPhone + stream; chạm/phím/gõ chữ thật chưa thử)
 - [ ] Đo độ trễ input
 
 ## Success criteria

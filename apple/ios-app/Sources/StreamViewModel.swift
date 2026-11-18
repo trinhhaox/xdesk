@@ -21,7 +21,8 @@ final class StreamViewModel {
 
     @ObservationIgnored private var browseTask: Task<Void, Never>?
     @ObservationIgnored private var target: ViewerTarget?
-    @ObservationIgnored private var currentConfig: DisplayConfig?
+    /// Cấu hình màn hình đang dùng; cho lớp nhập liệu biết kích thước màn hình host theo điểm.
+    private(set) var currentConfig: DisplayConfig?
     @ObservationIgnored private var isRestarting = false
     @ObservationIgnored private var suspended = false
     @ObservationIgnored private lazy var orientation = OrientationObserver { [weak self] _ in self?.screenSettled() }

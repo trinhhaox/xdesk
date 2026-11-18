@@ -27,6 +27,8 @@ targets:
         product: XdeskMedia
       - package: XdeskKit
         product: XdeskViewer
+      - package: XdeskKit
+        product: XdeskInput
     info:
       path: Sources/Info.plist
       properties:

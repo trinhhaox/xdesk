@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import os
 import XdeskMedia
@@ -20,20 +21,25 @@ actor HostSession {
     private let provider: VirtualDisplayProvider
     private let hostCaps: Capabilities
     private let report: @Sendable (HostSessionState) -> Void
-    private let log = Logger(subsystem: "vn.xox.xdesk", category: "host-session")
-    private var channel: UdpMediaChannel?
+    let onSecureInput: @Sendable (Bool) -> Void
+    let log = Logger(subsystem: "vn.xox.xdesk", category: "host-session")
+    private(set) var channel: UdpMediaChannel?
     private var pipeline: HostPipeline?
+    var input: HostInputService?
+    var viewerReady = false
     private var bitrate = BitrateController(initialKbps: HostSession.initialBitrateKbps)
     private var tasks: [Task<Void, Never>] = []
 
     init(
         connection: ControlConnection, provider: VirtualDisplayProvider, caps: Capabilities,
-        report: @escaping @Sendable (HostSessionState) -> Void
+        report: @escaping @Sendable (HostSessionState) -> Void,
+        onSecureInput: @escaping @Sendable (Bool) -> Void = { _ in }
     ) {
         self.connection = connection
         self.provider = provider
         self.hostCaps = caps
         self.report = report
+        self.onSecureInput = onSecureInput
     }
 
     func run() async {
@@ -80,9 +86,16 @@ actor HostSession {
         self.pipeline = pipeline
         try await pipeline.start()
         tasks.append(Task { await Self.pumpFrames(pipeline.encoder, to: channel) })
+        await startInput(displayID: acquired.displayID)
         tasks.append(Task { [weak pipeline] in
             for await event in channel.events {
-                if case .peerConnected = event { pipeline?.beginStreaming() }
+                switch event {
+                case .peerConnected:
+                    viewerReady = true
+                    pipeline?.beginStreaming()
+                case .packet(let packet): await handleInputPacket(packet)
+                default: break
+                }
             }
         })
         report(.streaming(mode: acquired.mode, width: width, height: height))
@@ -112,6 +125,7 @@ actor HostSession {
                 let t1 = ClockSync.wallClockMs()
                 let pong = ClockSync.makePong(for: ping, receivedAtMs: t1, sentAtMs: ClockSync.wallClockMs())
                 _ = try await connection.send(.pong(pong), id: envelope.id)
+            case .inputText(let t): await handleInputText(t.text)
             case .bye: return
             default: break
             }
@@ -130,6 +144,9 @@ actor HostSession {
     private func teardown() async {
         tasks.forEach { $0.cancel() }
         tasks.removeAll()
+        viewerReady = false
+        await input?.shutdown()
+        input = nil
         await pipeline?.stop()
         pipeline = nil
         await channel?.close()

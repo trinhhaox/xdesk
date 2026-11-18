@@ -6,6 +6,8 @@ import CoreMedia
 @MainActor
 public final class VideoLayerRenderer {
     public let layer = AVSampleBufferDisplayLayer()
+    /// Kích thước điểm ảnh của khung video gần nhất; dùng để biết vùng letterbox. `nil` khi chưa có khung.
+    public private(set) var videoSize: CGSize?
 
     public init() {
         layer.videoGravity = .resizeAspect
@@ -20,9 +22,16 @@ public final class VideoLayerRenderer {
             renderer.flush()
             return false
         }
+        if let format = CMSampleBufferGetFormatDescription(sample) {
+            let dims = CMVideoFormatDescriptionGetDimensions(format)
+            videoSize = CGSize(width: Int(dims.width), height: Int(dims.height))
+        }
         renderer.enqueue(sample)
         return true
     }
 
-    public func flush() { layer.sampleBufferRenderer.flush() }
+    public func flush() {
+        layer.sampleBufferRenderer.flush()
+        videoSize = nil
+    }
 }

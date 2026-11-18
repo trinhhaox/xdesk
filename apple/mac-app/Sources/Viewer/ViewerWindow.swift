@@ -9,19 +9,25 @@ final class ViewerWindow: NSObject, NSWindowDelegate {
     private let window: NSWindow
     private let session: ViewerSession
     private let onClose: @MainActor () -> Void
+    private let shortcutToggle: ShortcutCaptureToggle
 
     init(session: ViewerSession, title: String, fullScreen: Bool, latencyOverlay: Bool, onClose: @escaping @MainActor () -> Void) {
         self.session = session
         self.onClose = onClose
         let content = VideoContainerView(renderer: session.renderer)
+        let capture = ViewerEventCapture(session: session, renderer: session.renderer)
+        content.addSubview(capture)
         if latencyOverlay { content.addOverlay(LatencyOverlayView(session: session)) }
-        window = NSWindow(
+        let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1280, height: 800),
             styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false
         )
+        self.window = window
+        shortcutToggle = ShortcutCaptureToggle(window: window, capture: capture)
         super.init()
         window.title = title
         window.contentView = content
+        capture.frame = content.bounds
         window.contentAspectRatio = NSSize(width: 16, height: 10)
         window.collectionBehavior = [.fullScreenPrimary]
         window.isReleasedWhenClosed = false
@@ -33,11 +39,15 @@ final class ViewerWindow: NSObject, NSWindowDelegate {
     }
 
     func close() {
+        shortcutToggle.stop()
         window.delegate = nil
         window.close()
     }
 
-    func windowWillClose(_ notification: Notification) { onClose() }
+    func windowWillClose(_ notification: Notification) {
+        shortcutToggle.stop()
+        onClose()
+    }
 }
 
 /// View gắn `AVSampleBufferDisplayLayer` làm layer nền, co theo khung.

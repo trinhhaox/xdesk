@@ -3,6 +3,7 @@ import Foundation
 import Network
 import Observation
 import os
+import XdeskInput
 import XdeskMedia
 import XdeskTransport
 import XdeskWire
@@ -41,6 +42,9 @@ public final class ViewerSession {
     @ObservationIgnored var stats = ViewerStats()
     @ObservationIgnored var lastKeyframeRequestMs = 0
     @ObservationIgnored var streamId: UInt16 = 0
+    @ObservationIgnored var inputSequencer = InputSequencer()
+    @ObservationIgnored var inputOutbox: AsyncStream<MediaPacket>.Continuation?
+    @ObservationIgnored var lastHeartbeatMs: Int64 = 0
     #if DEBUG
     @ObservationIgnored var windowCount = 0
     #endif
@@ -89,7 +93,11 @@ public final class ViewerSession {
         streamId = result.ready.streamId
         let channel = try await UdpMediaChannel.connect(streamId: streamId, host: host, port: result.ready.udpPort)
         self.channel = channel
+        let (packets, outbox) = AsyncStream.makeStream(of: MediaPacket.self)
+        inputOutbox = outbox
         tasks = [
+            Task { [weak self] in await self?.pumpInput(packets, to: channel) },
+            Task { [weak self] in await self?.inputMaintenanceLoop() },
             Task { [weak self] in await self?.readControl(conn) },
             Task { [weak self] in await self?.consume(channel.events) },
             Task { [weak self] in await self?.pingLoop(conn) },
@@ -113,6 +121,9 @@ public final class ViewerSession {
     private func teardown() async {
         tasks.forEach { $0.cancel() }
         tasks.removeAll()
+        inputOutbox?.finish()
+        inputOutbox = nil
+        inputSequencer = InputSequencer()
         await channel?.close()
         channel = nil
         await connection?.close()

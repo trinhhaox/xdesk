@@ -10,6 +10,15 @@ struct MenuBarContent: View {
         if case .listening(let port) = host.status, let ip = LocalAddress.primaryIPv4() {
             Text("Nhập trên điện thoại: \(ip):\(port)")
         }
+        if !AccessibilityPermission.isGranted {
+            Button(AccessibilityPermission.menuTitle) {
+                AccessibilityPermission.requestPrompt()
+                AccessibilityPermission.openSettings()
+            }
+        }
+        if host.secureInputActive {
+            Text("Đang bật nhập liệu bảo mật: chữ gõ từ xa có thể không vào ô mật khẩu")
+        }
         Divider()
         Button(host.isHosting ? "Dừng chia sẻ màn hình" : "Bắt đầu chia sẻ màn hình") {
             Task { host.isHosting ? await host.stop() : await host.start() }

@@ -30,9 +30,12 @@ final class HostController {
 
     private(set) var status: Status = .stopped
     private(set) var sessionStates: [UUID: HostSessionState] = [:]
+    /// Một app đang bật Secure Event Input nên chữ gõ từ xa có thể không vào được ô đích.
+    private(set) var secureInputActive = false
 
     private let log = Logger(subsystem: "vn.xox.xdesk", category: "host-controller")
     private var listener: ControlListener?
+    private var promptedAccessibility = false
     private var acceptTask: Task<Void, Never>?
     private var sessions: [UUID: (session: HostSession, task: Task<Void, Never>)] = [:]
 
@@ -54,6 +57,10 @@ final class HostController {
             PermissionsCheck.requestScreenRecording()
             status = .failed("Chưa có quyền Ghi màn hình. \(PermissionsCheck.settingsHint)")
             return
+        }
+        if !AccessibilityPermission.isGranted, !promptedAccessibility {
+            promptedAccessibility = true
+            AccessibilityPermission.requestPrompt()
         }
         let advertiser = BonjourAdvertiser(id: HostIdentity.shortId, name: HostIdentity.displayName)
         let listener = ControlListener(security: AppSecurity.current, advertiser: advertiser)
@@ -90,7 +97,8 @@ final class HostController {
         let id = UUID()
         let session = HostSession(
             connection: connection, provider: VirtualDisplayProvider(), caps: [.h264, .hevc],
-            report: { [weak self] state in Task { @MainActor in self?.update(id, state) } }
+            report: { [weak self] state in Task { @MainActor in self?.update(id, state) } },
+            onSecureInput: { [weak self] active in Task { @MainActor in self?.secureInputActive = active } }
         )
         sessions[id] = (session, Task { await session.run() })
     }
