@@ -48,14 +48,14 @@ Viewer: [MediaReceiver UDP] → [Reassembler + NackTracker] → [FrameAssembler 
 8. Latency probe, đo, ghi kết quả vào `plans/reports/latency-phase-03.md`.
 
 ## Todo
-- [ ] VirtualDisplayProvider + fallback Mirror/Window
-- [ ] CaptureService
-- [ ] VideoEncoder low-latency
-- [ ] Control + Bonjour
-- [ ] UDP media + NACK
-- [ ] Viewer render
-- [ ] ABR
-- [ ] Latency probe + số đo
+- [x] VirtualDisplayProvider + fallback Mirror (03b: CGVirtualDisplay thật tạo 1920×1200 mở rộng, biến mất khi ngắt; fallback test bằng giả lập; fallback Window CHƯA làm)
+- [x] CaptureService (03b: SCStream 420v/queueDepth 3/60 fps chạy thật qua loopback; xử lý thiếu quyền + didStopWithError)
+- [x] VideoEncoder low-latency (03a: lib + test mã hoá→giải mã 30 khung thật)
+- [ ] Control + Bonjour (Control/handshake chạy thật trong app 03b; Bonjour CHƯA kiểm: hộp thoại Local Network chờ người dùng bấm Cho phép)
+- [x] UDP media + NACK (03a: lib + test loopback mất gói/NACK/keyframeNeeded)
+- [x] Viewer render (03b: ảnh chụp cửa sổ viewer thấy khung host; toàn màn hình tuỳ chọn viết, chưa thử tay)
+- [ ] ABR (03b: net.report 500 ms → BitrateController → bitrate.set đã nối; loopback không bao giờ nghẽn nên nhánh giảm bitrate chưa chạy thật)
+- [x] Latency probe + số đo (loopback 1 Mac: p50 34–35 ms, p95 52 ms — xem plans/reports/latency-phase-03.md; chưa đo Wi-Fi/Ethernet 2 máy)
 
 ## Success criteria (thiết bị thật)
 - Mac host: System Settings → Displays hiện màn hình "Xdesk" mới; kéo cửa sổ sang được.

@@ -1,7 +1,7 @@
 export DEVELOPER_DIR ?= /Volumes/XcodeExternal/Applications/Xcode.app/Contents/Developer
 export JAVA_HOME ?= /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
 
-.PHONY: bootstrap gen build-mac build-ios test-apple test-android lint
+.PHONY: bootstrap gen build-mac build-ios test-apple test-mac test-android lint
 
 bootstrap:
 	@command -v xcodegen >/dev/null || { echo "Thiếu xcodegen: brew install xcodegen"; exit 1; }
@@ -21,6 +21,9 @@ build-ios: gen
 
 test-apple:
 	cd apple/Packages/XdeskKit && swift test
+
+test-mac: gen
+	xcodebuild test -project apple/mac-app/Xdesk.xcodeproj -scheme Xdesk-mac -destination 'platform=macOS'
 
 test-android:
 	cd android && ./gradlew test

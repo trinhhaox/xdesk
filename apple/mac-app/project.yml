@@ -47,8 +47,23 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: vn.xox.xdesk
         ENABLE_HARDENED_RUNTIME: true
         GENERATE_INFOPLIST_FILE: false
+        SWIFT_OBJC_BRIDGING_HEADER: Sources/Host/Xdesk-Bridging-Header.h
+  Xdesk-mac-tests:
+    type: bundle.unit-test
+    platform: macOS
+    sources: [Tests]
+    dependencies:
+      - target: Xdesk-mac
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: true
+        PRODUCT_BUNDLE_IDENTIFIER: vn.xox.xdesk.tests
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Xdesk.app/Contents/MacOS/Xdesk
+        BUNDLE_LOADER: $(TEST_HOST)
 schemes:
   Xdesk-mac:
     build:
       targets:
         Xdesk-mac: all
+    test:
+      targets: [Xdesk-mac-tests]
