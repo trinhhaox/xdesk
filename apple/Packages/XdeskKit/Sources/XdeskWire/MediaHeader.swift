@@ -6,6 +6,8 @@ public enum MediaPacketType: UInt8, Sendable, CaseIterable {
     case input = 0x30
     case inputAck = 0x31
     case nack = 0x40
+    /// Viewer báo địa chỉ UDP cho host: header + (tuỳ chọn) u64 nonce.
+    case probe = 0x50
 }
 
 /// Header UDP 16 byte: `u8 ver | u8 ptype | u16 streamId | u32 frameNo | u16 fragIdx | u16 fragCnt | u32 ptsMs`.

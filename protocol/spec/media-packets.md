@@ -25,8 +25,17 @@ payload > 1200 → `payloadTooLarge`; ít hơn 16 byte → `truncated`.
 | 0x30 | input |
 | 0x31 | input-ack |
 | 0x40 | nack |
+| 0x50 | probe |
 
-Gói không phân mảnh (input, ack, nack) dùng `fragIdx=0`, `fragCnt=1`, `frameNo`/`ptsMs` tuỳ ý (NACK dùng 0).
+Gói không phân mảnh (input, ack, nack, probe) dùng `fragIdx=0`, `fragCnt=1`, `frameNo`/`ptsMs` tuỳ ý (NACK dùng 0).
+
+## Probe (ptype 0x50)
+
+Viewer gửi để host biết địa chỉ UDP của viewer (UDP không có bắt tay). Header + payload rỗng **hoặc** `u64 nonce` (big-endian);
+độ dài khác → bỏ qua. `frameNo`/`ptsMs` = 0.
+- Viewer gửi mỗi **250 ms** tới khi nhận gói đầu tiên từ host.
+- Host chỉ chấp nhận probe từ **IP của peer TCP** đã bắt tay (nguồn khác bị bỏ); probe hợp lệ đầu tiên chốt địa chỉ peer và host phát sự kiện `peerConnected`. Host không trả lời probe.
+Ví dụ stream 3, nonce `0123456789abcdef`: `01 50 0003 00000000 0000 0001 00000000 0123456789abcdef`.
 
 ## Video / audio: phân mảnh
 

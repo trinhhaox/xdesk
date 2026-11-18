@@ -8,6 +8,8 @@ func mediaVectors() -> JSONObject {
         ("video-max-frag-count", MediaHeader(type: .video, streamId: 65535, frameNo: 4_294_967_295, fragIdx: 2047, fragCnt: 2048, ptsMs: 4_294_967_295), [0x00]),
         ("audio-single", MediaHeader(type: .audio, streamId: 2, frameNo: 100, ptsMs: 2000), [0x10, 0x20]),
         ("video-parity-reserved", MediaHeader(type: .videoParity, streamId: 1, frameNo: 1), []),
+        ("probe-empty", MediaHeader(type: .probe, streamId: 3, frameNo: 0), []),
+        ("probe-nonce", MediaHeader(type: .probe, streamId: 3, frameNo: 0), [0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF]),
     ]
     return [
         "version": 1,

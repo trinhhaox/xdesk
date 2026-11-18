@@ -8,7 +8,7 @@ Noise Protocol Framework rev 34, RFC 8439, RFC 7748, H.264 Annex B / AVCC.
 | Kênh | Transport | Nội dung | Định dạng |
 |---|---|---|---|
 | Control | TCP, tin cậy | bắt tay, cấu hình, thống kê, clipboard, ping | frame `len\|kind\|payload`, payload JSON (xem `framing.md`, `control-messages.md`) |
-| Media | UDP (hoặc đóng trong TCP frame `0x04`) | video, audio, input, input-ack, NACK | header 16 B + payload ≤ 1200 B (xem `media-packets.md`) |
+| Media | UDP (hoặc đóng trong TCP frame `0x04`) | video, audio, input, input-ack, NACK, probe | header 16 B + payload ≤ 1200 B (xem `media-packets.md`) |
 
 Mã hoá: mọi frame sau handshake là AEAD (xem `crypto-handshake.md`). Chế độ `dev-plaintext` chỉ bật ở build Debug.
 

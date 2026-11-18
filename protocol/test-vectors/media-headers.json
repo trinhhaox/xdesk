@@ -461,6 +461,30 @@
       "ptsMs" : 0,
       "streamId" : 1,
       "type" : 17
+    },
+    {
+      "fragCnt" : 1,
+      "fragIdx" : 0,
+      "frameNo" : 0,
+      "hex" : "01500003000000000000000100000000",
+      "keyframe" : false,
+      "name" : "probe-empty",
+      "payloadHex" : "",
+      "ptsMs" : 0,
+      "streamId" : 3,
+      "type" : 80
+    },
+    {
+      "fragCnt" : 1,
+      "fragIdx" : 0,
+      "frameNo" : 0,
+      "hex" : "015000030000000000000001000000000123456789abcdef",
+      "keyframe" : false,
+      "name" : "probe-nonce",
+      "payloadHex" : "0123456789abcdef",
+      "ptsMs" : 0,
+      "streamId" : 3,
+      "type" : 80
     }
   ],
   "version" : 1
