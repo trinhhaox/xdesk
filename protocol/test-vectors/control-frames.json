@@ -1,0 +1,223 @@
+{
+  "frames" : [
+    {
+      "hex" : "0000000401aabbcc",
+      "kind" : 1,
+      "name" : "handshake-3-bytes",
+      "payloadHex" : "aabbcc"
+    },
+    {
+      "hex" : "000000020300",
+      "kind" : 3,
+      "name" : "bulk-1-byte",
+      "payloadHex" : "00"
+    },
+    {
+      "hex" : "0000000104",
+      "kind" : 4,
+      "name" : "media-over-tcp-empty",
+      "payloadHex" : ""
+    }
+  ],
+  "incompleteFrames" : [
+    {
+      "hex" : "000000",
+      "name" : "only-3-header-bytes"
+    },
+    {
+      "hex" : "0000000a02aabb",
+      "name" : "payload-missing"
+    }
+  ],
+  "invalidFrames" : [
+    {
+      "error" : "invalidFrameLength",
+      "hex" : "0000000002",
+      "name" : "len-zero"
+    },
+    {
+      "error" : "frameTooLarge",
+      "hex" : "0010000102",
+      "name" : "len-over-1MiB"
+    },
+    {
+      "error" : "frameTooLarge",
+      "hex" : "ffffffff02",
+      "name" : "len-4GiB-1"
+    },
+    {
+      "error" : "unknownFrameKind",
+      "hex" : "0000000109",
+      "name" : "unknown-kind"
+    },
+    {
+      "error" : "unknownFrameKind",
+      "hex" : "0000000100",
+      "name" : "kind-zero"
+    }
+  ],
+  "invalidMessages" : [
+    {
+      "error" : "malformedJSON",
+      "json" : "{{{",
+      "name" : "not-json"
+    },
+    {
+      "error" : "malformedJSON",
+      "json" : "{\"id\":1}",
+      "name" : "missing-t"
+    },
+    {
+      "error" : "malformedJSON",
+      "json" : "{\"t\":\"bye\"}",
+      "name" : "missing-id"
+    },
+    {
+      "error" : "malformedJSON",
+      "json" : "{\"id\":1,\"t\":\"hello\"}",
+      "name" : "hello-missing-fields"
+    },
+    {
+      "error" : "invalidField",
+      "json" : "{\"codec\":\"h264\",\"fps\":60,\"h\":100,\"id\":1,\"scale\":1,\"t\":\"display.config\",\"w\":0}",
+      "name" : "display-config-zero-width"
+    },
+    {
+      "error" : "malformedJSON",
+      "json" : "{\"codec\":\"vp9\",\"fps\":60,\"h\":100,\"id\":1,\"scale\":1,\"t\":\"display.config\",\"w\":100}",
+      "name" : "display-config-bad-codec"
+    },
+    {
+      "error" : "invalidField",
+      "json" : "{\"id\":1,\"streamId\":1,\"t\":\"display.ready\",\"udpPort\":0}",
+      "name" : "display-ready-port-zero"
+    },
+    {
+      "error" : "invalidField",
+      "json" : "{\"id\":1,\"jitterMs\":0,\"lossPermille\":1001,\"recvKbps\":0,\"rttMs\":0,\"t\":\"net.report\"}",
+      "name" : "net-report-loss-over-1000"
+    }
+  ],
+  "messages" : [
+    {
+      "frameHex" : "00000043027b2263617073223a36372c226964223a312c226e616d65223a224d61632063e1bba7612048c3a06f222c2274223a2268656c6c6f222c22766572223a22312e30227d",
+      "id" : 1,
+      "json" : "{\"caps\":67,\"id\":1,\"name\":\"Mac của Hào\",\"t\":\"hello\",\"ver\":\"1.0\"}",
+      "name" : "hello",
+      "type" : "hello"
+    },
+    {
+      "frameHex" : "00000041027b2263617073223a332c226964223a312c2273657373696f6e4964223a22732d37663361222c2274223a2277656c636f6d65222c22766572223a22312e30227d",
+      "id" : 1,
+      "json" : "{\"caps\":3,\"id\":1,\"sessionId\":\"s-7f3a\",\"t\":\"welcome\",\"ver\":\"1.0\"}",
+      "name" : "welcome",
+      "type" : "welcome"
+    },
+    {
+      "frameHex" : "0000004a027b2264657461696c223a226d616a6f722032206e6f7420737570706f72746564222c226964223a322c22726561736f6e223a2276657273696f6e222c2274223a2272656a656374227d",
+      "id" : 2,
+      "json" : "{\"detail\":\"major 2 not supported\",\"id\":2,\"reason\":\"version\",\"t\":\"reject\"}",
+      "name" : "reject-version",
+      "type" : "reject"
+    },
+    {
+      "frameHex" : "00000052027b22636f646563223a2268323634222c22667073223a36302c2268223a313434302c226964223a332c227363616c65223a322c2274223a22646973706c61792e636f6e666967222c2277223a323536307d",
+      "id" : 3,
+      "json" : "{\"codec\":\"h264\",\"fps\":60,\"h\":1440,\"id\":3,\"scale\":2,\"t\":\"display.config\",\"w\":2560}",
+      "name" : "display-config",
+      "type" : "display.config"
+    },
+    {
+      "frameHex" : "0000003a027b226964223a332c2273747265616d4964223a312c2274223a22646973706c61792e7265616479222c22756470506f7274223a35323030307d",
+      "id" : 3,
+      "json" : "{\"id\":3,\"streamId\":1,\"t\":\"display.ready\",\"udpPort\":52000}",
+      "name" : "display-ready",
+      "type" : "display.ready"
+    },
+    {
+      "frameHex" : "0000002d027b226964223a342c2273747265616d4964223a312c2274223a226b65796672616d652e72657175657374227d",
+      "id" : 4,
+      "json" : "{\"id\":4,\"streamId\":1,\"t\":\"keyframe.request\"}",
+      "name" : "keyframe-request",
+      "type" : "keyframe.request"
+    },
+    {
+      "frameHex" : "00000055027b226964223a352c226a69747465724d73223a332c226c6f73735065726d696c6c65223a32352c22726563764b627073223a31383030302c227274744d73223a31322c2274223a226e65742e7265706f7274227d",
+      "id" : 5,
+      "json" : "{\"id\":5,\"jitterMs\":3,\"lossPermille\":25,\"recvKbps\":18000,\"rttMs\":12,\"t\":\"net.report\"}",
+      "name" : "net-report",
+      "type" : "net.report"
+    },
+    {
+      "frameHex" : "00000028027b226964223a362c226b627073223a31323030302c2274223a22626974726174652e736574227d",
+      "id" : 6,
+      "json" : "{\"id\":6,\"kbps\":12000,\"t\":\"bitrate.set\"}",
+      "name" : "bitrate-set",
+      "type" : "bitrate.set"
+    },
+    {
+      "frameHex" : "00000032027b226964223a372c226b696e64223a2274657874222c2273697a65223a34322c2274223a22636c69702e6f66666572227d",
+      "id" : 7,
+      "json" : "{\"id\":7,\"kind\":\"text\",\"size\":42,\"t\":\"clip.offer\"}",
+      "name" : "clip-offer",
+      "type" : "clip.offer"
+    },
+    {
+      "frameHex" : "00000028027b226964223a382c226b696e64223a22696d616765222c2274223a22636c69702e70756c6c227d",
+      "id" : 8,
+      "json" : "{\"id\":8,\"kind\":\"image\",\"t\":\"clip.pull\"}",
+      "name" : "clip-pull",
+      "type" : "clip.pull"
+    },
+    {
+      "frameHex" : "0000002d027b226964223a392c226f776e6572223a226167656e74222c2274223a22636f6e74726f6c2e7374617465227d",
+      "id" : 9,
+      "json" : "{\"id\":9,\"owner\":\"agent\",\"t\":\"control.state\"}",
+      "name" : "control-state",
+      "type" : "control.state"
+    },
+    {
+      "frameHex" : "00000028027b226964223a31302c2274223a2270696e67222c227430223a313730303030303030303132337d",
+      "id" : 10,
+      "json" : "{\"id\":10,\"t\":\"ping\",\"t0\":1700000000123}",
+      "name" : "ping",
+      "type" : "ping"
+    },
+    {
+      "frameHex" : "0000004e027b226964223a31302c2274223a22706f6e67222c227430223a313730303030303030303132332c227431223a313730303030303030303133302c227432223a313730303030303030303133317d",
+      "id" : 10,
+      "json" : "{\"id\":10,\"t\":\"pong\",\"t0\":1700000000123,\"t1\":1700000000130,\"t2\":1700000000131}",
+      "name" : "pong",
+      "type" : "pong"
+    },
+    {
+      "frameHex" : "00000024027b226964223a31312c22726561736f6e223a2275736572222c2274223a22627965227d",
+      "id" : 11,
+      "json" : "{\"id\":11,\"reason\":\"user\",\"t\":\"bye\"}",
+      "name" : "bye",
+      "type" : "bye"
+    },
+    {
+      "frameHex" : "00000014027b226964223a31322c2274223a22627965227d",
+      "id" : 12,
+      "json" : "{\"id\":12,\"t\":\"bye\"}",
+      "name" : "bye-no-reason",
+      "type" : "bye"
+    },
+    {
+      "frameHex" : "0000003a027b226964223a31332c2274223a22696e7075742e74657874222c2274657874223a2258696e206368c3a06f2c205669e1bb8774204e616d227d",
+      "id" : 13,
+      "json" : "{\"id\":13,\"t\":\"input.text\",\"text\":\"Xin chào, Việt Nam\"}",
+      "name" : "input-text-vietnamese",
+      "type" : "input.text"
+    },
+    {
+      "frameHex" : "0000001d027b226964223a31342c2274223a226675747572652e7468696e67227d",
+      "id" : 14,
+      "json" : "{\"id\":14,\"t\":\"future.thing\"}",
+      "name" : "unknown-type",
+      "type" : "future.thing"
+    }
+  ],
+  "version" : 1
+}
