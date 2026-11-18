@@ -46,8 +46,8 @@ Viewer ──Noise msg1──► Host
 6. Rekey + xử lý lỗi giải mã (đếm lỗi > 50/s → đóng phiên).
 
 ## Todo
-- [ ] Noise + vectors
-- [ ] DatagramCipher + replay
+- [x] Noise + vectors (06a: XX/XXpsk3/IK pass cacophony 3/3, spec hoàn thiện)
+- [x] DatagramCipher + replay (06a: cửa sổ 1024, epoch/rekey, vector crypto-session.json)
 - [ ] Tích hợp transport
 - [ ] UI QR + SAS
 - [ ] Quản lý thiết bị + quyền

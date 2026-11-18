@@ -73,9 +73,9 @@ public struct MediaHeader: Sendable, Equatable {
     }
 }
 
-/// Gói UDP: header + payload (≤ 1200 byte).
+/// Gói UDP: header + payload (≤ 1192 byte; mã hoá xong ≤ 1232 B, vừa MTU IPv6 tối thiểu).
 public struct MediaPacket: Sendable, Equatable {
-    public static let maxPayload = 1200
+    public static let maxPayload = 1192
 
     public var header: MediaHeader
     public var payload: [UInt8]

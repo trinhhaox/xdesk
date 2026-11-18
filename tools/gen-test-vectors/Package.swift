@@ -8,7 +8,10 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "gen-test-vectors",
-            dependencies: [.product(name: "XdeskWire", package: "XdeskKit")]
+            dependencies: [
+                .product(name: "XdeskWire", package: "XdeskKit"),
+                .product(name: "XdeskCrypto", package: "XdeskKit"),
+            ]
         ),
     ]
 )

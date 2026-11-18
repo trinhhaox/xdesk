@@ -120,12 +120,12 @@ import Testing
 
     @Test func packetizerLimits() throws {
         #expect(Packetizer(streamId: 1, maxPayload: 0).maxPayload == 1)
-        #expect(Packetizer(streamId: 1, maxPayload: 99999).maxPayload == 1200)
+        #expect(Packetizer(streamId: 1, maxPayload: 99999).maxPayload == 1192)
         expectWireError("emptyPayload") { _ = try Packetizer(streamId: 1).packetize(frame: [], frameNo: 0, ptsMs: 0) }
         expectWireError("unexpectedPacketType") { _ = try Packetizer(streamId: 1).packetize(frame: [1], frameNo: 0, ptsMs: 0, type: .nack) }
-        let huge = [UInt8](repeating: 0, count: 2048 * 1200 + 1)
+        let huge = [UInt8](repeating: 0, count: 2048 * 1192 + 1)
         expectWireError("fragmentCountTooLarge") { _ = try Packetizer(streamId: 1).packetize(frame: huge, frameNo: 0, ptsMs: 0) }
-        let max = [UInt8](repeating: 0, count: 2048 * 1200)
+        let max = [UInt8](repeating: 0, count: 2048 * 1192)
         #expect(try Packetizer(streamId: 1).packetize(frame: max, frameNo: 0, ptsMs: 0).count == 2048)
     }
 }

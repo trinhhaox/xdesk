@@ -1,6 +1,7 @@
 # Xdesk Wire v1 — Gói media (UDP)
 
-MTU an toàn: payload ≤ **1200 B** (header 16 B + tag AEAD 16 B vẫn dưới MTU 1280 của Tailscale).
+MTU an toàn: payload ≤ **1192 B**. Khi mã hoá (`crypto-handshake.md` §8) gói UDP = header 16 B (rõ, là AD) + nonce 8 B + payload mã hoá + tag 16 B, tối đa **1232 B** =
+1280 (MTU IPv6 tối thiểu) − 40 (IPv6) − 8 (UDP): vừa mọi đường IPv4/IPv6, kể cả qua Tailscale (1280).
 
 ## Header 16 byte
 
@@ -15,7 +16,7 @@ MTU an toàn: payload ≤ **1200 B** (header 16 B + tag AEAD 16 B vẫn dưới 
 | 12 | u32 | `ptsMs` | |
 
 Lỗi: `fragCnt = 0` hoặc `fragIdx ≥ fragCnt` → `invalidFragment`; `fragCnt > 2048` → `fragmentCountTooLarge`;
-payload > 1200 → `payloadTooLarge`; ít hơn 16 byte → `truncated`.
+payload > 1192 → `payloadTooLarge`; ít hơn 16 byte → `truncated`.
 
 | ptype | Gói |
 |---|---|
@@ -39,7 +40,7 @@ Ví dụ stream 3, nonce `0123456789abcdef`: `01 50 0003 00000000 0000 0001 0000
 
 ## Video / audio: phân mảnh
 
-Một access unit (video: AVCC chuyển Annex B khi gửi) cắt thành `ceil(len/1200)` mảnh (tối đa 2048, rỗng không hợp lệ).
+Một access unit (video: AVCC chuyển Annex B khi gửi) cắt thành `ceil(len/1192)` mảnh (tối đa 2048, rỗng không hợp lệ).
 Mọi mảnh của frame giữ nguyên `frameNo`, `ptsMs`, `fragCnt`, cờ keyframe. Mảnh `i` mang byte `[i*max, min((i+1)*max, len))`.
 
 Ví dụ (`maxPayload=16`, frame 40 byte `00 01 … 27`, keyframe, stream 3, frame 42, pts 5000) → 3 gói, gói đầu:
@@ -82,6 +83,16 @@ bỏ frame và gửi `keyframe.request`. Sender giữ mảnh đã gửi để g�
 Payload gói input = 1…42 sự kiện nối nhau; độ dài không chia hết 28 / rỗng / kind lạ / NaN, ∞ / toạ độ ngoài 0…1 → `invalidInput`.
 Sự kiện down/up/key cần tin cậy: người gửi giữ tới khi nhận input-ack. Ví dụ `down` trái tại (0.25, 0.75), mods 8, seq 2:
 `01 01 0008 00000002 3e800000 3f400000 00000000 00000000 0000 0000`.
+
+Ngữ nghĩa theo `kind` (không đổi bố cục byte):
+- `mods` bit: 1 shift, 2 control, 4 option, 8 command, 16 capsLock, 32 fn.
+- `down`/`up`: `button` 0 trái, 1 phải, 2 khác; `dx` = số lần click liên tiếp (0 hiểu là 1); host chỉ nhận `up` của nút đang giữ.
+- `scroll`: `dx`,`dy` = pixel điểm của host, `dy` > 0 nội dung đi xuống; `(0, 0)` = heartbeat (không làm gì, chỉ báo còn sống).
+- `key`: `button` 1 nhấn / 0 nhả; `keyUsage` = HID usage (Keyboard page 0x07).
+- `seq`: down/up/key mang seq tăng dần từ 1 (cần tin cậy); move/scroll/touch để 0. Host áp dụng sự kiện cần tin cậy đúng thứ tự seq,
+  đệm sự kiện đến sớm tối đa 128, bỏ trùng; khoảng trống quá 500 ms bị bỏ qua. Người gửi gửi lại mỗi 100 ms tối đa 3 lần rồi bỏ.
+- Host giới hạn 1000 sự kiện/s/phiên (phần vượt bị bỏ, người gửi sẽ gửi lại nếu là sự kiện tin cậy) và nhả mọi nút/phím đang giữ
+  khi phiên kết thúc hoặc khi đang giữ mà > 1 s không nhận gì: người gửi gửi heartbeat mỗi 250 ms khi còn giữ nút/phím.
 
 **input-ack (0x31)**: payload `u32 seq` = seq lớn nhất nhận liên tục. Ví dụ seq 258 → `00000102`.
 Văn bản Unicode (IME/Telex) không đi qua input UDP mà qua control `input.text`.

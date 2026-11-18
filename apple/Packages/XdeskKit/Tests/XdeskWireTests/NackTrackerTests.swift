@@ -10,7 +10,7 @@ import Testing
     @Test func nacksOnlyAfterDelayAndRespectsRetryInterval() throws {
         var r = Reassembler()
         var t = NackTracker()
-        try partial(0, length: 3600, keep: [0, 2], into: &r, nowMs: 0)
+        try partial(0, length: 1192 * 3, keep: [0, 2], into: &r, nowMs: 0)
         #expect(t.poll(&r, nowMs: 19).nacks.isEmpty)
         #expect(t.poll(&r, nowMs: 20).nacks == [NackEntry(frameNo: 0, fragIdx: 1)])
         #expect(t.poll(&r, nowMs: 30).nacks.isEmpty)
@@ -28,7 +28,7 @@ import Testing
     @Test func capsEntriesPerPacketAndContinuesNextPoll() throws {
         var r = Reassembler()
         var t = NackTracker()
-        try partial(0, length: 1200 * 100, keep: [0], into: &r, nowMs: 0)
+        try partial(0, length: 1192 * 100, keep: [0], into: &r, nowMs: 0)
         let first = t.poll(&r, nowMs: 25).nacks
         #expect(first.count == NackEntry.maxEntries)
         let second = t.poll(&r, nowMs: 26).nacks
@@ -39,7 +39,7 @@ import Testing
     @Test func givesUpAndReportsAbandonedFrames() throws {
         var r = Reassembler()
         var t = NackTracker()
-        try partial(1, length: 2400, keep: [0], into: &r, nowMs: 0)
+        try partial(1, length: 1192 * 2, keep: [0], into: &r, nowMs: 0)
         _ = t.poll(&r, nowMs: 0)
         let poll = t.poll(&r, nowMs: 600)
         #expect(poll.abandoned == [0, 1])
@@ -52,7 +52,7 @@ import Testing
         config.nackDelayMs = 0
         var t = NackTracker(config: config)
         var r = Reassembler()
-        try partial(0, length: 2400, keep: [1], into: &r, nowMs: 0)
+        try partial(0, length: 1192 * 2, keep: [1], into: &r, nowMs: 0)
         #expect(t.poll(&r, nowMs: 0).nacks == [NackEntry(frameNo: 0, fragIdx: 0)])
     }
 }

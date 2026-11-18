@@ -3,7 +3,7 @@ public struct Packetizer: Sendable {
     public let streamId: UInt16
     public let maxPayload: Int
 
-    /// `maxPayload` được kẹp vào 1…1200.
+    /// `maxPayload` được kẹp vào 1…1192.
     public init(streamId: UInt16, maxPayload: Int = MediaPacket.maxPayload) {
         self.streamId = streamId
         self.maxPayload = min(max(maxPayload, 1), MediaPacket.maxPayload)

@@ -8,14 +8,14 @@ Noise Protocol Framework rev 34, RFC 8439, RFC 7748, H.264 Annex B / AVCC.
 | Kênh | Transport | Nội dung | Định dạng |
 |---|---|---|---|
 | Control | TCP, tin cậy | bắt tay, cấu hình, thống kê, clipboard, ping | frame `len\|kind\|payload`, payload JSON (xem `framing.md`, `control-messages.md`) |
-| Media | UDP (hoặc đóng trong TCP frame `0x04`) | video, audio, input, input-ack, NACK, probe | header 16 B + payload ≤ 1200 B (xem `media-packets.md`) |
+| Media | UDP (hoặc đóng trong TCP frame `0x04`) | video, audio, input, input-ack, NACK, probe | header 16 B + payload ≤ 1192 B (xem `media-packets.md`) |
 
 Mã hoá: mọi frame sau handshake là AEAD (xem `crypto-handshake.md`). Chế độ `dev-plaintext` chỉ bật ở build Debug.
 
 ## Quy ước chung
 
 - Mọi số nguyên và float: **big-endian** (network order). Float là IEEE-754 binary32.
-- Giới hạn cứng (vượt → lỗi, không bao giờ crash): `len` ≤ 1 MiB; `fragCnt` ≤ 2048; payload UDP ≤ 1200 B;
+- Giới hạn cứng (vượt → lỗi, không bao giờ crash): `len` ≤ 1 MiB; `fragCnt` ≤ 2048; payload UDP ≤ 1192 B;
   danh sách NACK ≤ 64; chunk `bulk` ≤ 64 KiB; `input.text` ≤ 4096 byte UTF-8; batch input ≤ 42 sự kiện.
 - Không trường nào chứa đường dẫn file hay lệnh thực thi.
 - Bộ giải mã chỉ báo lỗi có kiểu (mã lỗi ở bảng dưới); lỗi ở kênh TCP → đóng kết nối.

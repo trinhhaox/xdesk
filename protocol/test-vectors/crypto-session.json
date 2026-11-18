@@ -1,0 +1,242 @@
+{
+  "datagram" : {
+    "headerHex" : "011000030000002a0000800300001388",
+    "key" : "09be02818872ad8e1c1e28ac6cee28a49c410097c1f457a398d3aa8d2b65d2af",
+    "note" : "datagram = header | nonce u64 BE (epoch<<32|counter) | ciphertext | tag; AD = header; nonce12 = 4×00 | nonce u64 LE; rekeysBefore = số lần sender.rekey() trước khi seal; bên nhận chấp nhận epoch mới hơn 1…4 (dẫn xuất thử), 5+ → unknownEpoch",
+    "packets" : [
+      {
+        "datagramHex" : "011000030000002a000080030000138800000000000000009f587ea16424ffe91670172d3693f53e1bf4a0d3fda347",
+        "epoch" : 0,
+        "name" : "epoch0-counter0",
+        "payloadHex" : "6672616d652d30",
+        "rekeysBefore" : 0
+      },
+      {
+        "datagramHex" : "011000030000002a00008003000013880000000000000001e72a453542b750cd048b3105c25e9e5d",
+        "epoch" : 0,
+        "name" : "epoch0-counter1-empty",
+        "payloadHex" : "",
+        "rekeysBefore" : 0
+      },
+      {
+        "datagramHex" : "011000030000002a000080030000138800000001000000000723867cac40f5422a46cd0c16185e2e18c0581652c6ef5bd15553",
+        "epoch" : 1,
+        "name" : "epoch1-counter0",
+        "payloadHex" : "61667465722d72656b6579",
+        "rekeysBefore" : 1
+      },
+      {
+        "datagramHex" : "011000030000002a000080030000138800000003000000000b066f2f9da4656b45e2443d23a2a19da80cbe3d3ce7",
+        "epoch" : 3,
+        "name" : "epoch3-counter0",
+        "payloadHex" : "6a756d702d32",
+        "rekeysBefore" : 2
+      },
+      {
+        "datagramHex" : "011000030000002a00008003000013880000000300000001ea8079aa8cd94b48711a74e4c6a7eac5e432793bc109b309a7",
+        "epoch" : 3,
+        "name" : "epoch3-counter1",
+        "payloadHex" : "6f6c642d65706f6368",
+        "rekeysBefore" : 0
+      },
+      {
+        "datagramHex" : "011000030000002a00008003000013880000000600000000f599ff155a5c1fb2032232e1755e707a634ddf130d4d17ac9a06b4323f69824e",
+        "epoch" : 6,
+        "name" : "epoch6-counter0",
+        "payloadHex" : "646572697665642d70726576696f7573",
+        "rekeysBefore" : 3
+      },
+      {
+        "datagramHex" : "011000030000002a00008003000013880000000700000000603027fa9d19b9e56c44432ecd762144859dd8aa622a",
+        "epoch" : 7,
+        "name" : "epoch7-counter0",
+        "payloadHex" : "6a756d702d34",
+        "rekeysBefore" : 1
+      },
+      {
+        "datagramHex" : "011000030000002a00008003000013880000000c00000000ebe669e522ed656a5149df0d2bbb597dafa651d66bd7",
+        "epoch" : 12,
+        "name" : "epoch12-counter0",
+        "payloadHex" : "6a756d702d35",
+        "rekeysBefore" : 5
+      }
+    ],
+    "receiveScript" : [
+      {
+        "name" : "ok",
+        "packet" : 0,
+        "payloadHex" : "6672616d652d30",
+        "result" : "ok"
+      },
+      {
+        "name" : "duplicate",
+        "packet" : 0,
+        "result" : "replayed"
+      },
+      {
+        "name" : "ok-advances-epoch",
+        "packet" : 2,
+        "payloadHex" : "61667465722d72656b6579",
+        "result" : "ok"
+      },
+      {
+        "name" : "ok-late-previous-epoch",
+        "packet" : 1,
+        "payloadHex" : "",
+        "result" : "ok"
+      },
+      {
+        "name" : "duplicate-after-rekey",
+        "packet" : 2,
+        "result" : "replayed"
+      },
+      {
+        "name" : "ok-forward-jump-2-epochs",
+        "packet" : 3,
+        "payloadHex" : "6a756d702d32",
+        "result" : "ok"
+      },
+      {
+        "name" : "ok-forward-jump-4-epochs",
+        "packet" : 6,
+        "payloadHex" : "6a756d702d34",
+        "result" : "ok"
+      },
+      {
+        "name" : "ok-late-derived-previous-epoch",
+        "packet" : 5,
+        "payloadHex" : "646572697665642d70726576696f7573",
+        "result" : "ok"
+      },
+      {
+        "name" : "epoch-older-than-previous",
+        "packet" : 4,
+        "result" : "unknownEpoch"
+      },
+      {
+        "name" : "forward-jump-5-too-far",
+        "packet" : 7,
+        "result" : "unknownEpoch"
+      }
+    ]
+  },
+  "handshakeEnvelope" : {
+    "frames" : [
+      {
+        "hex" : "000101",
+        "name" : "begin-xx"
+      },
+      {
+        "hex" : "000102",
+        "name" : "begin-xxpsk3"
+      },
+      {
+        "hex" : "000103",
+        "name" : "begin-ik"
+      },
+      {
+        "hex" : "01808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f",
+        "name" : "commit"
+      },
+      {
+        "hex" : "02aabb",
+        "name" : "noise"
+      }
+    ],
+    "payloads" : [
+      {
+        "hex" : "010000034d6163",
+        "name" : "Mac",
+        "role" : 0,
+        "sasNonceHex" : ""
+      },
+      {
+        "hex" : "0101010469506164707172737475767778797a7b7c7d7e7f",
+        "name" : "iPad",
+        "role" : 1,
+        "sasNonceHex" : "707172737475767778797a7b7c7d7e7f"
+      }
+    ]
+  },
+  "note" : "Khoá thử nghiệm cố định; vai initiator. Responder hoán đổi send/receive.",
+  "pairing" : {
+    "addresses" : [
+      "192.168.1.5:7878",
+      "[fe80::1]:7878"
+    ],
+    "fingerprint" : "00E9-8867-7EEC-F94C",
+    "hostPublicKey" : "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebf",
+    "token" : "c0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedf",
+    "uri" : "xdesk://pair?h=oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8&t=wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t8&a=192.168.1.5:7878&a=%5Bfe80::1%5D:7878"
+  },
+  "sas" : {
+    "code" : 880655,
+    "commitment" : "8ef77d6f27ac3c7c79ad403ff90f6402ae2ab62cc3d095a4823fefa1f0a5cbdc",
+    "display" : "880 655",
+    "ephemeral" : "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+    "formatCases" : [
+      {
+        "code" : 0,
+        "display" : "000 000"
+      },
+      {
+        "code" : 7,
+        "display" : "000 007"
+      },
+      {
+        "code" : 123456,
+        "display" : "123 456"
+      },
+      {
+        "code" : 999999,
+        "display" : "999 999"
+      }
+    ],
+    "messageTwoHash" : "6162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f80",
+    "nonce" : "4142434445464748494a4b4c4d4e4f50",
+    "static" : "2122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40"
+  },
+  "sessionKeys" : {
+    "handshakeHash" : "909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeaf",
+    "initiator" : {
+      "tcpReceive" : "278126e2b3f0c9ea8754efa2f0003081115682c0ddfc5c53ea56a2c83a9db335",
+      "tcpSend" : "46d8ee0cc950840f4055aa34c5391da3977634dee7571c2cb58bc176b43b9e09",
+      "udpReceive" : "85ac65728e1200e8aef672ad29f756c29d465a3e0c277e0f3e2ab3e937c6be6c",
+      "udpSend" : "09be02818872ad8e1c1e28ac6cee28a49c410097c1f457a398d3aa8d2b65d2af"
+    },
+    "initiatorToResponder" : "101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f",
+    "responderToInitiator" : "505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f"
+  },
+  "stream" : {
+    "frames" : [
+      {
+        "ciphertextHex" : "2e52c090a88814b8ed5da513b0cff48508699d02982c77cf11111f48147fd2067ae13cb668efeb420407593f6cf7162737285dcf63b8a2",
+        "kind" : 2,
+        "name" : "control-ping",
+        "plaintextHex" : "7b226964223a31302c2274223a2270696e67222c227430223a313730303030303030303132337d"
+      },
+      {
+        "ciphertextHex" : "7f8400e3b5d11c15748f81a2de492cd3ed5af4",
+        "kind" : 3,
+        "name" : "bulk",
+        "plaintextHex" : "000102"
+      },
+      {
+        "ciphertextHex" : "05f6ca0e39b72976a3146b622ad02774",
+        "kind" : 4,
+        "name" : "media-over-tcp-empty",
+        "plaintextHex" : ""
+      },
+      {
+        "ciphertextHex" : "cede1a304a69125c59afea030ba6a03d9409811791965c77dd0f0aaf",
+        "kind" : 2,
+        "name" : "control-after-rekey",
+        "plaintextHex" : "7b2274223a22706f6e67227d"
+      }
+    ],
+    "key" : "46d8ee0cc950840f4055aa34c5391da3977634dee7571c2cb58bc176b43b9e09",
+    "note" : "ad = u32 BE(len=1+ciphertext.count) | kind; nonce = số thứ tự frame trong epoch; rekey sau frame 3",
+    "rekeyAfterFrame" : 3
+  },
+  "version" : 1
+}

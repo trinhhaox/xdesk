@@ -1,0 +1,73 @@
+import Foundation
+
+public struct DevicePermissions: Codable, Sendable, Equatable {
+    public var view: Bool
+    public var input: Bool
+    public var clipboard: Bool
+    public var audio: Bool
+
+    /// Thiết bị mới: xem + điều khiển bật; clipboard và âm thanh tắt tới khi người dùng bật.
+    public static let `default` = DevicePermissions(view: true, input: true, clipboard: false, audio: false)
+
+    public init(view: Bool, input: Bool, clipboard: Bool, audio: Bool) {
+        self.view = view
+        self.input = input
+        self.clipboard = clipboard
+        self.audio = audio
+    }
+}
+
+/// Thiết bị đã ghép. JSON: `{id, name, pub (base64url), role, createdAt, lastSeen?, permissions}`.
+public struct PairedDevice: Codable, Sendable, Equatable {
+    /// Dấu vân tay `AB12-CD34-EF56-7890` của `publicKey`.
+    public let id: String
+    public var name: String
+    public let publicKey: [UInt8]
+    public var role: DeviceRole
+    public let createdAt: Date
+    public var lastSeen: Date?
+    public var permissions: DevicePermissions
+
+    public init(
+        name: String, publicKey: [UInt8], role: DeviceRole, createdAt: Date,
+        lastSeen: Date? = nil, permissions: DevicePermissions = .default
+    ) {
+        id = DeviceFingerprint.make(publicKey: publicKey)
+        self.name = name
+        self.publicKey = publicKey
+        self.role = role
+        self.createdAt = createdAt
+        self.lastSeen = lastSeen
+        self.permissions = permissions
+    }
+
+    private enum CodingKeys: String, CodingKey { case id, name, pub, role, createdAt, lastSeen, permissions }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        guard let key = Base64URL.decode(try c.decode(String.self, forKey: .pub)), key.count == 32 else {
+            throw DecodingError.dataCorruptedError(forKey: .pub, in: c, debugDescription: "pub must be 32-byte base64url")
+        }
+        id = DeviceFingerprint.make(publicKey: key)
+        guard try c.decode(String.self, forKey: .id) == id else {
+            throw DecodingError.dataCorruptedError(forKey: .id, in: c, debugDescription: "id does not match pub")
+        }
+        name = try c.decode(String.self, forKey: .name)
+        publicKey = key
+        role = try c.decode(DeviceRole.self, forKey: .role)
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        lastSeen = try c.decodeIfPresent(Date.self, forKey: .lastSeen)
+        permissions = try c.decode(DevicePermissions.self, forKey: .permissions)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(name, forKey: .name)
+        try c.encode(Base64URL.encode(publicKey), forKey: .pub)
+        try c.encode(role, forKey: .role)
+        try c.encode(createdAt, forKey: .createdAt)
+        try c.encodeIfPresent(lastSeen, forKey: .lastSeen)
+        try c.encode(permissions, forKey: .permissions)
+    }
+}

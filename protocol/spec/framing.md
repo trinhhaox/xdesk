@@ -10,12 +10,14 @@
 
 | kind | Tên | Payload |
 |---|---|---|
-| 0x01 | Handshake | dữ liệu Noise (phase 06) |
+| 0x01 | Handshake | `u8 type | body` (begin/commit/noise), xem `crypto-handshake.md` §4 |
 | 0x02 | Control | JSON UTF-8 (xem `control-messages.md`) |
 | 0x03 | Bulk | chunk nhị phân (clipboard ảnh), ≤ 65 536 B |
 | 0x04 | MediaOverTcp | một gói media nguyên vẹn (header + payload, xem `media-packets.md`); dự phòng USB/mạng chặn UDP |
 
 kind khác → `unknownFrameKind`.
+
+Sau bắt tay, payload của `0x02/0x03/0x04` là `ciphertext | tag 16 B` (`len = 1 + plaintext + 16`, AD = `len | kind`), xem `crypto-handshake.md` §7.
 
 ## Quy tắc bộ giải mã luồng
 

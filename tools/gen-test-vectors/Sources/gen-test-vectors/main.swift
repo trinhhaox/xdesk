@@ -10,3 +10,4 @@ let outDir = CommandLine.arguments.count > 1 ? URL(fileURLWithPath: CommandLine.
 write(controlVectors(), to: outDir.appendingPathComponent("control-frames.json"))
 write(mediaVectors(), to: outDir.appendingPathComponent("media-headers.json"))
 write(inputVectors(), to: outDir.appendingPathComponent("input-events.json"))
+write(cryptoVectors(), to: outDir.appendingPathComponent("crypto-session.json"))

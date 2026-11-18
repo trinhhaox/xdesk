@@ -1,20 +1,154 @@
-# Xdesk Wire v1 — Mã hoá và bắt tay (KHUNG — phase 06 hoàn thiện)
+# Xdesk Wire v1 — Mã hoá, bắt tay và ghép đôi
 
-Trạng thái: **khung**, chưa đủ để cài đặt. Phase 06 điền chi tiết và thêm test vectors mật mã.
+Trạng thái: **đầy đủ để cài đặt** (Swift: `apple/Packages/XdeskKit/Sources/XdeskCrypto`; Kotlin: phase 07).
+Vector cho từng byte: `protocol/test-vectors/noise-*.json` (cacophony, công khai) và `crypto-session.json` (của Xdesk, sinh bởi `tools/gen-test-vectors`).
 
-## Quyết định đã chốt
+## 1. Thuật toán
 
-- Bắt tay Noise `XX` (ghép đôi lần đầu) và `IK` (kết nối lại), suite `Noise_*_25519_ChaChaPoly_SHA256`
-  (Noise Protocol Framework rev 34; X25519 RFC 7748; ChaCha20-Poly1305 RFC 8439).
-- Bắt tay đi trong frame TCP `kind 0x01`.
-- Sau bắt tay dẫn xuất hai khoá riêng bằng HKDF: info `"xdesk v1 tcp"` và `"xdesk v1 udp"`.
-- Sau bắt tay mọi frame `0x02/0x03/0x04` và mọi gói UDP là `AEAD(payload)`; chế độ `dev-plaintext` chỉ ở build Debug.
-- UDP: nonce 12 byte = `u32 0 | u64 packetCounter` (big-endian); tag 16 B nối cuối gói; cửa sổ chống replay 1024.
-- Ghép đôi: QR (token 32 B) hoặc so mã 6 số (SAS có commitment).
+- Noise Protocol Framework **rev 34** (noiseprotocol.org), suite `25519_ChaChaPoly_SHA256`: X25519 (RFC 7748), ChaCha20-Poly1305 (RFC 8439), SHA-256, HKDF theo §4.3 của Noise (HMAC-SHA256).
+- Chỉ dùng primitive của CryptoKit/JCA; máy trạng thái Noise tự cài (không có thư viện Noise).
+- **Nonce ChaCha 12 byte** (mọi nơi): `4 byte 0x00 | counter u64 little-endian` (đúng chuẩn Noise). Trường nonce *mang trên đường truyền* (UDP) là `u64 big-endian` như mọi trường wire khác.
+- Kết quả DH toàn số 0 (điểm bậc thấp) → huỷ bắt tay. So sánh token/commitment/tag dùng so sánh thời gian hằng.
 
-## Phase 06 cần chốt
+## 2. Danh tính thiết bị
 
-- Prologue/payload của handshake, định dạng static key lưu Keychain/Keystore.
-- Quy tắc xoay khoá, counter TCP, AAD (có gồm header UDP hay không — đề xuất: có).
-- Vector mật mã (handshake đầy đủ với khoá cố định, AEAD từng gói).
-- Ảnh hưởng tới kích thước: tag 16 B nằm ngoài giới hạn payload 1200 B của `media-packets.md`.
+- Mỗi thiết bị có một khoá tĩnh X25519 (32 byte), sinh lần đầu, **không bao giờ rời thiết bị**. Mac/iOS: Keychain generic password trong **data-protection keychain** (`kSecUseDataProtectionKeychain`, `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`, `kSecAttrSynchronizable=false`; app phải ký bằng Team ID — thiếu entitlement thì thư viện báo `dataProtectionKeychainUnavailable` hoặc, ở chế độ `preferred`, rơi về login keychain cũ và báo qua `backend`). Android: lưu mã hoá bằng khoá Android Keystore (phase 07). Mất khoá = ghép đôi lại.
+- **Fingerprint** = 8 byte đầu `SHA-256(pub)`, hex HOA, nhóm 4 ký tự nối bằng `-`: `AB12-CD34-EF56-7890`. Cũng là `id` của thiết bị đã ghép và giá trị `id` trong TXT Bonjour của host. Ví dụ pub = 32 byte 0 → `6668-7AAD-F862-BD77`.
+- `PairedDevicesStore` (JSON, `schemaVersion` 1): `{schemaVersion, devices:[{id, name, pub (base64url), role: 0 host|1 viewer, createdAt, lastSeen?, permissions:{view,input,clipboard,audio}}], mac}`.
+  `mac` = base64url `HMAC-SHA256(key, "xdesk v1 paired-devices" 0x00 | JSON chuẩn của {schemaVersion, devices})` (JSON chuẩn = bộ mã hoá sortedKeys, ngày ISO-8601 giây; không có trường `mac`), `key` = 32 B ngẫu nhiên trong Keychain cùng lớp truy cập với khoá tĩnh. File sai/thiếu MAC → coi là rỗng, bật cờ `integrityFailure` (fail-closed; UI phải báo). Tra cứu thiết bị luôn theo **khoá công khai đầy đủ 32 B** (so sánh hằng thời gian); `id` 64 bit chỉ để hiển thị. Thêm khoá có `id` trùng nhưng khác khoá → lỗi `deviceIdCollision`. File ghi 0600 (thư mục 0700). Mặc định thiết bị mới: view + input bật, clipboard + audio tắt. File lạ phiên bản hoặc hỏng → báo lỗi, không tự xoá.
+
+## 3. Chọn pattern
+
+Viewer luôn là **initiator**, host là **responder**. Prologue = ASCII `xdesk-wire-v1` (13 byte) cho mọi pattern.
+
+| Tình huống | Pattern | Ràng buộc |
+|---|---|---|
+| Ghép đôi bằng QR (viewer quét màn hình host) | `Noise_XXpsk3_25519_ChaChaPoly_SHA256`, psk = token 32 B của QR | viewer kiểm khoá tĩnh host (từ message 2) = `h` trong QR, sai → huỷ |
+| Ghép đôi so mã (không quét được QR, ví dụ Mac↔Mac) | `Noise_XX_25519_ChaChaPoly_SHA256` + SAS (mục 5) | host chỉ ghi thiết bị sau khi người dùng bấm "Khớp" |
+| Kết nối lại | `Noise_IK_25519_ChaChaPoly_SHA256` | viewer biết khoá host đã ghép; host từ chối khoá không có trong danh sách |
+
+Mọi kết nối Release bắt buộc một trong ba pattern. Không có đường plaintext ngoài `devPlaintext` (chỉ `#if DEBUG`).
+
+## 4. Frame bắt tay (TCP kind 0x01)
+
+Payload frame `0x01` = `u8 type | body` (`HandshakeFrame`):
+
+| type | Tên | Body |
+|---|---|---|
+| 0x00 | begin | `u8 wireMajor=1 | u8 pattern` (1 = XX, 2 = XXpsk3, 3 = IK). Initiator gửi đầu tiên |
+| 0x01 | commit | 32 B cam kết SAS; **chỉ XX**, gửi ngay sau `begin`, trước message 1 |
+| 0x02 | noise | một message Noise (≤ 65 535 B) |
+
+Host bác `begin` có `wireMajor` khác 1 hoặc pattern lạ, và bác mọi frame sai thứ tự/ sai type → đóng kết nối. Host **không** trả lời trước khi `begin` hợp lệ; XX không bắt đầu xử lý message 1 nếu chưa có `commit`. Timeout toàn bộ bắt tay: 30 s. Host giới hạn 4 bắt tay chưa xác thực đồng thời.
+
+Ví dụ `begin` XXpsk3: `000102` (payload frame 0x01 → `00000004 01 000102`).
+
+### Payload ứng dụng trong message Noise (`HandshakePayload`)
+
+`u8 ver=1 | u8 role (0 host, 1 viewer) | u8 flags (bit0 = có nonce SAS) | u8 nameLen (≤ 64) | name UTF-8 | [16 B sasNonce nếu bit0]`.
+Độ dài phải khớp tuyệt đối, UTF-8 hợp lệ, flags chưa định nghĩa phải = 0; sai → huỷ.
+
+| Pattern | Message 1 (I→R) | Message 2 (R→I) | Message 3 (I→R) |
+|---|---|---|---|
+| XX | payload rỗng | hello (role host, tên) | hello (role viewer, tên, **sasNonce**) |
+| XXpsk3 | rỗng | hello host | hello viewer (không nonce) |
+| IK | hello viewer (mã hoá dưới `es`) | hello host | — (2 message) |
+
+Message 1 của XX/XXpsk3 không được mã hoá nên payload phải rỗng; **cả bên viết lẫn bên đọc** từ chối payload khác rỗng (`invalidHandshakePayload`).
+
+### Luồng và kiểm tra của host
+
+- **XXpsk3**: host đang hiển thị QR có token hiệu lực mới nhận `begin(XXpsk3)` (không có token hiệu lực → đóng). Dùng `psk = token`. Sau message 3 hợp lệ, host gọi `consume(token)`: thất bại (token đã dùng/hết hạn) → huỷ. Thành công → ghi thiết bị với quyền mặc định. Token chỉ hết hạn/đã dùng khi *thành công*; host nên vô hiệu token sau 5 lần bắt tay hỏng.
+- **XX + SAS**: xem mục 5. Sau message 3 phiên ở trạng thái *tạm* (chỉ cho phép các message control ghép đôi do `control-messages.md` định nghĩa ở phase 06b; chưa có media). Host ghi thiết bị chỉ khi người dùng bấm "Khớp".
+- **IK**: sau message 1 host biết khoá tĩnh viewer; không có trong danh sách → đóng TCP, không trả lời (không lộ gì). Có → chạy tiếp, áp dụng quyền đã lưu, cập nhật `lastSeen`.
+- Thu hồi thiết bị ở host → đóng ngay mọi phiên của `id` đó; kết nối lại bị IK từ chối.
+
+Viewer: IK tới host mà khoá đã đổi (host cài lại) sẽ bị đóng như "không nhận ra" → UI gợi ý ghép đôi lại; nếu TXT Bonjour `id` của host cùng tên mà khác fingerprint đã lưu → cảnh báo khoá khác, không kết nối.
+
+## 5. SAS — so mã 6 số có cam kết (chỉ XX)
+
+Mục tiêu: người dùng so 6 số trên hai màn hình; kẻ MITM không thể "mài" khoá để hai mã trùng.
+
+**Vấn đề**: SAS 6 số chỉ 2^20 giá trị; nếu kẻ MITM còn chọn được một phần đầu vào của mã *sau khi* thấy mã phía bên kia, nó mài phần đó tới khi hai mã trùng (≈10^6 lần thử, dưới 1 giây nếu cache được mọi thứ trước payload).
+
+**Thiết kế** (kiểu ZRTP/Bluetooth): cam kết nonce trước, mã chỉ phụ thuộc dữ liệu đã chốt trước khi nonce lộ.
+
+1. Initiator sinh `sasNonce` 16 B ngẫu nhiên, ephemeral `e` và có sẵn static `s`.
+2. Gửi `commit = SHA-256("xdesk v1 sas-commit" | e.pub | s.pub | sasNonce)` (ASCII nhãn + 32 + 32 + 16 B) trong frame `commit`, **trước** message 1.
+3. Chạy XX; `sasNonce` đi trong payload message 3 (mã hoá). Mỗi bên lưu `h2` = handshake hash **ngay sau message 2** (bên viết message 2 lưu sau khi viết, bên đọc lưu sau khi đọc; hai giá trị bằng nhau). Thư viện: `NoiseHandshakeState.messageTwoHash`.
+4. Sau message 3, responder dựng lại commit từ `e` (message 1), `s` (message 3), `sasNonce` và so sánh thời gian hằng với commit đã nhận; lệch → huỷ (`commitment mismatch`).
+5. Mỗi bên tính `code = u64_BE(HKDF-SHA256(ikm = sasNonce, salt = h2 (32 B), info = "xdesk v1 sas", 8 B)) mod 1 000 000`, hiển thị `NNN NNN` (đệm số 0 đầu). **Không** dùng hash sau message 3: payload message 3 (tên thiết bị…) do initiator chọn tự do và không được cam kết nên không được ảnh hưởng mã.
+
+**Lý do chống MITM** (M = kẻ giữa, I = viewer, R = host). Mã phía R là `f(n_M, h2_R)`. `n_M` bị khoá bởi commit *trước khi* R gửi message 2; `h2_R` chứa `e_R` ngẫu nhiên của R nên M không biết/không chọn được khi cam kết, và sau message 2 mọi thứ trong `h2_R` đã chốt, nội dung message 3 không đổi được mã (test hồi quy: đổi payload message 3 → mã không đổi). Mã phía I là `f(n_I, h2_I)` với `n_I` chỉ lộ ở message 3, tức sau khi M đã chốt message 2 của nó, nên với M `code_I` đồng đều ngẫu nhiên. Vậy M thắng với xác suất ≤ 10^-6 mỗi lần thử, không mài được. (Phiên bản trước dùng hash sau message 3 và bị phá: M mài tên thiết bị trong message 3 tới khi `code_R = code_I`, xem báo cáo rà soát 261119.) Mỗi lần thử hỏng người dùng thấy hai mã khác nhau và bấm "Không khớp"; host giới hạn 3 lần ghép SAS hỏng / 10 phút.
+
+Chỉ initiator cam kết; responder không cần vì mọi đóng góp của R vào `h2` (gồm `e_R`) đã có trước khi initiator lộ nonce.
+
+## 6. Dẫn xuất khoá phiên
+
+Sau message cuối, `split()` của Noise cho `k1` (initiator→responder) và `k2` (responder→initiator). `h` = handshake hash. Bốn khoá, mỗi khoá `HKDF-SHA256(ikm, salt = h, info, 32 B)`:
+
+| Khoá | ikm | info (ASCII) |
+|---|---|---|
+| TCP i→r | k1 | `xdesk v1 tcp i2r` |
+| TCP r→i | k2 | `xdesk v1 tcp r2i` |
+| UDP i→r | k1 | `xdesk v1 udp i2r` |
+| UDP r→i | k2 | `xdesk v1 udp r2i` |
+
+Initiator gửi bằng `i2r` và nhận bằng `r2i`; responder ngược lại. TCP và UDP không bao giờ dùng chung khoá; mỗi hướng một khoá. Khoá Noise thô `k1/k2` không dùng trực tiếp.
+
+**Rekey** (một chiều): `K' = HKDF-SHA256(ikm = K, salt = rỗng, info = "xdesk v1 rekey", 32 B)`.
+
+## 7. Kênh TCP sau bắt tay
+
+Frame `0x02/0x03/0x04` mã hoá. Khung vẫn là `len | kind | payload` (`framing.md`) nhưng `payload = ciphertext | tag 16 B`:
+
+- `len = 1 + plaintext + 16`, vẫn ≤ 1 048 576 → plaintext tối đa 1 048 559 B; bulk ≤ 65 536 B giữ nguyên (tính trên plaintext).
+- Nonce = bộ đếm frame u64 mỗi hướng, bắt đầu 0, tăng sau mỗi frame (kể cả `0x04`); không mang trên đường truyền (TCP có thứ tự).
+- **AD = `u32 len BE | u8 kind`** nên kind và độ dài được xác thực.
+- Frame `0x01` không còn hợp lệ sau bắt tay; frame `0x01` sau đó → đóng.
+- `MediaOverTcp (0x04)` chứa nguyên gói media (header + payload) được mã hoá bằng khoá TCP, **không** dùng khoá UDP.
+- Giải mã lỗi (tag sai, thứ tự sai) → đóng kết nối ngay, vì luồng không thể đồng bộ lại.
+- **Rekey TCP** (mỗi hướng độc lập): bên gửi gửi control `{"t":"rekey"}` (định nghĩa ở phase 06b) là frame cuối dưới khoá cũ rồi đổi khoá gửi (nonce về 0); bên nhận sau khi giải mã `rekey` đổi khoá nhận. Kích hoạt mỗi ≥ 1 giờ (và không để nonce tới 2^63).
+
+## 8. Gói UDP sau bắt tay
+
+```
++----------------+-----------------+-----------------+----------+
+| header 16 B    | nonce u64 BE    | ciphertext      | tag 16 B |
+| (rõ, là AD)    | epoch<<32|ctr   | = len(payload)  |          |
++----------------+-----------------+-----------------+----------+
+```
+
+- Header media (`media-packets.md`) **không mã hoá** và là AD → không sửa được; payload mã hoá. Tổng thêm `8 + 16 = 24` byte; datagram tối đa `16 + 1192 + 24 = 1232` B (vừa MTU IPv6 tối thiểu, `media-packets.md`).
+- `nonce = epoch u32 << 32 | counter u32`; counter đếm từ 0 mỗi epoch, tăng cho **mọi gói gửi**. Gói gửi lại (đáp NACK) phải **mã hoá lại** với counter mới, không gửi lại cùng byte (sẽ bị coi là replay).
+- Bên nhận kiểm theo thứ tự: độ dài ≥ 40; chọn epoch (hiện tại, ngay trước, hoặc 1…**4** epoch mới hơn, xem dưới; khác → `unknownEpoch`); **cửa sổ replay 1024** theo counter của epoch đó (bitmap; trùng → `replayed`, cũ hơn `highest − 1023` → `outsideReplayWindow`); giải mã AEAD với AD = header; **chỉ khi thành công** mới đánh dấu cửa sổ/ chuyển epoch. Gói tag sai không đốt counter.
+- Epoch mới hơn `e + k` (`1 ≤ k ≤ 4`) mở được ngay: bên nhận dẫn xuất thử `rekey^k(K_e)`, giải mã AEAD, và **chỉ khi tag đúng** mới chuyển sang epoch đó (cửa sổ replay mới) và giữ epoch ngay trước nó (`e + k − 1`, cửa sổ mới nếu `k ≥ 2`) cho gói đến muộn; epoch cũ hơn nữa bị bỏ. Vậy bên gửi im lặng rekey theo giờ hoặc mất cả epoch vẫn được bên nhận theo kịp sau tối đa 3 epoch bị bỏ qua. Nhảy `k ≥ 5` → `unknownEpoch` và không thể tự phục hồi: tầng phiên phải đồng bộ qua kênh control TCP (thông điệp resync định nghĩa ở phase 06b) hoặc đóng phiên. Chi phí DoS của gói giả epoch xa chỉ ≤ 4 HKDF + 1 AEAD, không đổi trạng thái.
+- **Rekey UDP**: bên gửi tự quyết, gọi `rekey()` khi `needsRekey` (≥ 2^32 − 65 536 gói trong epoch **hoặc** epoch sống ≥ 3600 s); cứng: refuse gửi ở 2^32 gói/epoch. Bên nhận tự theo kịp khi thấy gói epoch mới xác thực được — không cần message control cho UDP.
+- Gói UDP mã hoá tối thiểu 40 B; ngắn hơn → bỏ.
+
+## 9. Mã QR ghép đôi
+
+`xdesk://pair?h=<b64url host pub>&t=<b64url token>&a=<host:port>[&a=<host:port>…]`
+
+- `h`: 32 B khoá tĩnh host; `t`: token 32 B (cũng là psk); base64url **không đệm** (RFC 4648 §5). `a`: 1…4 địa chỉ ứng viên `host:port` (IPv6 dạng `[addr]:port`, nên %-encode `[` `]`), thứ tự ưu tiên. Mỗi địa chỉ phải đúng cú pháp: IPv4 chấm thập phân, `[IPv6]` (không zone `%`), hoặc hostname RFC 1123 (nhãn 1…63 ký tự `[A-Za-z0-9-]`, không đầu/cuối `-`, tổng ≤ 253, nhãn cuối không thuần số); cổng chỉ chữ số, 1…65535; tổng ≤ 255 B; sai một địa chỉ → từ chối cả URI. Tham số lạ bỏ qua; trùng `h`/`t`, thiếu, sai độ dài, scheme/host khác `xdesk`/`pair`, có path → từ chối.
+- Token: 32 B từ RNG hệ thống, **hết hạn 2 phút**, một tại một thời điểm (phát token mới vô hiệu token cũ), dùng một lần, không log. Ví dụ trong `crypto-session.json` → `pairing`.
+
+## 10. Xử lý lỗi và giới hạn
+
+| Tình huống | Hành động |
+|---|---|
+| Lỗi giải mã TCP (bất kỳ) | đóng kết nối |
+| Lỗi UDP: tag sai, `unknownEpoch`, quá ngắn | bỏ gói, đếm; **> 50 lỗi trong 1 giây** → đóng phiên. Replay/ quá cũ không tính |
+| Bắt tay lỗi (auth, DH, payload, commit, khoá không khớp QR) | đóng TCP; không gửi chi tiết cho đối tác |
+| Hết nonce (2^64 − 1 TCP, 2^32 mỗi epoch UDP) | đóng/ rekey; không bao giờ lặp nonce |
+
+Mọi lỗi mật mã là `CryptoError` (Swift), kể cả điểm bậc thấp (CryptoKit tự ném → gói thành `invalidDiffieHellman`; kiểm DH toàn số 0 vẫn bắt buộc cho cổng Kotlin/JCA); không log khoá, nonce, token, psk, hash.
+
+## 11. Ghi chú Android (phase 07)
+
+JCA cần: X25519 (`XDH`), ChaCha20-Poly1305, HMAC-SHA256, SHA-256, HKDF tự cài trên HMAC. Phải kiểm API tối thiểu trên JP1; nếu thiếu thì dùng thư viện đã kiểm định (Tink/BouncyCastle — hỏi user). Kotlin phải chạy xanh `noise-*.json`, `crypto-session.json`.
+
+## 12. Điểm còn mở
+
+- MTU đã giải quyết: `maxPayload` = 1192 → datagram mã hoá ≤ 1232 B (đủ IPv6 1280).
+- Tên message control (`rekey`, xác nhận SAS) chốt ở 06b trong `control-messages.md`.
