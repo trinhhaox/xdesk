@@ -1,12 +1,8 @@
 import Foundation
 import Observation
 import XdeskTransport
+import XdeskViewer
 import XdeskWire
-
-enum ViewerTarget: Sendable {
-    case discovered(DiscoveredHost)
-    case manual(host: String, port: UInt16)
-}
 
 /// Danh sách host Bonjour + vòng đời kết nối viewer (một cửa sổ video tại một thời điểm).
 @MainActor
@@ -40,17 +36,10 @@ final class ViewerController {
         browseTask = nil
     }
 
-    /// `host:port` (IPv4/tên miền). Trả `nil` nếu sai định dạng.
-    static func parseManual(_ text: String) -> ViewerTarget? {
-        let parts = text.trimmingCharacters(in: .whitespaces).split(separator: ":", omittingEmptySubsequences: false)
-        guard parts.count == 2, !parts[0].isEmpty, let port = UInt16(parts[1]), port > 0 else { return nil }
-        return .manual(host: String(parts[0]), port: port)
-    }
-
     func connect(to target: ViewerTarget, title: String) async {
         guard session == nil else { return }
         errorMessage = nil
-        let session = ViewerSession()
+        let session = ViewerSession(security: AppSecurity.current, deviceName: HostIdentity.displayName)
         self.session = session
         await session.connect(to: target, config: displayConfig())
         guard case .streaming = session.state else {

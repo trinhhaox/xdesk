@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import XdeskMedia
+import XdeskViewer
 
 /// Cửa sổ hiển thị luồng video của một `ViewerSession` (AVSampleBufferDisplayLayer). Đóng cửa sổ = ngắt kết nối.
 @MainActor

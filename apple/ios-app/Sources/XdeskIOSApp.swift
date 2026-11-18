@@ -2,16 +2,28 @@ import SwiftUI
 
 @main
 struct XdeskIOSApp: App {
+    @State private var model = StreamViewModel()
+    @Environment(\.scenePhase) private var scenePhase
+
     var body: some Scene {
         WindowGroup {
-            VStack(spacing: 12) {
-                Image(systemName: "display.2")
-                    .font(.system(size: 56))
-                Text("Xdesk")
-                    .font(.largeTitle.bold())
-                Text("Chưa kết nối máy Mac nào")
-                    .foregroundStyle(.secondary)
+            Group {
+                if model.inStream { StreamView(model: model) } else { HostListView(model: model) }
             }
+            .onChange(of: model.session.state) { _, state in
+                UIApplication.shared.isIdleTimerDisabled = state == .streaming || state == .connecting
+                model.failIfNeeded()
+            }
+            .onChange(of: scenePhase) { _, phase in
+                switch phase {
+                case .background: Task { await model.enterBackground() }
+                case .active: Task { await model.enterForeground() }
+                default: break
+                }
+            }
+            #if DEBUG
+            .task { await AutomationHooks.run(model) }
+            #endif
         }
     }
 }

@@ -25,15 +25,25 @@ public struct Reject: Codable, Sendable, Equatable {
     public init(reason: String, detail: String? = nil) { self.reason = reason; self.detail = detail }
 }
 
+/// Cách host dùng màn hình viewer: mở rộng (màn hình mới bên cạnh) hoặc bản sao màn hình Mac theo kích thước viewer.
+public enum ScreenMode: String, Codable, Sendable, CaseIterable {
+    case extend
+    case mirror
+}
+
 public struct DisplayConfig: Codable, Sendable, Equatable {
     public var w: UInt32
     public var h: UInt32
     public var scale: Double
     public var fps: UInt32
     public var codec: VideoCodec
-    public init(w: UInt32, h: UInt32, scale: Double, fps: UInt32, codec: VideoCodec) {
-        self.w = w; self.h = h; self.scale = scale; self.fps = fps; self.codec = codec
+    /// Vắng mặt = `extend` (tương thích viewer cũ).
+    public var mode: ScreenMode?
+    public init(w: UInt32, h: UInt32, scale: Double, fps: UInt32, codec: VideoCodec, mode: ScreenMode? = nil) {
+        self.w = w; self.h = h; self.scale = scale; self.fps = fps; self.codec = codec; self.mode = mode
     }
+
+    public var screenMode: ScreenMode { mode ?? .extend }
 }
 
 public struct DisplayReady: Codable, Sendable, Equatable {

@@ -2,6 +2,7 @@
 import AppKit
 import Foundation
 import os
+import XdeskViewer
 
 /// Chỉ build Debug: điều khiển app bằng tham số dòng lệnh để kiểm thử không cần bấm UI.
 ///   --auto-host                 bật host ngay
@@ -47,7 +48,7 @@ enum AutomationHooks {
             log.notice("bonjour hosts: \(viewer.hosts.map(\.name).joined(separator: ","), privacy: .public)")
             target = viewer.hosts.first.map { ViewerTarget.discovered($0) }
         } else {
-            target = ViewerController.parseManual(value)
+            target = ViewerTarget.parse(manual: value)
         }
         guard let target else { log.error("auto-connect: no target for \(value, privacy: .public)"); return }
         await viewer.connect(to: target, title: value)

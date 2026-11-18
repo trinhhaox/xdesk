@@ -25,6 +25,8 @@ targets:
         product: XdeskTransport
       - package: XdeskKit
         product: XdeskMedia
+      - package: XdeskKit
+        product: XdeskViewer
     info:
       path: Sources/Info.plist
       properties:
@@ -39,6 +41,7 @@ targets:
         PRODUCT_NAME: Xdesk
         PRODUCT_BUNDLE_IDENTIFIER: vn.xox.xdesk.ios
         TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: false
 schemes:
   Xdesk-ios:

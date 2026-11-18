@@ -9,7 +9,7 @@ là "unknown" và bỏ qua (tương thích tiến). JSON hỏng / thiếu trư�
 | `hello` | V→H | `ver` string "1.0", `caps` u32, `name` string | |
 | `welcome` | H→V | `ver`, `sessionId` string, `caps` (giao) u32 | |
 | `reject` | cả hai | `reason` string ("version"…), `detail` string? | |
-| `display.config` | V→H | `w`,`h` u32, `scale` number, `fps` u32, `codec` "h264"\|"hevc" | w,h 1…16384; fps 1…240; scale (0,8] |
+| `display.config` | V→H | `w`,`h` u32, `scale` number, `fps` u32, `codec` "h264"\|"hevc", `mode` "extend"\|"mirror"? (vắng = extend; mirror = màn hình Mac phản chiếu màn hình ảo theo kích thước viewer) | w,h 1…16384; fps 1…240; scale (0,8] |
 | `display.ready` | H→V | `udpPort` u16, `streamId` u16 | udpPort ≠ 0 |
 | `keyframe.request` | V→H | `streamId` u16 | |
 | `net.report` | V→H | `rttMs`,`lossPermille`,`jitterMs`,`recvKbps` u32 | lossPermille ≤ 1000 |

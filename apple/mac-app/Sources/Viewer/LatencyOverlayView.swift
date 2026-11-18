@@ -1,4 +1,5 @@
 import AppKit
+import XdeskViewer
 
 /// Lớp phủ đo độ trễ (tool `latency-probe`): vạch xanh lá + 32 ô bit của (giờ host ước lượng) tại mỗi nhịp màn hình.
 /// Đặt cạnh hình probe của host (vạch tím + 32 ô bit) trong cùng một ảnh chụp → hiệu hai mã = độ trễ glass-to-glass.

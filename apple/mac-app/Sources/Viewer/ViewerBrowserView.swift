@@ -1,5 +1,6 @@
 import SwiftUI
 import XdeskTransport
+import XdeskViewer
 
 /// Cửa sổ chọn host: danh sách Bonjour + nhập tay `host:port`.
 struct ViewerBrowserView: View {
@@ -23,7 +24,7 @@ struct ViewerBrowserView: View {
                 TextField("host:port, ví dụ 127.0.0.1:47800", text: $manualText)
                     .onSubmit(connectManual)
                 Button("Kết nối", action: connectManual)
-                    .disabled(ViewerController.parseManual(manualText) == nil || controller.isConnecting)
+                    .disabled(ViewerTarget.parse(manual: manualText) == nil || controller.isConnecting)
             }
             Section("Tuỳ chọn") {
                 Toggle("Retina (HiDPI 2×, 3840×2400)", isOn: $controller.options.retina)
@@ -39,7 +40,7 @@ struct ViewerBrowserView: View {
     }
 
     private func connectManual() {
-        guard let target = ViewerController.parseManual(manualText) else { return }
+        guard let target = ViewerTarget.parse(manual: manualText) else { return }
         connect(target, title: manualText)
     }
 

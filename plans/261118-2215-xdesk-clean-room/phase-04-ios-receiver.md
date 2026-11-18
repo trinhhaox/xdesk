@@ -39,6 +39,8 @@
 - [ ] Xoay màn hình
 - [ ] Đo latency + pin trên iPad/iPhone
 
+Ghi chú 19/11 (code xong, chưa tick vì chưa kiểm bằng mắt/tay): build+ký+cài iPhone 14 Pro Max OK; `--auto-connect` nhận ~45 fps 1290×2796, RTT ~5 ms (Wi-Fi). Chưa kiểm: hiển thị thực, xoay máy, nền/foreground, màn hướng dẫn Local Network, iPad, pin. Host chưa đổi mode giữa phiên → xoay = mở lại phiên với display.config mới.
+
 ## Success criteria
 - iPad thật hiển thị màn hình mở rộng của Mac, kéo cửa sổ sang iPad mượt, chữ sắc ở scale 2×.
 - Khoá iPad 10 s rồi mở → hình trở lại ≤ 2 s.
