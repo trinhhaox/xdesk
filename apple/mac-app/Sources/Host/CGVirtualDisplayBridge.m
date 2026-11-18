@@ -77,10 +77,12 @@ static NSError *XDFail(NSString *message) {
 
     Class modeClass = NSClassFromString(@"CGVirtualDisplayMode");
     NSMutableArray *modes = [NSMutableArray array];
+    // HiDPI: chỉ đưa mode 2× (điểm = điểm ảnh / 2). Nếu kèm mode 1× gốc, macOS chọn mode 1× và chữ trên viewer rất nhỏ.
     if (hiDPI) {
         [modes addObject:[[modeClass alloc] initWithWidth:pixelWidth / 2 height:pixelHeight / 2 refreshRate:refreshRate]];
+    } else {
+        [modes addObject:[[modeClass alloc] initWithWidth:pixelWidth height:pixelHeight refreshRate:refreshRate]];
     }
-    [modes addObject:[[modeClass alloc] initWithWidth:pixelWidth height:pixelHeight refreshRate:refreshRate]];
     CGVirtualDisplaySettings *settings = [[NSClassFromString(@"CGVirtualDisplaySettings") alloc] init];
     settings.hiDPI = hiDPI ? 1 : 0;
     settings.modes = modes;

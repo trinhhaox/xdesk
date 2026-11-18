@@ -69,7 +69,8 @@ actor HostSession {
         let width = Int(config.w), height = Int(config.h)
         let hiDPI = config.scale >= 2
         let acquired = await provider.acquire(VirtualDisplaySpec(
-            pixelWidth: width, pixelHeight: height, refreshRate: Double(config.fps), hiDPI: hiDPI
+            pixelWidth: width, pixelHeight: height, refreshRate: Double(config.fps), hiDPI: hiDPI,
+            mirrorsMac: config.screenMode == .mirror
         ))
         if let reason = acquired.fallbackReason { log.notice("fallback \(acquired.mode == .mirror ? "mirror" : "extend", privacy: .public): \(reason, privacy: .public)") }
         let settings = EncoderSettings(width: width, height: height, fps: Int(config.fps), bitrateKbps: Self.initialBitrateKbps, codec: config.codec)

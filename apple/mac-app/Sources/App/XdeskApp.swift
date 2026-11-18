@@ -16,8 +16,11 @@ struct XdeskApp: App {
     }
 
     init() {
+        // Bật chia sẻ ngay khi mở app để điện thoại tìm thấy Mac mà không cần vào menu.
+        let host = host
+        Task { @MainActor in await host.start() }
         #if DEBUG
-        let host = host, viewer = viewer
+        let viewer = viewer
         Task { @MainActor in await AutomationHooks.run(host: host, viewer: viewer) }
         #endif
     }

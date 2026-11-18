@@ -7,6 +7,9 @@ struct MenuBarContent: View {
 
     var body: some View {
         Text(statusText)
+        if case .listening(let port) = host.status, let ip = LocalAddress.primaryIPv4() {
+            Text("Nhập trên điện thoại: \(ip):\(port)")
+        }
         Divider()
         Button(host.isHosting ? "Dừng chia sẻ màn hình" : "Bắt đầu chia sẻ màn hình") {
             Task { host.isHosting ? await host.stop() : await host.start() }

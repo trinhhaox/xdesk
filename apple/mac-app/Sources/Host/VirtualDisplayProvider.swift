@@ -13,6 +13,8 @@ struct VirtualDisplaySpec: Sendable, Equatable {
     var pixelHeight: Int
     var refreshRate: Double
     var hiDPI: Bool
+    /// Bản sao: màn hình Mac phản chiếu màn hình ảo (desktop đổi theo kích thước viewer) thay vì mở rộng sang phải.
+    var mirrorsMac = false
 }
 
 /// Màn hình ảo đang sống; huỷ (deinit) = màn hình biến mất.
@@ -85,7 +87,12 @@ struct CGVirtualDisplayBackend: VirtualDisplayBackend {
             withName: spec.name, pixelWidth: UInt(spec.pixelWidth), pixelHeight: UInt(spec.pixelHeight),
             refreshRate: spec.refreshRate, hiDPI: spec.hiDPI
         )
-        try DisplayArrangement.extendRight(newDisplay: display.displayID)
+        if spec.hiDPI { DisplayArrangement.applyRetinaMode(display.displayID, pixels: (spec.pixelWidth, spec.pixelHeight)) }
+        if spec.mirrorsMac {
+            try DisplayArrangement.mirrorMac(onto: display.displayID)
+        } else {
+            try DisplayArrangement.extendRight(newDisplay: display.displayID)
+        }
         return RealVirtualDisplay(display: display)
     }
 }
