@@ -9,8 +9,10 @@ extension ViewerSession {
     func readControl(_ conn: ControlConnection) async {
         do {
             while let inbound = try await conn.nextInbound() {
+                if case .bulk(let chunk) = inbound { await clipboardSync?.handleBulk(chunk); continue }
                 guard case .message(let envelope) = inbound else { continue }
                 switch envelope.message {
+                case .clipOffer, .clipPull, .clipData: await clipboardSync?.handle(envelope.message)
                 case .pong(let pong): updateClock(ClockSample(pong: pong, receivedAtMs: ClockSync.wallClockMs()))
                 case .bye(let bye): throw TransportError.rejected(reason: "bye", detail: bye.reason)
                 case .reject(let reject) where reject.reason == Reject.reasonRevoked:

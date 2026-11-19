@@ -1,5 +1,6 @@
 import Observation
 import UIKit
+import XdeskClipboard
 import XdeskCrypto
 import XdeskTransport
 import XdeskViewer
@@ -33,6 +34,11 @@ final class StreamViewModel {
     var isPairing = false
     /// Mac đã ghép vừa từ chối kết nối (thường do đã thu hồi): danh sách hỏi có ghép đôi lại không.
     var refusedHost: RefusedHost?
+    var manualHosts: [ManualHost] = []
+    var manualHostError: String?
+    /// Kết quả lần bấm "Gửi clipboard sang Mac" gần nhất (toast).
+    var clipboardNotice: String?
+    @ObservationIgnored let manualStore: Result<ManualHostStore, any Error>
 
     struct RefusedHost: Identifiable {
         let target: ViewerTarget
@@ -49,18 +55,21 @@ final class StreamViewModel {
     @ObservationIgnored private lazy var orientation = OrientationObserver { [weak self] _ in self?.screenSettled() }
 
     init() {
+        manualStore = Result { try ManualHostStore.openDefault() }
+        // iOS chỉ đọc UIPasteboard khi người dùng bấm nút (tránh banner "đã dán từ"), không tự theo dõi.
+        let clipboard = ClipboardConfig(pasteboard: SystemPasteboard(), autoWatch: false)
         do {
             let stores = try DeviceSecurityStores.openDefault()
             let trust = ViewerTrust(identity: stores.identity, knownHosts: stores.knownHosts)
             security = stores
             securityError = nil
             self.trust = trust
-            session = ViewerSession(security: AppSecurity.current, deviceName: UIDevice.current.name, trust: trust)
+            session = ViewerSession(security: AppSecurity.current, deviceName: UIDevice.current.name, trust: trust, clipboard: clipboard)
         } catch {
             security = nil
             trust = nil
             securityError = error.localizedDescription
-            session = ViewerSession(security: AppSecurity.current, deviceName: UIDevice.current.name)
+            session = ViewerSession(security: AppSecurity.current, deviceName: UIDevice.current.name, clipboard: clipboard)
         }
     }
 
@@ -104,6 +113,7 @@ final class StreamViewModel {
         currentConfig = config
         await first(config)
         await refreshTrust()
+        await recordManualConnection()
         self.target = session.connectedTarget ?? target
         if let hostId = session.refusedHostId { refusedHost = RefusedHost(target: target, hostId: hostId) }
         failIfNeeded()

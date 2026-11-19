@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 import os
+import XdeskClipboard
 import XdeskCrypto
 import XdeskMedia
 import XdeskTransport
@@ -18,9 +19,9 @@ actor HostSession {
     static let streamId: UInt16 = 1
     static let initialBitrateKbps = 10_000
 
-    private let connection: ControlConnection
+    let connection: ControlConnection
     private let provider: VirtualDisplayProvider
-    private let hostCaps: Capabilities
+    let hostCaps: Capabilities
     private let report: @Sendable (HostSessionState) -> Void
     let onSecureInput: @Sendable (Bool) -> Void
     private let onAgentAnswer: @Sendable (_ requestId: String, _ allow: Bool) -> Void
@@ -33,13 +34,20 @@ actor HostSession {
     private(set) var permissions = DevicePermissions.default
     private var bitrate = BitrateController(initialKbps: HostSession.initialBitrateKbps)
     private var tasks: [Task<Void, Never>] = []
+    let pasteboard: (any PasteboardAccess)?
+    let permissionLookup: @Sendable ([UInt8]) async -> DevicePermissions?
+    var clipboard: ClipboardSync?
 
     init(
         connection: ControlConnection, provider: VirtualDisplayProvider, caps: Capabilities,
         report: @escaping @Sendable (HostSessionState) -> Void,
         onSecureInput: @escaping @Sendable (Bool) -> Void = { _ in },
-        onAgentAnswer: @escaping @Sendable (String, Bool) -> Void = { _, _ in }
+        onAgentAnswer: @escaping @Sendable (String, Bool) -> Void = { _, _ in },
+        pasteboard: (any PasteboardAccess)? = nil,
+        permissionLookup: @escaping @Sendable ([UInt8]) async -> DevicePermissions? = { _ in nil }
     ) {
+        self.pasteboard = pasteboard
+        self.permissionLookup = permissionLookup
         self.onAgentAnswer = onAgentAnswer
         self.connection = connection
         self.provider = provider
@@ -52,9 +60,11 @@ actor HostSession {
         report(.handshaking)
         var reason = "viewer ngắt kết nối"
         do {
-            let result = try await connection.performHostHandshake(caps: hostCaps, sessionId: UUID().uuidString) { [self] _, display in
+            permissions = await connection.peer?.permissions ?? .default
+            let result = try await connection.performHostHandshake(caps: negotiableCaps, sessionId: UUID().uuidString) { [self] _, display in
                 try await prepare(display)
             }
+            if result.caps.contains(.clipboard) { await startClipboard() }
             try await startPipeline(result.display)
             try await controlLoop()
         } catch {
@@ -140,8 +150,10 @@ actor HostSession {
 
     private func controlLoop() async throws {
         while let inbound = try await connection.nextInbound() {
+            if case .bulk(let chunk) = inbound { await clipboard?.handleBulk(chunk); continue }
             guard case .message(let envelope) = inbound else { continue }
             switch envelope.message {
+            case .clipOffer, .clipPull, .clipData: await clipboard?.handle(envelope.message)
             case .keyframeRequest: pipeline?.requestKeyframe()
             case .netReport(let r): try await applyNetReport(r)
             case .ping(let ping):
@@ -171,6 +183,8 @@ actor HostSession {
     private func teardown() async {
         tasks.forEach { $0.cancel() }
         tasks.removeAll()
+        await clipboard?.stop()
+        clipboard = nil
         viewerReady = false
         await input?.shutdown()
         input = nil

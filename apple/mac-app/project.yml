@@ -30,6 +30,8 @@ targets:
       - package: XdeskKit
         product: XdeskInput
       - package: XdeskKit
+        product: XdeskClipboard
+      - package: XdeskKit
         product: XdeskAgent
     info:
       path: Sources/Info.plist

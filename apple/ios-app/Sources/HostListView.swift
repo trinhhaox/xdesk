@@ -34,15 +34,31 @@ struct HostListView: View {
                         Button { tap(host) } label: { hostLabel(host) }
                     }
                 }
-                Section("Nhập địa chỉ") {
-                    TextField("host:port, ví dụ 192.168.1.10:47800", text: $manualText)
+                if !model.manualHosts.isEmpty {
+                    Section("Máy đã lưu (Tailscale / nhập tay)") {
+                        ForEach(model.manualHosts) { saved in
+                            Button { connectSaved(saved) } label: { savedLabel(saved) }
+                                .swipeActions {
+                                    Button("Xoá", role: .destructive) { Task { await model.removeManualHost(saved) } }
+                                }
+                        }
+                    }
+                }
+                Section {
+                    TextField("host:port, ví dụ 192.168.1.10:47800 hoặc 100.x.y.z", text: $manualText)
                         .keyboardType(.numbersAndPunctuation)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .onSubmit(connectManual)
                     Button("Kết nối", action: connectManual).disabled(ViewerTarget.parse(manual: manualText) == nil)
+                    Button("Lưu máy này") { Task { if await model.addManualHost(address: manualText) { manualText = "" } } }
+                        .disabled(ManualHostAddress(manualText) == nil)
+                } header: {
+                    Text("Nhập địa chỉ")
+                } footer: {
+                    Text("Qua Tailscale: nhập IP 100.x.y.z hoặc tên máy (MagicDNS) của Mac, rồi \"Lưu máy này\". Trên Mac phải bật \"Cho phép kết nối qua Tailscale\".")
                 }
-                if let message = model.errorMessage { Section { Text(message).foregroundStyle(.red) } }
+                if let message = model.errorMessage ?? model.manualHostError { Section { Text(message).foregroundStyle(.red) } }
             }
             .navigationTitle("Xdesk")
             .refreshable { model.stopBrowsing(); model.startBrowsing() }
@@ -78,7 +94,10 @@ struct HostListView: View {
                 Text("Máy Mac không còn nhận thiết bị này, thường là do đã bấm \"Thu hồi\" trên Mac. Chọn \"Ghép đôi lại\" để quét mã QR hoặc so mã 6 số.")
             }
         }
-        .onAppear { model.startBrowsing() }
+        .onAppear {
+            model.startBrowsing()
+            Task { await model.loadManualHosts() }
+        }
         .onDisappear { model.stopBrowsing() }
     }
 
@@ -131,6 +150,21 @@ struct HostListView: View {
         case .none, .paired?: connect(.discovered(host))
         case .unknown?: choosing = .discovered(host)
         case .keyChanged(let expected)?: changedKey = KeyChange(host: host, expected: expected)
+        }
+    }
+
+    private func savedLabel(_ saved: ManualHost) -> some View {
+        VStack(alignment: .leading) {
+            Label(saved.name, systemImage: "network")
+            Text(saved.lastAddress.map { "\(saved.address) · IP lần trước \($0)" } ?? saved.address)
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    private func connectSaved(_ saved: ManualHost) {
+        guard let target = ViewerTarget.parse(manual: saved.address) else { return }
+        Task {
+            if await model.isPaired(address: target) { await model.connect(to: target) } else { choosing = target }
         }
     }
 

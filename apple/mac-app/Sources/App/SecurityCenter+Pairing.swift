@@ -39,7 +39,7 @@ extension SecurityCenter {
                 print("xdesk-sas-host-code \(code)")
                 fflush(stdout)
             }
-            return .approve(.default)
+            return .approve(CommandLine.arguments.contains("--auto-approve-clipboard") ? DevicePermissions(view: true, input: true, clipboard: true, audio: false) : .default)
         }
         #endif
         guard decisionContinuation == nil else { return .reject }

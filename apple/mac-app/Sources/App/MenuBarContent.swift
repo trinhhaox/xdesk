@@ -1,4 +1,5 @@
 import SwiftUI
+import XdeskTransport
 
 struct MenuBarContent: View {
     let host: HostController
@@ -11,6 +12,12 @@ struct MenuBarContent: View {
         Text(statusText)
         if case .listening(let port) = host.status, let ip = LocalAddress.primaryIPv4() {
             Text("Nhập trên điện thoại: \(ip):\(port)")
+        }
+        Toggle("Cho phép kết nối qua Tailscale", isOn: Binding(get: { host.allowTailscale }, set: { host.setAllowTailscale($0) }))
+        if host.allowTailscale, case .listening(let port) = host.status, let tailscale = InterfaceFilter.tailscaleInterfaces().first {
+            Text("Qua Tailscale: \(tailscale.address):\(port)")
+        } else if host.allowTailscale {
+            Text("Chưa thấy Tailscale trên máy này")
         }
         if !AccessibilityPermission.isGranted {
             Button(AccessibilityPermission.menuTitle) {

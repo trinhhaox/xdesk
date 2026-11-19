@@ -12,7 +12,7 @@
 |---|---|---|
 | 0x01 | Handshake | `u8 type | body` (begin/commit/noise), xem `crypto-handshake.md` §4 |
 | 0x02 | Control | JSON UTF-8 (xem `control-messages.md`) |
-| 0x03 | Bulk | chunk nhị phân (clipboard ảnh), ≤ 65 536 B |
+| 0x03 | Bulk | chunk nhị phân của một lần truyền clipboard (sau message `clip.data`), ≤ 65 536 B |
 | 0x04 | MediaOverTcp | một gói media nguyên vẹn (header + payload, xem `media-packets.md`); dự phòng USB/mạng chặn UDP |
 
 kind khác → `unknownFrameKind`.

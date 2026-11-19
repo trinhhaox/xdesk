@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import XdeskClipboard
 import XdeskCrypto
 import XdeskTransport
 import XdeskViewer
@@ -23,12 +24,28 @@ final class ViewerController {
     /// Mã 6 số đang hiển thị để so với màn hình host (nil = không đang so mã).
     private(set) var sasCode: String?
     var options = Options()
+    /// Máy nhập tay (Tailscale/MagicDNS/IP): Bonjour không đi qua Tailscale nên lưu lại để chọn lần sau.
+    internal(set) var manualHosts: [ManualHost] = []
+    internal(set) var manualHostError: String?
+    /// Clipboard viewer đồng bộ với host; Debug có thể thay bằng pasteboard riêng (xem AutomationHooks).
+    var clipboardPasteboard: any PasteboardAccess = SystemPasteboard()
 
     @ObservationIgnored private let security: SecurityCenter
     @ObservationIgnored private var browseTask: Task<Void, Never>?
     @ObservationIgnored private var window: ViewerWindow?
+    @ObservationIgnored let manualStore: ManualHostStore?
+    @ObservationIgnored let manualStoreError: String?
 
-    init(security: SecurityCenter) { self.security = security }
+    init(security: SecurityCenter) {
+        self.security = security
+        do {
+            manualStore = try ManualHostStore.openDefault()
+            manualStoreError = nil
+        } catch {
+            manualStore = nil
+            manualStoreError = error.localizedDescription
+        }
+    }
 
     var requiresPairing: Bool { AppSecurity.current == .encrypted }
     var isConnecting: Bool { session?.state == .connecting }
@@ -86,11 +103,14 @@ final class ViewerController {
     private func run(title: String, _ start: (ViewerSession, DisplayConfig) async -> Void) async {
         guard session == nil else { return }
         errorMessage = nil
-        let session = ViewerSession(security: AppSecurity.current, deviceName: HostIdentity.displayName, trust: security.viewerTrust)
+        let session = ViewerSession(
+            security: AppSecurity.current, deviceName: HostIdentity.displayName, trust: security.viewerTrust,
+            clipboard: ClipboardConfig(pasteboard: clipboardPasteboard, autoWatch: true))
         self.session = session
         await start(session, displayConfig())
         await security.refresh()
         await refreshTrust()
+        await recordManualConnection(session)
         guard case .streaming = session.state else {
             if case .failed(let message) = session.state { errorMessage = message }
             self.session = nil

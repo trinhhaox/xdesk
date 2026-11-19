@@ -96,3 +96,8 @@ Ngữ nghĩa theo `kind` (không đổi bố cục byte):
 
 **input-ack (0x31)**: payload `u32 seq` = seq lớn nhất nhận liên tục. Ví dụ seq 258 → `00000102`.
 Văn bản Unicode (IME/Telex) không đi qua input UDP mà qua control `input.text`.
+
+## Đường dài (Tailscale / 4G)
+
+- MTU Tailscale 1280 → payload 1200 B ở trên đã an toàn, không cần chỉnh.
+- ABR của host (`BitrateController`): khi `net.report.rttMs` > 20 ms bitrate bị chặn trần 15 000 kb/s (giảm ngay xuống 15 Mb/s nếu đang cao hơn, không tăng vượt); RTT ≤ 20 ms trở lại trần LAN 40 Mb/s.

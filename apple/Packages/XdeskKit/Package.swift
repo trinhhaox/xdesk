@@ -1,13 +1,14 @@
 // swift-tools-version: 6.0
 import PackageDescription
 
-let modules = ["XdeskWire", "XdeskCrypto", "XdeskTransport", "XdeskMedia", "XdeskViewer", "XdeskInput", "XdeskAgent"]
+let modules = ["XdeskWire", "XdeskCrypto", "XdeskTransport", "XdeskMedia", "XdeskViewer", "XdeskInput", "XdeskAgent", "XdeskClipboard"]
 /// Phụ thuộc nội bộ giữa các module (Wire là nền, không phụ thuộc ai).
 let moduleDependencies: [String: [String]] = [
     "XdeskTransport": ["XdeskWire", "XdeskCrypto"],
     "XdeskMedia": ["XdeskWire"],
     "XdeskInput": ["XdeskWire"],
-    "XdeskViewer": ["XdeskWire", "XdeskCrypto", "XdeskTransport", "XdeskMedia", "XdeskInput"],
+    "XdeskClipboard": ["XdeskWire", "XdeskTransport"],
+    "XdeskViewer": ["XdeskWire", "XdeskCrypto", "XdeskTransport", "XdeskMedia", "XdeskInput", "XdeskClipboard"],
 ]
 
 let package = Package(

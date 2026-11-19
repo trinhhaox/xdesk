@@ -63,6 +63,7 @@ public enum ControlMessageCodec {
         case "bitrate.set": return .bitrateSet(try body(BitrateSet.self))
         case "clip.offer": return .clipOffer(try body(ClipOffer.self))
         case "clip.pull": return .clipPull(try body(ClipPull.self))
+        case "clip.data": return .clipData(try body(ClipData.self))
         case "control.state": return .controlState(try body(ControlState.self))
         case "ping": return .ping(try body(Ping.self))
         case "pong": return .pong(try body(Pong.self))

@@ -29,6 +29,8 @@ targets:
         product: XdeskViewer
       - package: XdeskKit
         product: XdeskInput
+      - package: XdeskKit
+        product: XdeskClipboard
     info:
       path: Sources/Info.plist
       properties:

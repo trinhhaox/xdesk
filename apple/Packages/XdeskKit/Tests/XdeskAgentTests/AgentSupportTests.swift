@@ -73,14 +73,6 @@ import Testing
     }
 }
 
-@Suite struct ClipboardPolicyTests {
-    @Test func concealedAndTransientTypesAreRefused() {
-        #expect(ClipboardPolicy.refusalReason(types: ["public.utf8-plain-text", "org.nspasteboard.ConcealedType"]) != nil)
-        #expect(ClipboardPolicy.refusalReason(types: ["org.nspasteboard.TransientType"]) != nil)
-        #expect(ClipboardPolicy.refusalReason(types: ["public.utf8-plain-text"]) == nil)
-    }
-}
-
 @Suite struct RunStepsToolTests {
     private actor Recorder { var calls: [String] = []; func add(_ name: String) { calls.append(name) } }
     private struct Step: ToolHandler {

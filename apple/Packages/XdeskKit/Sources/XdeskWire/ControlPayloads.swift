@@ -74,10 +74,29 @@ public struct BitrateSet: Codable, Sendable, Equatable {
     public init(kbps: UInt32) { self.kbps = kbps }
 }
 
+/// Giới hạn clipboard: văn bản (UTF-8) và ảnh PNG đều ≤ 10 MiB.
+public enum ClipLimits {
+    public static let maxBytes = 10 * 1024 * 1024
+    /// SHA-256 dạng hex thường (64 ký tự).
+    static func isValidHash(_ text: String) -> Bool {
+        text.utf8.count == 64 && text.utf8.allSatisfy { ($0 >= 0x30 && $0 <= 0x39) || ($0 >= 0x61 && $0 <= 0x66) }
+    }
+}
+
+/// "Tôi có clipboard mới": chỉ siêu dữ liệu; bên kia `clip.pull` khi cần. `hash` = SHA-256 hex của dữ liệu (chống lặp/kiểm tra toàn vẹn).
 public struct ClipOffer: Codable, Sendable, Equatable {
     public var kind: ClipKind
     public var size: UInt32
-    public init(kind: ClipKind, size: UInt32) { self.kind = kind; self.size = size }
+    public var hash: String?
+    public init(kind: ClipKind, size: UInt32, hash: String? = nil) { self.kind = kind; self.size = size; self.hash = hash }
+}
+
+/// Phần đầu của một lần truyền clipboard (trả lời `clip.pull`): ngay sau message này là `ceil(size/65536)` frame bulk liên tiếp.
+public struct ClipData: Codable, Sendable, Equatable {
+    public var kind: ClipKind
+    public var size: UInt32
+    public var hash: String
+    public init(kind: ClipKind, size: UInt32, hash: String) { self.kind = kind; self.size = size; self.hash = hash }
 }
 
 public struct ClipPull: Codable, Sendable, Equatable {

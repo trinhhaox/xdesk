@@ -10,6 +10,7 @@ public enum ControlMessage: Sendable, Equatable {
     case bitrateSet(BitrateSet)
     case clipOffer(ClipOffer)
     case clipPull(ClipPull)
+    case clipData(ClipData)
     case controlState(ControlState)
     case ping(Ping)
     case pong(Pong)
@@ -37,6 +38,7 @@ public enum ControlMessage: Sendable, Equatable {
         case .bitrateSet(let p): ("bitrate.set", p)
         case .clipOffer(let p): ("clip.offer", p)
         case .clipPull(let p): ("clip.pull", p)
+        case .clipData(let p): ("clip.data", p)
         case .controlState(let p): ("control.state", p)
         case .ping(let p): ("ping", p)
         case .pong(let p): ("pong", p)
@@ -65,6 +67,12 @@ public enum ControlMessage: Sendable, Equatable {
             guard n.lossPermille <= 1000 else { throw WireError.invalidField("net.report.lossPermille") }
         case .agentApprove(let a):
             try a.validate()
+        case .clipOffer(let o):
+            guard o.size > 0, Int(o.size) <= ClipLimits.maxBytes else { throw WireError.invalidField("clip.offer.size") }
+            if let hash = o.hash, !ClipLimits.isValidHash(hash) { throw WireError.invalidField("clip.offer.hash") }
+        case .clipData(let d):
+            guard d.size > 0, Int(d.size) <= ClipLimits.maxBytes else { throw WireError.invalidField("clip.data.size") }
+            guard ClipLimits.isValidHash(d.hash) else { throw WireError.invalidField("clip.data.hash") }
         default:
             break
         }

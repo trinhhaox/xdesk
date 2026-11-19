@@ -94,7 +94,7 @@ public actor ControlConnection {
         try await write(try wireBytes(for: frame))
     }
 
-    private func takeNextId() -> UInt32 {
+    func takeNextId() -> UInt32 {
         defer { nextMessageId &+= 1 }
         return nextMessageId
     }

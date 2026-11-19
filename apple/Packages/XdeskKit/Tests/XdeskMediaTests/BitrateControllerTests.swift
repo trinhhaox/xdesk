@@ -59,3 +59,25 @@ import Testing
         #expect(c.update(lossPermille: 0, rttMs: 2, nowMs: 3_900) == 8_400)
     }
 }
+
+@Suite struct BitrateHighRttCeilingTests {
+    @Test func highRttClampsDownToFifteenMbps() {
+        var c = BitrateController(initialKbps: 30_000)
+        #expect(c.update(lossPermille: 0, rttMs: 21, nowMs: 0) == 15_000)
+        #expect(c.kbps == 15_000)
+    }
+
+    @Test func highRttNeverClimbsAboveCeiling() {
+        var c = BitrateController(initialKbps: 14_900)
+        _ = c.update(lossPermille: 0, rttMs: 25, nowMs: 0)
+        #expect(c.update(lossPermille: 0, rttMs: 25, nowMs: 2_000) == 15_000)
+        #expect(c.update(lossPermille: 0, rttMs: 25, nowMs: 4_000) == nil)
+        #expect(c.kbps == 15_000)
+    }
+
+    @Test func lowRttKeepsLanCeiling() {
+        var c = BitrateController(initialKbps: 30_000)
+        #expect(c.update(lossPermille: 0, rttMs: 20, nowMs: 0) == nil)       // đúng 20 ms chưa vượt ngưỡng
+        #expect(c.update(lossPermille: 0, rttMs: 2, nowMs: 2_000) == 31_500)
+    }
+}

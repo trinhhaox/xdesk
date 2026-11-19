@@ -20,6 +20,7 @@ struct StreamView: View {
                     connectingOverlay
                 }
                 topBar
+                if let notice = model.clipboardNotice { clipboardToast(notice) }
             }
             .onChange(of: proxy.size, initial: true) { _, size in
                 model.screenChanged(ScreenMetrics(size: size, scale: displayScale))
@@ -52,6 +53,10 @@ struct StreamView: View {
         HStack(spacing: 0) {
             Button { Task { await model.disconnect() } } label: { faintIcon("xmark.circle.fill") }
                 .accessibilityLabel("Ngắt kết nối")
+            if model.session.clipboardAvailable {
+                Button { Task { await model.sendClipboardToMac() } } label: { faintIcon("doc.on.clipboard") }
+                    .accessibilityLabel("Gửi clipboard sang Mac")
+            }
             if composing, let composer {
                 TextComposerBar(controller: composer) { composing = false }
                     .padding(.trailing, 16)
@@ -61,6 +66,17 @@ struct StreamView: View {
                     .disabled(model.session.state != .streaming)
             }
         }
+    }
+
+    private func clipboardToast(_ text: String) -> some View {
+        Text(text)
+            .font(.callout)
+            .padding(.horizontal, 14).padding(.vertical, 8)
+            .background(.black.opacity(0.7), in: Capsule())
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            .padding(.bottom, 40)
+            .allowsHitTesting(false)
     }
 
     private func faintIcon(_ name: String) -> some View {

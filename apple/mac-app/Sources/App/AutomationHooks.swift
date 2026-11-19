@@ -2,6 +2,7 @@
 import AppKit
 import Foundation
 import os
+import XdeskClipboard
 import XdeskCrypto
 import XdeskInput
 import XdeskViewer
@@ -25,6 +26,10 @@ import XdeskViewer
 ///   --enable-mcp [tệp]          bật máy chủ MCP (không lưu cài đặt); có tệp thì ghi token vào đó (0600) cho script curl
 ///   --auto-approve-agent        bỏ qua hộp thoại duyệt quyền/ứng dụng của agent (chỉ Debug, để kiểm thử tự động; không tồn tại ở Release)
 ///   SIGUSR1 / SIGUSR2           tạm dừng / tiếp tục agent như phím tắt ⌃⌥⌘. (chỉ Debug, đo độ trễ "control paused")
+///   --clipboard-host-pasteboard <tên>    host đồng bộ clipboard trên NSPasteboard có tên này (không đụng clipboard thật)
+///   --clipboard-viewer-pasteboard <tên>  viewer cùng tiến trình dùng pasteboard có tên khác (để thấy clipboard đi qua mạng)
+///   --auto-approve-clipboard    khi tự duyệt ghép đôi, cấp luôn quyền clipboard (mặc định tắt)
+///   --allow-tailscale           host nhận kết nối Tailscale (chỉ trong tiến trình này, không lưu cài đặt)
 ///   --quit-after <giây>         tự thoát
 @MainActor
 enum AutomationHooks {
@@ -35,6 +40,9 @@ enum AutomationHooks {
         viewer.options.retina = args.contains("--retina")
         viewer.options.fullScreen = args.contains("--fullscreen")
         viewer.options.latencyOverlay = args.contains("--latency-overlay")
+        if let name = value(after: "--clipboard-host-pasteboard", in: args) { host.clipboardPasteboard = SystemPasteboard(name: name) }
+        if let name = value(after: "--clipboard-viewer-pasteboard", in: args) { viewer.clipboardPasteboard = SystemPasteboard(name: name) }
+        if args.contains("--allow-tailscale") { host.setAllowTailscale(true, persist: false) }
         if args.contains("--auto-host") {
             await host.start()
             log.notice("auto-host status: \(String(describing: host.status), privacy: .public)")

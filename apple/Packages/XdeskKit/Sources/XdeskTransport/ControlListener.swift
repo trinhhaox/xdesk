@@ -6,7 +6,7 @@ import XdeskWire
 /// Chế độ plaintext (Debug): kết nối thứ N+1 nhận `reject{reason:"busy"}` rồi bị đóng.
 /// Chế độ mã hoá: listener tự chạy bắt tay Noise (`HostAuthenticator`) và chỉ trao ra kết nối đã xác thực; kết nối chưa xác thực
 /// bị giới hạn mỗi IP nguồn `maxPendingPerSource` (2), tối đa `maxPending` (4) cùng lúc (đầy thì đuổi kết nối cũ nhất) (M5).
-/// Peer ngoài LAN/loopback bị bỏ ngay.
+/// Peer ngoài LAN/loopback bị bỏ ngay; peer Tailscale (100.64/10, fd7a:115c:a1e0::/48) chỉ được nhận khi `allowTailscale` (mặc định tắt).
 public actor ControlListener {
     public static let defaultMaxViewers = 4
     public static let busyReason = "busy"
@@ -32,12 +32,17 @@ public actor ControlListener {
     private let queue = DispatchQueue(label: "xdesk.control.listener")
     private var listener: NWListener?
     private var entries: [UUID: Entry] = [:]
+    private var allowTailscale: Bool
+    private let isTailscale: @Sendable (NWEndpoint) -> Bool
 
     public init(
         security: TransportSecurity, advertiser: BonjourAdvertiser? = nil, authenticator: HostAuthenticator? = nil,
         maxViewers: Int = ControlListener.defaultMaxViewers, maxPending: Int = ControlListener.defaultMaxPending,
-        maxPendingPerSource: Int = ControlListener.defaultMaxPendingPerSource
+        maxPendingPerSource: Int = ControlListener.defaultMaxPendingPerSource, allowTailscale: Bool = false,
+        tailscaleClassifier: @escaping @Sendable (NWEndpoint) -> Bool = { InterfaceFilter.isTailscale($0) }
     ) {
+        self.allowTailscale = allowTailscale
+        self.isTailscale = tailscaleClassifier
         (connections, continuation) = AsyncStream.makeStream(of: ControlConnection.self)
         self.security = security
         self.advertiser = advertiser
@@ -46,6 +51,9 @@ public actor ControlListener {
         self.maxPending = max(1, maxPending)
         self.maxPendingPerSource = max(1, maxPendingPerSource)
     }
+
+    /// Bật/tắt nhận kết nối qua Tailscale (chỉ áp dụng cho kết nối mới; phiên đang chạy giữ nguyên).
+    public func setAllowTailscale(_ allowed: Bool) { allowTailscale = allowed }
 
     /// Số viewer đang giữ chỗ (đã xác thực, hoặc plaintext).
     public var activeViewers: Int { entries.values.filter(\.authenticated).count }
@@ -89,6 +97,10 @@ public actor ControlListener {
     }
 
     private func admit(_ nwConnection: NWConnection) async {
+        guard allowTailscale || !isTailscale(nwConnection.endpoint) else {
+            nwConnection.cancel()
+            return
+        }
         if security == .encrypted, let authenticator {
             await admitSecure(nwConnection, authenticator)
         } else {

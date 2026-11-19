@@ -1,6 +1,8 @@
 import Foundation
 import Observation
 import os
+import XdeskClipboard
+import XdeskCrypto
 import XdeskTransport
 import XdeskWire
 
@@ -21,6 +23,12 @@ final class HostController {
     private(set) var sessionStates: [UUID: HostSessionState] = [:]
     /// Một app đang bật Secure Event Input nên chữ gõ từ xa có thể không vào được ô đích.
     private(set) var secureInputActive = false
+
+    /// Clipboard dùng cho đồng bộ; Debug có thể thay bằng pasteboard riêng (xem AutomationHooks) để không đụng clipboard thật.
+    var clipboardPasteboard: any PasteboardAccess = SystemPasteboard()
+    /// "Cho phép kết nối qua Tailscale": mặc định tắt; áp dụng ngay cho kết nối mới.
+    private(set) var allowTailscale = UserDefaults.standard.bool(forKey: HostController.allowTailscaleKey)
+    private static let allowTailscaleKey = "xdesk.host.allowTailscale"
 
     private let log = Logger(subsystem: "vn.xox.xdesk", category: "host-controller")
     private let security: SecurityCenter
@@ -64,7 +72,8 @@ final class HostController {
         await security.attach()
         let advertiser = BonjourAdvertiser(id: security.identityFingerprint.flatMap { encrypted ? $0 : nil } ?? HostIdentity.shortId, name: HostIdentity.displayName)
         let listener = ControlListener(
-            security: AppSecurity.current, advertiser: advertiser, authenticator: encrypted ? security.hostAuthenticator : nil)
+            security: AppSecurity.current, advertiser: advertiser, authenticator: encrypted ? security.hostAuthenticator : nil,
+            allowTailscale: allowTailscale)
         do {
             let port = try await startListener(listener)
             self.listener = listener
@@ -75,6 +84,13 @@ final class HostController {
         } catch {
             status = .failed(error.localizedDescription)
         }
+    }
+
+    /// `persist: false` chỉ dành cho kiểm thử tự động (không ghi vào cài đặt người dùng).
+    func setAllowTailscale(_ allowed: Bool, persist: Bool = true) {
+        allowTailscale = allowed
+        if persist { UserDefaults.standard.set(allowed, forKey: Self.allowTailscaleKey) }
+        Task { await listener?.setAllowTailscale(allowed) }
     }
 
     func stop() async {
@@ -105,9 +121,16 @@ final class HostController {
             connection: connection, provider: VirtualDisplayProvider(), caps: [.h264, .hevc],
             report: { [weak self] state in Task { @MainActor in self?.update(id, state) } },
             onSecureInput: { [weak self] active in Task { @MainActor in self?.secureInputActive = active } },
-            onAgentAnswer: { [weak self] requestId, allow in Task { @MainActor in self?.agentAnswerSink?(requestId, allow) } }
+            onAgentAnswer: { [weak self] requestId, allow in Task { @MainActor in self?.agentAnswerSink?(requestId, allow) } },
+            pasteboard: clipboardPasteboard,
+            permissionLookup: { [weak self] key in await self?.permissions(forViewerKey: key) }
         )
         sessions[id] = (session, Task { await session.run() })
+    }
+
+    /// Quyền hiện hành của viewer đã ghép (đọc lại mỗi lần để đổi quyền giữa phiên có hiệu lực ngay).
+    private func permissions(forViewerKey key: [UInt8]) -> DevicePermissions? {
+        security.pairedViewers.first { $0.publicKey == key }?.permissions
     }
 
     private func update(_ id: UUID, _ state: HostSessionState) {

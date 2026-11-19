@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import XdeskAgent
+import XdeskClipboard
 
 struct ClipboardReadTool: ToolHandler {
     static let maxChars = 10_000

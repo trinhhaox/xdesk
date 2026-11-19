@@ -22,11 +22,23 @@ struct ViewerBrowserView: View {
                             forget: { forgetting = $0 })
                 }
             }
+            if !controller.manualHosts.isEmpty {
+                Section("Máy đã lưu (Tailscale / nhập tay)") {
+                    ForEach(controller.manualHosts) { saved in
+                        ManualHostRow(host: saved, busy: controller.isConnecting, canPair: controller.requiresPairing,
+                                      connect: { Task { await controller.connect(toManual: saved) } },
+                                      pair: { if let target = ViewerTarget.parse(manual: saved.address) { pair(target, title: saved.name) } },
+                                      remove: { Task { await controller.removeManualHost(saved) } })
+                    }
+                }
+            }
             Section("Nhập địa chỉ") {
-                TextField("host:port, ví dụ 127.0.0.1:47800", text: $manualText)
+                TextField("host:port, ví dụ 127.0.0.1:47800 hoặc 100.x.y.z (Tailscale)", text: $manualText)
                     .onSubmit(connectManual)
                 HStack {
                     Button("Kết nối", action: connectManual)
+                    Button("Lưu máy này") { Task { if await controller.addManualHost(address: manualText, name: nil) { manualText = "" } } }
+                        .disabled(ManualHostAddress(manualText) == nil)
                     if controller.requiresPairing {
                         Button("Ghép đôi bằng mã 6 số") { if let target = manualTarget { pair(target, title: manualText) } }
                     }
@@ -39,11 +51,14 @@ struct ViewerBrowserView: View {
             }
             if let code = controller.sasCode { SasCodePanel(code: code) }
             else if controller.isConnecting { ProgressView("Đang kết nối…") }
-            if let message = controller.errorMessage { Text(message).foregroundStyle(.red) }
+            if let message = controller.errorMessage ?? controller.manualHostError { Text(message).foregroundStyle(.red) }
         }
         .formStyle(.grouped)
         .frame(width: 440, height: 520)
-        .onAppear { controller.startBrowsing() }
+        .onAppear {
+            controller.startBrowsing()
+            Task { await controller.loadManualHosts() }
+        }
         .onDisappear { controller.stopBrowsing() }
         .confirmationDialog(
             "Quên khoá cũ của \"\(forgetting?.name ?? "")\"?", isPresented: Binding(get: { forgetting != nil }, set: { if !$0 { forgetting = nil } }),
@@ -103,6 +118,33 @@ private struct HostRow: View {
         case .unpaired: BrandPalette.warning
         case .keyChanged: .red
         }
+    }
+}
+
+private struct ManualHostRow: View {
+    let host: ManualHost
+    let busy: Bool
+    let canPair: Bool
+    let connect: () -> Void
+    let pair: () -> Void
+    let remove: () -> Void
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading) {
+                Label(host.name, systemImage: "network")
+                Text(detail).font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            if canPair { Button("Ghép đôi", action: pair).disabled(busy) }
+            Button("Kết nối", action: connect).disabled(busy)
+            Button("Xoá", role: .destructive, action: remove).help("Xoá máy này khỏi danh sách đã lưu (không thu hồi ghép đôi)")
+        }
+    }
+
+    private var detail: String {
+        guard let last = host.lastAddress, last != host.address else { return host.address }
+        return "\(host.address) · IP lần trước \(last)"
     }
 }
 

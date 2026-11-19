@@ -3,6 +3,7 @@ import Foundation
 import Network
 import Observation
 import os
+import XdeskClipboard
 import XdeskCrypto
 import XdeskInput
 import XdeskMedia
@@ -30,6 +31,8 @@ public final class ViewerSession {
     public private(set) var rttMs: Int64?
     /// Đích đã kết nối thành công (QR có thể thử nhiều địa chỉ); phiên mở lại dùng đích này.
     public private(set) var connectedTarget: ViewerTarget?
+    /// `ip:cổng` thực của host nhập tay vừa kết nối (tên MagicDNS đã phân giải); nil với host Bonjour.
+    public private(set) var connectedRemoteAddress: String?
     /// Chênh đồng hồ host − viewer (ms); dùng cho overlay đo độ trễ.
     public private(set) var clockOffsetMs: Double?
     /// Host đã ghép vừa từ chối IK ở lần `connect` gần nhất (id = fingerprint); UI đề nghị ghép đôi lại.
@@ -38,12 +41,16 @@ public final class ViewerSession {
     @ObservationIgnored var connectedHostId: String?
     /// Yêu cầu duyệt quyền điều khiển cho agent AI đang chờ trả lời (xem `agent.approve`); nil khi không có/đã hết hạn.
     public internal(set) var pendingAgentApproval: AgentApprovalRequest?
+    /// Host đã cấp quyền clipboard cho thiết bị này và phiên đang đồng bộ (iOS dùng để hiện nút "Gửi clipboard sang Mac").
+    public internal(set) var clipboardAvailable = false
     public let renderer = VideoLayerRenderer()
 
     @ObservationIgnored let log = Logger(subsystem: "vn.xox.xdesk", category: "viewer-session")
     @ObservationIgnored let security: TransportSecurity
     @ObservationIgnored let deviceName: String
     @ObservationIgnored let trust: ViewerTrust?
+    @ObservationIgnored let clipboardConfig: ClipboardConfig?
+    @ObservationIgnored var clipboardSync: ClipboardSync?
     @ObservationIgnored var connection: ControlConnection?
     @ObservationIgnored var channel: UdpMediaChannel?
     @ObservationIgnored var tasks: [Task<Void, Never>] = []
@@ -60,7 +67,8 @@ public final class ViewerSession {
     #endif
 
     /// `trust` bắt buộc khi `security == .encrypted` (danh tính + host đã biết); plaintext (Debug) bỏ qua.
-    public init(security: TransportSecurity, deviceName: String, trust: ViewerTrust? = nil) {
+    public init(security: TransportSecurity, deviceName: String, trust: ViewerTrust? = nil, clipboard: ClipboardConfig? = nil) {
+        self.clipboardConfig = clipboard
         self.security = security
         self.deviceName = deviceName
         self.trust = trust
@@ -78,6 +86,7 @@ public final class ViewerSession {
         state = .connecting
         refusedHostId = nil
         connectedHostId = nil
+        connectedRemoteAddress = nil
         do {
             try await establish(candidates, config: config, auth: auth)
             state = .streaming
@@ -103,8 +112,10 @@ public final class ViewerSession {
         connectedTarget = target
         connection = conn
         try await authenticate(conn, target: target, auth: auth)
-        let result = try await conn.performViewerHandshake(name: deviceName, caps: [.h264, .hevc], display: config)
+        let result = try await conn.performViewerHandshake(name: deviceName, caps: offeredCaps, display: config)
+        await startClipboard(on: conn, negotiated: result.caps)
         guard let host = await conn.resolvedRemoteHost else { throw TransportError.connectionFailed("không xác định được địa chỉ host") }
+        if case .manual(_, let port) = target { connectedRemoteAddress = "\(PeerAddressPolicy.normalized(host)):\(port)" }
         factory = SampleBufferFactory(codec: config.codec)
         streamId = result.ready.streamId
         let channel = try await UdpMediaChannel.connect(streamId: streamId, host: host, port: result.ready.udpPort, keys: await conn.udpKeys)
@@ -144,6 +155,7 @@ public final class ViewerSession {
 
     func teardown() async {
         pendingAgentApproval = nil
+        await stopClipboard()
         tasks.forEach { $0.cancel() }
         tasks.removeAll()
         inputOutbox?.finish()
