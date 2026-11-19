@@ -11,6 +11,7 @@ private extension View {
 struct PermissionCard: View {
     let missing: [PermissionKind]
     let open: (PermissionKind) -> Void
+    var relaunch: () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -30,6 +31,10 @@ struct PermissionCard: View {
                         .accessibilityLabel("Mở Cài đặt để cấp quyền \(kind.title)")
                 }
                 .padding(.vertical, 6)
+                if kind == .screenRecording {
+                    Button("Đã bật rồi? Mở lại Xdesk để áp dụng", action: relaunch)
+                        .buttonStyle(.link).font(.caption).padding(.bottom, 6)
+                }
                 if kind != missing.last { Divider() }
             }
         }

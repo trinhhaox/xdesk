@@ -9,7 +9,7 @@ struct MenuPopoverView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             PopoverHeader(state: state, toggle: actions.toggleSharing)
-            if !state.missing.isEmpty { PermissionCard(missing: state.missing, open: actions.openPermission) }
+            if !state.missing.isEmpty { PermissionCard(missing: state.missing, open: actions.openPermission, relaunch: actions.relaunch) }
             if state.secureInput { NoticeRow(symbol: "lock.fill", text: "Đang bật nhập liệu bảo mật: chữ gõ từ xa có thể không vào ô mật khẩu.") }
             SessionsCard(sessions: state.sessions, disconnect: actions.disconnect)
             VStack(spacing: 4) {

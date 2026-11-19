@@ -19,6 +19,8 @@ struct MenuPopoverLive: View {
     let updater: UpdaterController
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
+    /// Đóng bảng thanh menu trước khi mở cửa sổ/Cài đặt hệ thống, để bảng không che lên chúng.
+    @Environment(\.dismiss) private var dismiss
     @State private var system = SystemSnapshot()
     private let ticker = Timer.publish(every: 3, on: .main, in: .common).autoconnect()
 
@@ -66,11 +68,13 @@ struct MenuPopoverLive: View {
                 case .accessibility: AccessibilityPermission.requestPrompt()
                 case .inputMonitoring: break
                 }
+                dismiss()
                 if let url = kind.settingsURL { NSWorkspace.shared.open(url) }
             },
-            pairNewDevice: { [pairing] in Task { await pairing.showQrWindow() } },
-            showPairedDevices: { [pairing] in pairing.showDevicesWindow() },
+            pairNewDevice: { [pairing] in dismiss(); Task { await pairing.showQrWindow() } },
+            showPairedDevices: { [pairing] in dismiss(); pairing.showDevicesWindow() },
             connectToMac: {
+                dismiss()
                 NSApp.activate(ignoringOtherApps: true)
                 openWindow(id: ViewerBrowserWindow.id)
             },
@@ -79,10 +83,21 @@ struct MenuPopoverLive: View {
                 Task { await host.connectUsb(to: device) }
             },
             openSettings: {
+                dismiss()
                 NSApp.activate(ignoringOtherApps: true)
                 openSettings()
             },
             checkForUpdates: { [updater] in updater.checkForUpdates() },
-            quit: { NSApplication.shared.terminate(nil) })
+            quit: { NSApplication.shared.terminate(nil) },
+            relaunch: Self.relaunch)
+    }
+
+    /// Mở một bản Xdesk mới rồi thoát bản hiện tại.
+    private static func relaunch() {
+        let config = NSWorkspace.OpenConfiguration()
+        config.createsNewApplicationInstance = true
+        NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: config) { _, _ in
+            Task { @MainActor in NSApplication.shared.terminate(nil) }
+        }
     }
 }

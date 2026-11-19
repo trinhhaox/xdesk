@@ -38,4 +38,6 @@ struct PopoverActions {
     var openSettings: () -> Void = {}
     var checkForUpdates: () -> Void = {}
     var quit: () -> Void = {}
+    /// Mở lại Xdesk: macOS chỉ áp quyền Ghi màn hình mới cấp sau khi app khởi động lại.
+    var relaunch: () -> Void = {}
 }
