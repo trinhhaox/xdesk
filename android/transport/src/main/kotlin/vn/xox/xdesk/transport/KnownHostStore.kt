@@ -66,8 +66,18 @@ class FileKnownHostStore(private val file: File) : KnownHostStore {
 
     @Synchronized override fun markSeen(id: String, nowMs: Long) = update(id) { KnownHost(it.id, it.name, it.publicKey, it.lastAddress, it.addedMs, nowMs) }
 
-    @Synchronized override fun setLastAddress(id: String, address: String) =
-        update(id) { KnownHost(it.id, it.name, it.publicKey, address, it.addedMs, it.lastSeenMs) }
+    /** Một địa chỉ chỉ thuộc một host: Mac khác từng giữ địa chỉ này (DHCP cấp lại) bị bỏ địa chỉ để `device(address)` không trả nhầm khoá. */
+    @Synchronized override fun setLastAddress(id: String, address: String) {
+        if (id !in hosts) return
+        hosts.replaceAll { key, host ->
+            when {
+                key == id -> KnownHost(host.id, host.name, host.publicKey, address, host.addedMs, host.lastSeenMs)
+                host.lastAddress == address -> KnownHost(host.id, host.name, host.publicKey, null, host.addedMs, host.lastSeenMs)
+                else -> host
+            }
+        }
+        persist()
+    }
 
     private fun update(id: String, change: (KnownHost) -> KnownHost) {
         val current = hosts[id] ?: return

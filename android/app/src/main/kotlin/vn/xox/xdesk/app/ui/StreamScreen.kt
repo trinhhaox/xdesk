@@ -14,6 +14,18 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
+import vn.xox.xdesk.app.ui.theme.XdeskOverlay
+import vn.xox.xdesk.app.awaitingFrame
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -38,6 +50,9 @@ import kotlinx.coroutines.delay
 import vn.xox.xdesk.app.FloatingControlStore
 import vn.xox.xdesk.app.PointerSettingsStore
 import vn.xox.xdesk.app.ViewerController
+import vn.xox.xdesk.app.clearViewport
+import vn.xox.xdesk.app.onViewportChanged
+import vn.xox.xdesk.app.switchFit
 import vn.xox.xdesk.app.nextFit
 
 /**
@@ -88,7 +103,7 @@ fun StreamScreen(controller: ViewerController, window: Window) {
         Overlay(controller)
         controller.agentApproval?.takeIf { controller.streaming }?.let { AgentApprovalDialog(it, controller::answerAgentApproval) }
         val actions = floatingActions(controller, pointerStore, zoomed, onKeyboard = { viewRef?.surfaceView?.showKeyboard() }, onResetZoom = { viewRef?.resetZoom() }) { showPointerSettings = true }
-        FloatingControl(floatingStore, controller.stats, actions, Modifier.padding(bottom = with(density) { obscured.toDp() }))
+        if (!controller.awaitingFrame && controller.sasCode == null) FloatingControl(floatingStore, controller.stats, actions, Modifier.padding(bottom = with(density) { obscured.toDp() }))
         controller.input?.takeIf { imeBottom > 0 }?.let {
             KeyBar(it, onHide = { viewRef?.surfaceView?.hideKeyboard() }, modifier = Modifier.align(Alignment.BottomCenter).imePadding())
         }
@@ -113,17 +128,34 @@ private fun floatingActions(
     controller.nextFit()?.let { next -> add(FloatingAction("Kiểu: ${controller.display.fit.title()}", "Đổi kiểu Bản sao sang ${next.title()}, kết nối lại") { controller.switchFit(next) }) }
 }
 
+/** Mã SAS có lớp phủ riêng; còn lại, từ lúc chạm Mac tới khung hình đầu tiên là lớp phủ "Đang kết nối" có nút Huỷ. */
 @Composable
 private fun Overlay(controller: ViewerController) {
     val code = controller.sasCode
     if (code != null) {
-        Column(Modifier.fillMaxSize().background(Color(0xE6000000)), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(Modifier.fillMaxSize().background(XdeskOverlay.scrim), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
             SasCodeView(code)
         }
-    } else if (controller.connecting) {
-        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator()
-            Text("Đang kết nối…", color = Color.White, modifier = Modifier.padding(top = 12.dp))
-        }
+    } else if (controller.awaitingFrame) {
+        ConnectingOverlay(controller.progress.targetName, onCancel = controller::disconnect)
+    }
+}
+
+/** Nền đặc để không lộ khung hình dở dang; chặn chạm để không gửi click xuống Mac khi chưa có hình. */
+@Composable
+private fun ConnectingOverlay(name: String, onCancel: () -> Unit) {
+    Column(
+        Modifier.fillMaxSize().background(Color.Black).pointerInput(Unit) { detectTapGestures { } },
+        verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        CircularProgressIndicator(color = XdeskOverlay.accentLight)
+        Text(
+            if (name.isBlank()) "Đang kết nối…" else "Đang kết nối tới $name…", color = XdeskOverlay.content, style = MaterialTheme.typography.titleMedium,
+            textAlign = TextAlign.Center, modifier = Modifier.padding(top = 16.dp, start = 24.dp, end = 24.dp).semantics { liveRegion = LiveRegionMode.Polite },
+        )
+        OutlinedButton(
+            onCancel, Modifier.padding(top = 24.dp), border = BorderStroke(1.dp, XdeskOverlay.outline),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = XdeskOverlay.content),
+        ) { Text("Huỷ") }
     }
 }

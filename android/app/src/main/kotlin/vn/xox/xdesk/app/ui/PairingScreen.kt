@@ -22,18 +22,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import vn.xox.xdesk.app.Screen
 import vn.xox.xdesk.app.ViewerController
 import vn.xox.xdesk.app.pairWithQr
+import vn.xox.xdesk.app.ui.theme.XdeskCard
 import vn.xox.xdesk.transport.ViewerTarget
 
 /** Ghép đôi: quét QR (xin quyền camera chỉ ở đây) hoặc so mã 6 số với host đã chọn/nhập tay. */
 @Composable
 fun PairingScreen(controller: ViewerController) {
-    var tab by remember { mutableIntStateOf(0) }
+    var tab by remember { mutableIntStateOf(if (controller.pairOnSas) 1 else 0) }
     Column(Modifier.fillMaxSize()) {
         TabRow(selectedTabIndex = tab) {
             Tab(tab == 0, { tab = 0 }, text = { Text("Quét QR") })
@@ -60,12 +61,17 @@ private fun SasPairing(controller: ViewerController) {
     Row { Button(onClick = { target?.let(controller::pairWithSas) }, enabled = target != null) { Text("Ghép đôi") } }
 }
 
-/** Mã SAS "NNN NNN" cỡ lớn trong lúc chờ người dùng bấm "Khớp" trên Mac. */
+/**
+ * Mã SAS "NNN NNN" cỡ lớn trong lúc chờ người dùng bấm "Khớp" trên Mac. Dùng kiểu chữ displayMedium (sp, co giãn theo cỡ chữ hệ thống) với chữ số
+ * đơn cách, trong thẻ riêng để đủ tương phản dù nằm trên video.
+ */
 @Composable
 fun SasCodeView(code: String, modifier: Modifier = Modifier) {
-    Column(modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("So mã với màn hình Mac", style = MaterialTheme.typography.titleMedium)
-        Text(code, fontSize = 56.sp, fontFamily = FontFamily.Monospace, textAlign = TextAlign.Center)
-        Text("Nếu hai mã giống nhau, bấm Khớp trên Mac. Nếu khác, bấm Không khớp: có thể đang bị nghe lén.", textAlign = TextAlign.Center)
+    XdeskCard(modifier.padding(24.dp)) {
+        Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("So mã với màn hình Mac", style = MaterialTheme.typography.titleMedium)
+            Text(code, style = MaterialTheme.typography.displayMedium.copy(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold), textAlign = TextAlign.Center)
+            Text("Nếu hai mã giống nhau, bấm Khớp trên Mac. Nếu khác, bấm Không khớp: có thể đang bị nghe lén.", textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyMedium)
+        }
     }
 }

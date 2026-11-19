@@ -2,20 +2,25 @@ package vn.xox.xdesk.app
 
 import android.os.Build
 import android.os.Bundle
+import android.view.HapticFeedbackConstants
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.core.view.WindowCompat
@@ -28,6 +33,7 @@ import vn.xox.xdesk.app.ui.PairingScreen
 import vn.xox.xdesk.app.ui.SecuritySettingsScreen
 import vn.xox.xdesk.app.ui.StreamScreen
 import vn.xox.xdesk.app.ui.UpdatePrompt
+import vn.xox.xdesk.app.ui.theme.XdeskTheme
 
 class MainActivity : ComponentActivity() {
     private val controller: ViewerController by viewModels {
@@ -55,6 +61,8 @@ class MainActivity : ComponentActivity() {
         // Cửa sổ luôn tràn viền (cả Android 13 chưa ép edge-to-edge): nếu không, hệ điều hành tự chừa chỗ thanh trạng thái đã ẩn
         // và vùng video nhỏ hơn cỡ đã xin với host. Vùng an toàn do Compose chừa.
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        @Suppress("DEPRECATION") // Android 13: thanh hệ thống phải trong suốt để màu nền giao diện (sáng/tối) lan tới mép.
+        window.apply { statusBarColor = android.graphics.Color.TRANSPARENT; navigationBarColor = android.graphics.Color.TRANSPARENT }
         window.attributes = window.attributes.apply { layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES }
         browser = NsdBrowser(this, controller::updateHosts)
         val updates = (application as XdeskApplication).container.updates
@@ -63,8 +71,13 @@ class MainActivity : ComponentActivity() {
         // Các màn danh sách chừa vùng an toàn (tai thỏ, thanh hệ thống, bàn phím); màn stream ẩn thanh hệ thống nên chỉ chừa tai thỏ,
         // và không chừa chỗ cho bàn phím: tự dịch video lên để vùng video giữ nguyên kích thước (đổi kích thước sẽ mở lại phiên).
         setContent {
-            val insets = if (controller.screen == Screen.STREAM) Modifier.background(Color.Black).windowInsetsPadding(WindowInsets.displayCutout) else Modifier.safeDrawingPadding()
-            MaterialTheme { Surface(insets) { Root() } }
+            val stream = controller.screen == Screen.STREAM
+            val insets = if (stream) Modifier.windowInsetsPadding(WindowInsets.displayCutout) else Modifier.safeDrawingPadding()
+            XdeskTheme {
+                val dark = isSystemInDarkTheme()
+                SideEffect { WindowCompat.getInsetsController(window, window.decorView).apply { isAppearanceLightStatusBars = !dark; isAppearanceLightNavigationBars = !dark } }
+                Surface(Modifier.fillMaxSize(), color = if (stream) Color.Black else MaterialTheme.colorScheme.background) { Box(insets) { Root() } }
+            }
         }
     }
 
@@ -80,6 +93,10 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun Root() {
+        val view = LocalView.current
+        LaunchedEffect(controller.progress.pairingResult) {
+            controller.progress.pairingResult?.let { view.performHapticFeedback(if (it.success) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.REJECT) }
+        }
         BackHandler(enabled = controller.screen != Screen.HOSTS) {
             if (controller.screen == Screen.STREAM) controller.disconnect() else controller.screen = Screen.HOSTS
         }

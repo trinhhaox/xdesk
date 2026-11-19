@@ -17,9 +17,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -32,12 +38,9 @@ import androidx.compose.ui.unit.sp
 import vn.xox.xdesk.app.StreamInputRouter
 import vn.xox.xdesk.app.input.HidKeys
 import vn.xox.xdesk.app.input.StickyModifiers.State
+import vn.xox.xdesk.app.ui.theme.XdeskOverlay
 import vn.xox.xdesk.transport.InputModifiers
 
-private val Brand = Color(0xFF2F6BFF)
-private val BarBackground = Color(0xFF0E1015)
-private val KeyBackground = Color(0xFF4A5063)
-private val KeyOutline = Color(0x66FFFFFF)
 val KeyBarHeight = 48.dp
 
 /**
@@ -46,10 +49,10 @@ val KeyBarHeight = 48.dp
  */
 @Composable
 fun KeyBar(router: StreamInputRouter, onHide: () -> Unit, modifier: Modifier = Modifier) {
-    Column(modifier.fillMaxWidth().background(BarBackground)) {
+    Column(modifier.fillMaxWidth().background(XdeskOverlay.panel)) {
         if (router.composingPreview.isNotEmpty()) {
             Text(
-                router.composingPreview, color = Color.White, fontSize = 15.sp,
+                router.composingPreview, color = XdeskOverlay.content, fontSize = 15.sp,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp).semantics { contentDescription = "Đang soạn: ${router.composingPreview}" },
             )
         }
@@ -75,7 +78,7 @@ fun KeyBar(router: StreamInputRouter, onHide: () -> Unit, modifier: Modifier = M
 }
 
 @Composable
-private fun Divider() = Box(Modifier.padding(horizontal = 2.dp).width(1.dp).height(24.dp).background(Color(0x55FFFFFF)))
+private fun Divider() = Box(Modifier.padding(horizontal = 2.dp).width(1.dp).height(24.dp).background(XdeskOverlay.divider))
 
 @Composable
 private fun PlainKey(label: String, name: String, router: StreamInputRouter, usage: Int) =
@@ -88,13 +91,19 @@ private fun ModifierKey(label: String, name: String, router: StreamInputRouter, 
 @Composable
 private fun Key(label: String, name: String, state: State, hint: String?, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val shape = RoundedCornerShape(8.dp)
+    val haptic = LocalHapticFeedback.current
+    var previous by remember { mutableStateOf(state) }
+    LaunchedEffect(state) {
+        if (state == State.LOCKED && previous != State.LOCKED) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        previous = state
+    }
     val description = hint ?: ""
     Box(
         modifier
             .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
             .padding(2.dp)
-            .background(if (state == State.LOCKED) Brand else if (state == State.ARMED) Brand.copy(alpha = 0.5f) else KeyBackground, shape)
-            .border(if (state == State.OFF) 1.dp else 2.dp, if (state == State.OFF) KeyOutline else Color.White, shape)
+            .background(if (state == State.LOCKED) XdeskOverlay.accent else if (state == State.ARMED) XdeskOverlay.accent.copy(alpha = 0.5f) else XdeskOverlay.key, shape)
+            .border(if (state == State.OFF) 1.dp else 2.dp, if (state == State.OFF) XdeskOverlay.outline else XdeskOverlay.content, shape)
             .clickable(onClickLabel = name, onClick = onClick)
             .semantics {
                 role = Role.Button
@@ -106,6 +115,6 @@ private fun Key(label: String, name: String, state: State, hint: String?, modifi
             },
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp))
+        Text(label, color = XdeskOverlay.content, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp))
     }
 }

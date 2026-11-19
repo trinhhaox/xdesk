@@ -19,6 +19,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -31,7 +35,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -50,10 +53,11 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import vn.xox.xdesk.app.FloatingControlStore
 import vn.xox.xdesk.app.FloatingPlacement
+import vn.xox.xdesk.app.ui.theme.XdeskOverlay
 
 private val ButtonSize = 48.dp
-private val Panel = Color(0xFF16181F)
-private val Outline = Color(0x8CFFFFFF)
+private val Panel = XdeskOverlay.panel
+private val Outline = XdeskOverlay.outline
 private const val IDLE_ALPHA = 0.7f
 private const val IDLE_MS = 3000L
 private const val EXPANDED_MS = 8000L
@@ -95,14 +99,14 @@ fun FloatingControl(store: FloatingControlStore, status: String, actions: List<F
                     .shadow(8.dp, RoundedCornerShape(14.dp)).background(Panel, RoundedCornerShape(14.dp)).border(1.dp, Outline, RoundedCornerShape(14.dp))
                     .verticalScroll(rememberScrollState()).padding(6.dp),
             ) {
-                if (status.isNotBlank()) Text(status, color = Color(0xFFC8CCD8), fontSize = 12.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
+                if (status.isNotBlank()) Text(status, color = XdeskOverlay.contentMuted, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
                 actions.forEach { a ->
                     Box(
                         Modifier.fillMaxWidth().heightIn(min = 48.dp)
                             .pointerInput(a) { detectTapGestures(onTap = { if (a.enabled) { a.onClick(); expanded = false; activity++ } }) }
                             .semantics { contentDescription = a.description; role = Role.Button; onClick { if (a.enabled) { a.onClick(); expanded = false; activity++ }; true } },
                         contentAlignment = Alignment.CenterStart,
-                    ) { Text(a.label, color = if (a.enabled) Color.White else Color(0x80FFFFFF), fontSize = 16.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(horizontal = 12.dp)) }
+                    ) { Text(a.label, color = if (a.enabled) XdeskOverlay.content else XdeskOverlay.contentDisabled, fontSize = 16.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(horizontal = 12.dp)) }
                 }
             }
         }
@@ -130,6 +134,6 @@ fun FloatingControl(store: FloatingControlStore, status: String, actions: List<F
                     onClick { expanded = !expanded; activity++; true }
                 },
             contentAlignment = Alignment.Center,
-        ) { Text(if (expanded) "✕" else "⋯", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold) }
+        ) { Icon(if (expanded) Icons.Filled.Close else Icons.Filled.MoreVert, contentDescription = null, tint = XdeskOverlay.content, modifier = Modifier.size(28.dp)) }
     }
 }
