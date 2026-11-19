@@ -4,6 +4,7 @@ struct MenuBarContent: View {
     let host: HostController
     let viewer: ViewerController
     let pairing: PairingCoordinator
+    let agent: AgentController
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -33,6 +34,8 @@ struct MenuBarContent: View {
         if viewer.session != nil {
             Button("Ngắt kết nối viewer") { Task { await viewer.disconnect() } }
         }
+        Divider()
+        AgentMenuSection(agent: agent)
         Divider()
         Button("Thoát Xdesk") { NSApplication.shared.terminate(nil) }
             .keyboardShortcut("q")

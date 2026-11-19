@@ -22,12 +22,13 @@ import XdeskViewer
 ///   --pair-sas host:port        viewer ghép đôi bằng so mã 6 số (in `xdesk-sas-viewer-code NNN NNN`; host in `xdesk-sas-host-code`)
 ///   --revoke-viewers-after <giây>  host thu hồi mọi viewer đã ghép → phiên phải bị cắt ≤ 1 s
 ///   --disconnect-after <giây>   viewer tự ngắt (host vẫn chạy) → màn hình ảo phải biến mất
+///   --enable-mcp [tệp]          bật máy chủ MCP (không lưu cài đặt); có tệp thì ghi token vào đó (0600) cho script curl
 ///   --quit-after <giây>         tự thoát
 @MainActor
 enum AutomationHooks {
     private static let log = Logger(subsystem: "vn.xox.xdesk", category: "automation")
 
-    static func run(host: HostController, viewer: ViewerController, security: SecurityCenter, pairing: PairingCoordinator) async {
+    static func run(host: HostController, viewer: ViewerController, security: SecurityCenter, pairing: PairingCoordinator, agent: AgentController) async {
         let args = CommandLine.arguments
         viewer.options.retina = args.contains("--retina")
         viewer.options.fullScreen = args.contains("--fullscreen")
@@ -35,6 +36,11 @@ enum AutomationHooks {
         if args.contains("--auto-host") {
             await host.start()
             log.notice("auto-host status: \(String(describing: host.status), privacy: .public)")
+        }
+        if args.contains("--enable-mcp") {
+            await agent.setEnabled(true, persist: false)
+            log.notice("auto-mcp status: \(String(describing: agent.status), privacy: .public)")
+            if let path = value(after: "--enable-mcp", in: args), !path.hasPrefix("--") { agent.writeTokenForAutomation(to: path) }
         }
         if let path = value(after: "--snapshot-approval", in: args) {
             Task { await snapshotApproval(pairing, to: path) }
