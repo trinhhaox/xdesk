@@ -42,6 +42,8 @@ class FakeHost(val identity: DeviceIdentity = DeviceIdentity.generate()) : Close
     val port: Int get() = server.localPort
     val udpPort: Int get() = udp.localPort
     private var sender: StreamSender? = null
+    private val sendLock = Any()
+    @Volatile private var push: ((ControlMessage, Long) -> Unit)? = null
 
     init { thread(isDaemon = true) { while (!server.isClosed) { runCatching { serve(server.accept()) } } } }
 
@@ -82,12 +84,13 @@ class FakeHost(val identity: DeviceIdentity = DeviceIdentity.generate()) : Close
         val tx = StreamSender(keys.tcpSend).also { sender = it }
         val rx = StreamReceiver(keys.tcpReceive)
         decoder.extraBulkAllowance = 16
-        fun send(message: ControlMessage, id: Long = 0) {
+        fun send(message: ControlMessage, id: Long = 0) = synchronized(sendLock) {
             val plain = ControlMessageCodec.encode(ControlEnvelope(id, message))
             val ct = tx.seal(ControlFrameKind.CONTROL.raw, plain)
             val len = 1 + ct.size
             socket.getOutputStream().write(byteArrayOf((len ushr 24).toByte(), (len ushr 16).toByte(), (len ushr 8).toByte(), len.toByte(), 2) + ct)
         }
+        push = ::send
         if (begin.pattern != NoisePattern.IK) send(ControlMessage.PairResult(true))
         while (true) {
             val f = frame()
@@ -106,6 +109,9 @@ class FakeHost(val identity: DeviceIdentity = DeviceIdentity.generate()) : Close
             }
         }
     }
+
+    /** Gửi chủ động một message điều khiển (đã mã hoá) tới viewer đang kết nối. */
+    fun push(message: ControlMessage, id: Long = 0) = checkNotNull(push) { "chưa có phiên" }(message, id)
 
     /** Chờ probe của viewer rồi gửi `datagrams` (đã mã hoá bằng khoá UDP chiều host→viewer). */
     fun sendUdp(build: (DatagramSender) -> List<ByteArray>, timeoutMs: Int = 3000): DatagramPacket {

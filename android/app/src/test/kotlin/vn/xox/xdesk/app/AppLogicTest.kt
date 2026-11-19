@@ -16,6 +16,7 @@ import vn.xox.xdesk.app.identity.WrappedKeyCodec
 import vn.xox.xdesk.app.input.HidKeys
 import vn.xox.xdesk.app.input.TextAction
 import vn.xox.xdesk.app.input.TextInputBridge
+import vn.xox.xdesk.app.ui.agentApprovalTitle
 import vn.xox.xdesk.crypto.DeviceIdentity
 import vn.xox.xdesk.transport.FileKnownHostStore
 import vn.xox.xdesk.transport.InputModifiers
@@ -90,5 +91,10 @@ class AppLogicTest {
         val target = DiscoveredHost("ID", "Mac", "10.0.0.5", 5555).toTarget()
         assertEquals("10.0.0.5:5555", target.address)
         assertEquals("ID", target.hostId)
+    }
+
+    @Test
+    fun agentApprovalTitleNamesTheAgent() {
+        assertEquals("Claude muốn điều khiển máy Mac", agentApprovalTitle("Claude"))
     }
 }

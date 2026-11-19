@@ -6,6 +6,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import vn.xox.xdesk.testing.Vectors
 import vn.xox.xdesk.testing.hex
 import vn.xox.xdesk.testing.int
@@ -71,6 +72,8 @@ class ControlVectorsTest {
             ControlMessage.PairResult(true),
             ControlMessage.Rekey,
             ControlMessage.RekeyResync(7, ask = true),
+            ControlMessage.AgentApprove("r1", "Claude", "Mở TextEdit", 1_700_000_060_000),
+            ControlMessage.AgentApprove.response("r1", allow = false),
         )
         for (m in cases) {
             val bytes = ControlMessageCodec.encode(ControlEnvelope(0, m))
@@ -88,6 +91,19 @@ class ControlVectorsTest {
     fun inputTextLimitIsEnforced() {
         val big = ControlMessage.InputText("a".repeat(4097))
         assertEquals("invalidField", errorOf { ControlMessageCodec.encode(ControlEnvelope(1, big)) })
+    }
+
+    @Test
+    fun agentApproveDistinguishesRequestFromResponseAndEnforcesLimits() {
+        val request = ControlMessage.AgentApprove("r1", "Claude", "Mở TextEdit", 5)
+        assertTrue(request.isRequest)
+        assertTrue(!ControlMessage.AgentApprove.response("r1", true).isRequest)
+        val bytes = ControlMessageCodec.encode(ControlEnvelope(3, ControlMessage.AgentApprove.response("r", false)))
+        assertEquals("""{"allow":false,"id":3,"requestId":"r","t":"agent.approve"}""", String(bytes))
+        val long = ControlMessage.AgentApprove("r", "a", "x".repeat(513), 1)
+        assertEquals("invalidField", errorOf { ControlMessageCodec.encode(ControlEnvelope(1, long)) })
+        assertEquals("invalidField", errorOf { ControlMessageCodec.encode(ControlEnvelope(1, ControlMessage.AgentApprove(""))) })
+        assertEquals("malformedJSON", errorOf { ControlMessageCodec.decode("""{"id":1,"t":"agent.approve"}""".toByteArray()) })
     }
 
     @Test

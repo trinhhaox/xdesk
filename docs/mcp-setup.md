@@ -1,8 +1,6 @@
 # Kết nối agent AI với Xdesk qua MCP
 
-Xdesk có sẵn một máy chủ MCP cục bộ để agent AI (Claude Code, Cursor, Codex…) đọc trạng thái và, từ phase 08b, điều khiển màn hình riêng "Bàn làm việc agent". Mặc định **TẮT**.
-
-> Phase 08a (bản này) chỉ có `xdesk_status` chạy thật. 13 tool còn lại có đủ schema nhưng trả lỗi "Chưa hỗ trợ ở bản này (phase 08b)".
+Xdesk có sẵn một máy chủ MCP cục bộ để agent AI (Claude Code, Cursor, Codex…) đọc trạng thái và điều khiển một màn hình ảo riêng tên **"Xdesk Agent"**, không đụng tới màn hình của bạn. Mặc định **TẮT**. Cả 14 tool đều chạy thật; mọi tool ngoài `xdesk_status`, `xdesk_request_control`, `xdesk_end_control` chỉ hoạt động khi bạn đã cấp quyền.
 
 ## Bật máy chủ
 
@@ -57,6 +55,59 @@ export XDESK_MCP_TOKEN="<token>"
 
 Tên khoá có thể khác giữa các phiên bản Codex; xem `codex mcp --help` nếu cấu hình không nhận.
 
+## Cấp quyền và dừng khẩn cấp
+
+Agent phải gọi `xdesk_request_control` trước. Xdesk hỏi bạn (hộp thoại "Agent AI xin quyền" trên Mac, và cả điện thoại nếu có, xem mục dưới); **chỉ khi bạn bấm Cho phép** màn hình "Xdesk Agent" mới được tạo (mặc định 1280x800, không HiDPI). Không trả lời trong 60 giây là từ chối.
+
+Trong lúc agent điều khiển, một banner luôn nằm trên cùng màn hình agent (không nhận focus, không lọt vào ảnh chụp hay luồng stream):
+
+- **Tạm dừng / Tiếp tục**: khi tạm dừng, mọi tool điều khiển bị chặn tới khi bạn bấm Tiếp tục.
+- **Dừng**: kết thúc quyền ngay; agent phải xin lại.
+- Phím tắt toàn cục **⌃⌥⌘.** (Control+Option+Command+dấu chấm) **tạm dừng** agent, không cần quyền riêng. Muốn cho chạy tiếp thì bấm **Tiếp tục** trên banner, muốn kết thúc thì bấm **Dừng**.
+- Chạm chuột hoặc bàn phím thật vào màn hình agent cũng tự tạm dừng (cần quyền Giám sát đầu vào, xem dưới; bấm vào chính banner thì không tính).
+- Agent im lặng quá **120 giây** (mặc định) thì quyền tự nhả; agent phải xin lại.
+
+## Màn hình "Xdesk Agent"
+
+- Sau `xdesk_end_control` (hoặc khi bạn bấm Dừng), màn hình agent **vẫn được giữ** để bạn xem lại kết quả. Banner ẩn đi.
+- Gỡ bằng mục **Gỡ màn hình agent** trên menu Xdesk (chỉ hiện khi màn hình đang tồn tại). Tắt công tắc MCP cũng gỡ nó.
+- Chỉ dùng được khi hệ thống tạo được màn hình ảo thật. Nếu macOS chỉ cho phản chiếu màn hình chính thì Xdesk từ chối cấp, vì agent không bao giờ được điều khiển màn hình của bạn.
+- `xdesk_set_workspace_size` đổi kích thước trong khoảng 640x480 đến 3840x2160 (màn hình được tạo lại, `ref` cũ hết hiệu lực).
+
+## Luật theo ứng dụng
+
+Mỗi lần agent thao tác, Xdesk kiểm ứng dụng đích (cửa sổ dưới con trỏ với chuột/cuộn, cửa sổ đang focus với phím) theo luật theo bundle id:
+
+| Luật | Ý nghĩa |
+| --- | --- |
+| `allow` (Cho phép) | Cho qua |
+| `ask` (Hỏi) | Hỏi bạn một lần cho mỗi app trong một lượt cấp quyền (60 giây; hết giờ là từ chối) |
+| `never` (Cấm) | Từ chối luôn |
+
+- App chưa có luật: **hỏi**.
+- Mặc định chặn (`never`): Cài đặt hệ thống (`com.apple.systempreferences`, kể cả mở thẳng bằng URL `x-apple.systempreferences:`), Truy cập chuỗi khoá (`com.apple.keychainaccess`), Terminal (`com.apple.Terminal`).
+- Sửa luật và thời gian im lặng (15 đến 1800 giây, mặc định 120) ở **Cài đặt agent AI…** trên menu Xdesk; lưu trong UserDefaults của app.
+- Gõ vào ô mật khẩu (`AXSecureTextField`) bị từ chối.
+
+## Quyền macOS cần cấp cho Xdesk
+
+| Quyền | Dùng để | Thiếu thì |
+| --- | --- | --- |
+| **Trợ năng** (Accessibility) | Chèn chuột/bàn phím, đọc cây giao diện (`xdesk_ui_tree`), đưa cửa sổ lên màn hình agent (`xdesk_launch`) | Tool báo lỗi kèm hướng dẫn |
+| **Ghi màn hình** (Screen Recording) | `xdesk_screenshot` | Tool báo lỗi kèm đường dẫn cài đặt |
+| **Giám sát đầu vào** (Input Monitoring) | Phát hiện bạn chạm vào màn hình agent để tự tạm dừng | Agent vẫn chạy nhưng không tự dừng khi bạn chạm; menu hiện "Thiếu quyền Giám sát đầu vào" |
+
+Cấp ở Cài đặt hệ thống › Quyền riêng tư & Bảo mật. Xdesk không tự cấp được các quyền này.
+
+## Duyệt quyền trên điện thoại
+
+Khi agent xin quyền (hoặc xin dùng một app có luật `ask`), Xdesk gửi yêu cầu `agent.approve` tới **mọi điện thoại đang xem màn hình và có quyền input**, cùng lúc với hộp thoại trên Mac. Điện thoại hiện hộp thoại "‹agent› muốn điều khiển máy Mac" kèm lý do, nút **Cho phép** / **Từ chối** (iOS và Android). **Trả lời đầu tiên thắng**: bên còn lại tự đóng, trả lời muộn bị bỏ. Hộp thoại tự đóng khi hết hạn (60 giây). Viewer chỉ xem (không có quyền input) và viewer bản cũ không nhận được yêu cầu.
+
+## Giới hạn đã biết
+
+- **Con trỏ thật nhảy**: agent thao tác bằng sự kiện chuột/bàn phím hệ thống nên mỗi lần agent click, con trỏ thật của bạn nhảy sang màn hình agent. Tránh dùng chuột lúc agent đang làm việc (chạm vào màn hình agent sẽ tạm dừng nó).
+- **Gõ chữ/phím chỉ vào cửa sổ nằm trên màn hình agent**: nếu cửa sổ đang focus ở màn hình khác, `xdesk_type_text` và `xdesk_press_keys` từ chối; agent phải click vào cửa sổ trên màn hình agent trước.
+
 ## Mô hình bảo mật
 
 - **Chỉ loopback**: lắng nghe duy nhất `127.0.0.1`. Không mở ở LAN hay Tailscale. Kiểm: `lsof -nP -iTCP -sTCP:LISTEN | grep -i xdesk`.
@@ -90,4 +141,9 @@ npx @modelcontextprotocol/inspector --cli http://127.0.0.1:47810/mcp --transport
   --header "Authorization: Bearer $TOKEN" --method tools/list
 ```
 
-Bản Debug có cờ `--enable-mcp [tệp]` bật máy chủ không lưu cài đặt và ghi token vào tệp (0600) cho script kiểm thử.
+## Cờ chỉ có ở bản Debug
+
+Dành cho kiểm thử tự động, **không tồn tại ở bản Release**:
+
+- `--enable-mcp [tệp]`: bật máy chủ MCP mà không lưu cài đặt; có `tệp` thì ghi token vào đó (quyền 0600) cho script curl.
+- `--auto-approve-agent`: bỏ qua mọi hộp thoại duyệt (xin quyền và luật `ask`). Không bao giờ dùng với agent thật.

@@ -12,6 +12,7 @@ import vn.xox.xdesk.app.discovery.DiscoveredHost
 import vn.xox.xdesk.crypto.CryptoException
 import vn.xox.xdesk.crypto.PairingURI
 import vn.xox.xdesk.media.VideoDecoder
+import vn.xox.xdesk.transport.AgentApprovalRequest
 import vn.xox.xdesk.transport.DisplayConfigPlanner
 import vn.xox.xdesk.transport.KnownHost
 import vn.xox.xdesk.transport.TransportErrorCode
@@ -46,6 +47,8 @@ class ViewerController(private val container: AppContainer, private val deviceNa
     var failure by mutableStateOf<ConnectionFailure?>(null)
     var pairTarget by mutableStateOf<ViewerTarget?>(null)
     var stats by mutableStateOf("")
+    /** Yêu cầu duyệt agent AI đang chờ; null khi hết hạn, đã trả lời hoặc Mac đã duyệt trước. */
+    var agentApproval by mutableStateOf<AgentApprovalRequest?>(null)
     var input: StreamInputRouter? = null
         private set
 
@@ -89,7 +92,7 @@ class ViewerController(private val container: AppContainer, private val deviceNa
         lastTarget = targets.firstOrNull()
         currentConfig = config
         val next = ViewerSession(trust, deviceName, { decoder.submit(it) }, { post { onState(it) } },
-            { Thread(it, "xdesk-udp").also { t -> t.priority = Thread.MAX_PRIORITY } })
+            { Thread(it, "xdesk-udp").also { t -> t.priority = Thread.MAX_PRIORITY } }, onAgentApproval = { post { agentApproval = it } })
         session = next
         input = StreamInputRouter(next).also { it.configure(config.w / config.scale.toFloat(), config.h / config.scale.toFloat()) }
         background.execute { next.connect(targets, config, auth) }
@@ -101,7 +104,7 @@ class ViewerController(private val container: AppContainer, private val deviceNa
             ViewerState.Connecting -> connecting = true
             ViewerState.Idle -> { connecting = false; streaming = false }
             is ViewerState.Failed -> {
-                connecting = false; streaming = false; sasCode = null
+                connecting = false; streaming = false; sasCode = null; agentApproval = null
                 decoder.stop()
                 failure = ConnectionFailure(state.message, state.code in REPAIRABLE)
                 pairTarget = lastTarget
@@ -127,7 +130,7 @@ class ViewerController(private val container: AppContainer, private val deviceNa
         input = null
         decoder.stop()
         background.execute { ending.disconnect() }
-        connecting = false; streaming = false
+        connecting = false; streaming = false; agentApproval = null
         screen = Screen.HOSTS
         knownHosts = container.knownHosts.all()
     }
@@ -135,6 +138,11 @@ class ViewerController(private val container: AppContainer, private val deviceNa
     fun forget(id: String) {
         container.knownHosts.remove(id)
         knownHosts = container.knownHosts.all()
+    }
+
+    fun answerAgentApproval(allow: Boolean) {
+        session?.answerAgentApproval(allow)
+        agentApproval = null
     }
 
     fun refreshStats() {

@@ -96,6 +96,11 @@
       "error" : "invalidField",
       "json" : "{\"id\":1,\"jitterMs\":0,\"lossPermille\":1001,\"recvKbps\":0,\"rttMs\":0,\"t\":\"net.report\"}",
       "name" : "net-report-loss-over-1000"
+    },
+    {
+      "error" : "invalidField",
+      "json" : "{\"id\":1,\"requestId\":\"\",\"t\":\"agent.approve\"}",
+      "name" : "agent-approve-empty-request-id"
     }
   ],
   "messages" : [
@@ -217,6 +222,27 @@
       "json" : "{\"id\":14,\"t\":\"future.thing\"}",
       "name" : "unknown-type",
       "type" : "future.thing"
+    },
+    {
+      "frameHex" : "00000092027b226167656e744e616d65223a22436c61756465222c22657870697265734174223a313730303030303036303030302c226964223a31352c22726571756573744964223a227265712d37663361222c2273756d6d617279223a224de1bb9f2054657874456469742076c3a02067c3b5206ce1bb9d69206368c3a06f222c2274223a226167656e742e617070726f7665227d",
+      "id" : 15,
+      "json" : "{\"agentName\":\"Claude\",\"expiresAt\":1700000060000,\"id\":15,\"requestId\":\"req-7f3a\",\"summary\":\"Mở TextEdit và gõ lời chào\",\"t\":\"agent.approve\"}",
+      "name" : "agent-approve-request",
+      "type" : "agent.approve"
+    },
+    {
+      "frameHex" : "00000042027b22616c6c6f77223a747275652c226964223a31352c22726571756573744964223a227265712d37663361222c2274223a226167656e742e617070726f7665227d",
+      "id" : 15,
+      "json" : "{\"allow\":true,\"id\":15,\"requestId\":\"req-7f3a\",\"t\":\"agent.approve\"}",
+      "name" : "agent-approve-response-allow",
+      "type" : "agent.approve"
+    },
+    {
+      "frameHex" : "00000043027b22616c6c6f77223a66616c73652c226964223a31362c22726571756573744964223a227265712d39633031222c2274223a226167656e742e617070726f7665227d",
+      "id" : 16,
+      "json" : "{\"allow\":false,\"id\":16,\"requestId\":\"req-9c01\",\"t\":\"agent.approve\"}",
+      "name" : "agent-approve-response-deny",
+      "type" : "agent.approve"
     }
   ],
   "version" : 1

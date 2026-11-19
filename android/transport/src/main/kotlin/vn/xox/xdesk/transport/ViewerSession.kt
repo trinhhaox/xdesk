@@ -9,14 +9,6 @@ import vn.xox.xdesk.wire.ControlMessage
 import vn.xox.xdesk.wire.InputEvent
 import vn.xox.xdesk.wire.MediaPacket
 
-/** Trạng thái phiên viewer. */
-sealed interface ViewerState {
-    object Idle : ViewerState
-    object Connecting : ViewerState
-    object Streaming : ViewerState
-    class Failed(val message: String, val code: TransportErrorCode? = null) : ViewerState
-}
-
 /**
  * Phía viewer của một kết nối: handshake → UDP → ghép frame (giao cho [frameSink]), ping/pong (ClockSync),
  * `net.report` mỗi 500 ms và `keyframe.request` khi cần. Mọi việc gửi đi chạy trên một executor I/O riêng
@@ -30,6 +22,7 @@ class ViewerSession(
     private val onState: (ViewerState) -> Unit = {},
     private val threadFactory: (Runnable) -> Thread = { Thread(it, "xdesk-udp") },
     private val nowMs: () -> Long = System::currentTimeMillis,
+    onAgentApproval: (AgentApprovalRequest?) -> Unit = {},
 ) {
     private val connector = ViewerConnector(trust, deviceName, nowMs)
     private val lock = Any()
@@ -39,6 +32,7 @@ class ViewerSession(
     private var inputPump: InputPump? = null
     private var streamId = 0
     private val metrics = SessionMetrics()
+    private val approvals = AgentApprovalGate(nowMs, { delayMs, task -> io?.schedule(task, delayMs, TimeUnit.MILLISECONDS) }, onAgentApproval)
     private var lastKeyframeRequestMs = 0L
 
     @Volatile var state: ViewerState = ViewerState.Idle
@@ -51,11 +45,12 @@ class ViewerSession(
     val recvKbps: Int get() = metrics.recvKbps
     val rttMs: Long? get() = metrics.rttMs
     val clockOffsetMs: Double? get() = metrics.clockOffsetMs
-
     val refusedHostId: String? get() = connector.refusedHostId
     /** Sự kiện input chờ host ack (-1 khi chưa streaming). */
     val pendingInputCount: Int get() = inputPump?.pendingCount ?: -1
     val udpStats: UdpChannelStats? get() = channel?.stats
+    /** Yêu cầu duyệt agent AI đang chờ (null nếu không có / đã hết hạn / đã trả lời). */
+    val pendingAgentApproval: AgentApprovalRequest? get() = approvals.pending
 
     /** Chặn tới khi streaming hoặc lỗi. Trả `true` nếu streaming. */
     fun connect(candidates: List<ViewerTarget>, config: ControlMessage.DisplayConfig, auth: ViewerAuth = ViewerAuth.Automatic): Boolean {
@@ -100,6 +95,12 @@ class ViewerSession(
         }
     }
 
+    /** Trả lời yêu cầu duyệt trên kênh điều khiển mã hoá; chỉ lần đầu có tác dụng, trả lời sau khi hết hạn bị bỏ. */
+    fun answerAgentApproval(allow: Boolean) {
+        val request = approvals.take() ?: return
+        runIo { connection?.send(ControlMessage.AgentApprove.response(request.id, allow)) }
+    }
+
     fun requestKeyframe() = runIo { requestKeyframeNow() }
     fun hostNowMs(): Long? = metrics.hostNowMs()
 
@@ -120,7 +121,7 @@ class ViewerSession(
         )
         val reader = ControlReader(
             conn, { metrics.updateClock(ClockSample(it, ClockSync.wallClockMs())) }, { channel?.handleResync(it) },
-            { connectedHostId?.let(trust.knownHosts::remove) }, ::fail,
+            { approvals.receive(it, hostNowMs()) }, { connectedHostId?.let(trust.knownHosts::remove) }, ::fail,
         )
         Thread(reader::run, "xdesk-control").apply { isDaemon = true }.start()
         executor.scheduleWithFixedDelay({ guardedIo { inputPump?.maintain(nowMs()) } }, 50, InputPump.MAINTENANCE_INTERVAL_MS, TimeUnit.MILLISECONDS)
@@ -145,9 +146,7 @@ class ViewerSession(
         lastKeyframeRequestMs = now
         connection?.send(ControlMessage.KeyframeRequest(streamId))
     }
-
     private fun sendResync(resync: ControlMessage.RekeyResync) = runIo { connection?.send(resync) }
-
     private fun runIo(task: () -> Unit) {
         val executor = io ?: return
         if (!executor.isShutdown) executor.execute { guardedIo(task) }
@@ -167,6 +166,7 @@ class ViewerSession(
     }
 
     private fun teardown() {
+        approvals.clear()
         io?.shutdownNow()
         io = null
         channel?.close()

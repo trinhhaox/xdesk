@@ -15,6 +15,7 @@ internal class ControlReader(
     private val conn: ControlConnection,
     private val onPong: (ControlMessage.Pong) -> Unit,
     private val onResync: (ControlMessage.RekeyResync) -> Unit,
+    private val onAgentApprove: (ControlMessage.AgentApprove) -> Unit,
     private val onRevoked: () -> Unit,
     private val onEnd: (String, TransportErrorCode?) -> Unit,
 ) {
@@ -25,6 +26,7 @@ internal class ControlReader(
                 when (val message = (inbound as? ControlInbound.Message)?.envelope?.message) {
                     is ControlMessage.Pong -> onPong(message)
                     is ControlMessage.RekeyResync -> onResync(message)
+                    is ControlMessage.AgentApprove -> onAgentApprove(message)
                     is ControlMessage.Bye -> return onEnd("Host đã ngắt: ${message.reason.orEmpty()}", null)
                     is ControlMessage.Reject -> return rejected(message)
                     else -> Unit

@@ -61,6 +61,7 @@ fun StreamScreen(controller: ViewerController, window: Window) {
         }, update = { it.router = controller.input })
 
         Overlay(controller)
+        controller.agentApproval?.takeIf { controller.streaming }?.let { AgentApprovalDialog(it, controller::answerAgentApproval) }
         if (showBars || !controller.streaming) {
             TopBar(controller, onKeyboard = { viewRef?.showKeyboard() }, onKeys = { showKeys = !showKeys }, modifier = Modifier.align(Alignment.TopCenter))
         } else {

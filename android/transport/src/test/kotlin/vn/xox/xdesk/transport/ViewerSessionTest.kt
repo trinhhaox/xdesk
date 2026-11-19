@@ -20,7 +20,8 @@ class ViewerSessionTest {
     private val frames = CopyOnWriteArrayList<AssembledFrame>()
     private val identity = DeviceIdentity.generate()
     private val store = FileKnownHostStore(createTempFile("hosts", ".txt").toFile().also { it.deleteOnExit() })
-    private val session = ViewerSession(ViewerTrust(identity, store), "Android-test", frames::add)
+    private val approvalEvents = CopyOnWriteArrayList<AgentApprovalRequest?>()
+    private val session = ViewerSession(ViewerTrust(identity, store), "Android-test", frames::add, onAgentApproval = approvalEvents::add)
     private val target = ViewerTarget("127.0.0.1", host.port)
     private val config = checkNotNull(DisplayConfigPlanner.config(1280.0, 720.0, 1.0))
 
@@ -103,6 +104,51 @@ class ViewerSessionTest {
         await("revoked") { session.state is ViewerState.Failed }
         assertEquals(TransportErrorCode.REVOKED_BY_HOST, failedCode())
         assertTrue(store.all().isEmpty())
+    }
+
+    private fun connectStreaming() = assertTrue(session.connect(listOf(target), config, ViewerAuth.Qr(qr())))
+
+    private fun agentRequests() = host.received.filterIsInstance<ControlMessage.AgentApprove>()
+
+    @Test
+    fun agentApprovalIsSurfacedAndAnsweredOnceOverEncryptedChannel() {
+        connectStreaming()
+        val expiresAt = System.currentTimeMillis() + 60_000
+        host.push(ControlMessage.AgentApprove("req-1", "Claude", "Mở TextEdit", expiresAt), id = 9)
+        await("yêu cầu duyệt hiện lên") { session.pendingAgentApproval != null }
+        val pending = checkNotNull(session.pendingAgentApproval)
+        assertEquals("req-1", pending.id)
+        assertEquals("Claude", pending.agentName)
+        assertEquals("Mở TextEdit", pending.summary)
+        session.answerAgentApproval(allow = true)
+        session.answerAgentApproval(allow = false)
+        await("trả lời tới host") { agentRequests().isNotEmpty() }
+        Thread.sleep(150)
+        assertEquals(listOf(ControlMessage.AgentApprove.response("req-1", true)), agentRequests())
+        assertEquals(null, session.pendingAgentApproval)
+        assertEquals(null, approvalEvents.last())
+    }
+
+    @Test
+    fun agentApprovalExpiresOnItsOwnAndLateAnswerIsDropped() {
+        connectStreaming()
+        host.push(ControlMessage.AgentApprove("req-2", "Claude", "Bấm nút", System.currentTimeMillis() + 400))
+        await("hiện lên") { session.pendingAgentApproval != null }
+        await("tự hết hạn") { session.pendingAgentApproval == null }
+        session.answerAgentApproval(allow = true)
+        Thread.sleep(150)
+        assertTrue(agentRequests().isEmpty())
+    }
+
+    @Test
+    fun expiredOrResponseShapedAgentApproveIsIgnored() {
+        connectStreaming()
+        host.push(ControlMessage.AgentApprove("old", "Claude", "x", System.currentTimeMillis() - 1000))
+        host.push(ControlMessage.AgentApprove.response("echo", true))
+        host.push(ControlMessage.AgentApprove("good", "Claude", "y", System.currentTimeMillis() + 60_000))
+        await("yêu cầu hợp lệ hiện lên") { session.pendingAgentApproval != null }
+        assertEquals("good", session.pendingAgentApproval?.id)
+        assertEquals(listOf("good"), approvalEvents.mapNotNull { it?.id })
     }
 
     @Test

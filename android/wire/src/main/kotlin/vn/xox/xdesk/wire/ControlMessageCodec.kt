@@ -58,6 +58,7 @@ object ControlMessageCodec {
         ControlMessage.Rekey -> "rekey"
         is ControlMessage.RekeyResync -> "rekey.resync"
         is ControlMessage.PairResult -> "pair.result"
+        is ControlMessage.AgentApprove -> "agent.approve"
         is ControlMessage.Unknown -> message.type
     }
 }
@@ -75,6 +76,14 @@ internal class FieldReader(private val obj: JsonObject) {
     }
 
     fun bool(key: String): Boolean = (obj[key] as? JsonBool)?.value ?: bad(key)
+
+    fun optBool(key: String): Boolean? = when (val v = obj[key]) {
+        null, JsonNull -> null
+        is JsonBool -> v.value
+        else -> bad(key)
+    }
+
+    fun optI64(key: String): Long? = if (obj[key] == null || obj[key] == JsonNull) null else i64(key)
 
     fun double(key: String): Double = (obj[key] as? JsonNumber)?.double ?: bad(key)
 

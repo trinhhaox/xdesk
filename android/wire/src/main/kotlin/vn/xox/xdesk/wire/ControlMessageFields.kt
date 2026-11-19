@@ -37,6 +37,13 @@ internal object ControlMessageFields {
             ControlMessage.Rekey -> Unit
             is ControlMessage.RekeyResync -> { f["epoch"] = num(m.epoch); f["ask"] = JsonBool(m.ask) }
             is ControlMessage.PairResult -> f["accepted"] = JsonBool(m.accepted)
+            is ControlMessage.AgentApprove -> {
+                f["requestId"] = str(m.requestId)
+                m.agentName?.let { f["agentName"] = str(it) }
+                m.summary?.let { f["summary"] = str(it) }
+                m.expiresAt?.let { f["expiresAt"] = num(it) }
+                m.allow?.let { f["allow"] = JsonBool(it) }
+            }
             is ControlMessage.Unknown -> Unit
         }
     }
@@ -64,6 +71,9 @@ internal object ControlMessageFields {
         "rekey" -> ControlMessage.Rekey
         "rekey.resync" -> ControlMessage.RekeyResync(r.u32("epoch"), r.bool("ask"))
         "pair.result" -> ControlMessage.PairResult(r.bool("accepted"))
+        "agent.approve" -> ControlMessage.AgentApprove(
+            r.string("requestId"), r.optString("agentName"), r.optString("summary"), r.optI64("expiresAt"), r.optBool("allow"),
+        )
         else -> ControlMessage.Unknown(type)
     }
 }

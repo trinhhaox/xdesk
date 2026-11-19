@@ -37,6 +37,28 @@ sealed interface ControlMessage {
     data object Rekey : ControlMessage
     data class RekeyResync(val epoch: Long, val ask: Boolean) : ControlMessage
     data class PairResult(val accepted: Boolean) : ControlMessage
+    /**
+     * Xin duyệt quyền điều khiển cho agent AI, hai chiều trên cùng type. Yêu cầu (host→viewer): `agentName`, `summary`,
+     * `expiresAt` (ms Unix, giờ host), không có `allow`. Trả lời (viewer→host): chỉ `requestId` + `allow`.
+     */
+    data class AgentApprove(
+        val requestId: String,
+        val agentName: String? = null,
+        val summary: String? = null,
+        val expiresAt: Long? = null,
+        val allow: Boolean? = null,
+    ) : ControlMessage {
+        /** `allow` vắng = đây là yêu cầu duyệt. */
+        val isRequest: Boolean get() = allow == null
+
+        companion object {
+            const val MAX_ID_BYTES = 64
+            const val MAX_NAME_BYTES = 128
+            const val MAX_SUMMARY_BYTES = 512
+
+            fun response(requestId: String, allow: Boolean) = AgentApprove(requestId, allow = allow)
+        }
+    }
     data class Unknown(val type: String) : ControlMessage
 }
 
@@ -58,6 +80,14 @@ internal fun ControlMessage.validate() {
             }
         is ControlMessage.NetReport ->
             if (lossPermille > 1000) wireError(WireErrorCode.invalidField, "net.report.lossPermille")
+        is ControlMessage.AgentApprove -> validateAgentApprove()
         else -> Unit
     }
+}
+
+private fun ControlMessage.AgentApprove.validateAgentApprove() {
+    fun bytes(s: String?) = s?.toByteArray(Charsets.UTF_8)?.size ?: 0
+    if (requestId.isEmpty() || bytes(requestId) > ControlMessage.AgentApprove.MAX_ID_BYTES) wireError(WireErrorCode.invalidField, "agent.approve.requestId")
+    if (bytes(agentName) > ControlMessage.AgentApprove.MAX_NAME_BYTES) wireError(WireErrorCode.invalidField, "agent.approve.agentName")
+    if (bytes(summary) > ControlMessage.AgentApprove.MAX_SUMMARY_BYTES) wireError(WireErrorCode.invalidField, "agent.approve.summary")
 }
