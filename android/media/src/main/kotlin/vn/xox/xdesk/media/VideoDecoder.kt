@@ -19,31 +19,36 @@ class VideoDecoder(
     private val onNeedKeyframe: () -> Unit,
     private val onError: (String) -> Unit,
     private val log: (String) -> Unit = { Log.i(TAG, it) },
+    lagWindow: Int = 120,
 ) {
     private val thread = HandlerThread("xdesk-decode", Process.THREAD_PRIORITY_URGENT_DISPLAY).also { it.start() }
     private val handler = Handler(thread.looper)
     private val pendingCount = AtomicInteger()
     private val pending = ArrayDeque<AssembledFrame>()
     private val freeInputs = ArrayDeque<Int>()
-    private val meter = FrameLagMeter()
+    private val meter = FrameLagMeter(lagWindow)
     private var codec: MediaCodec? = null
     private var waitingForKeyframe = true
+
+    /** Số frame đã đưa vào codec nhưng chưa xuất; ≤ 1 nghĩa là decoder không giữ frame. */
+    val framesHeld: Int get() = meter.held
 
     /** Tên codec đang dùng (null khi chưa start). Ghi từ thread decode, đọc từ UI để hiển thị. */
     @Volatile var codecName: String? = null
         private set
 
     /** Chọn decoder, cấu hình và start. Trả `false` (và gọi [onError]) nếu máy không có decoder H.264 hoặc cấu hình lỗi. */
-    fun start(surface: Surface, width: Int, height: Int): Boolean {
+    fun start(surface: Surface, width: Int, height: Int, extraFormat: Map<String, Int> = emptyMap(), forceCodec: String? = null): Boolean {
         val candidates = AndroidCodecList.decoders()
-        val choice = CodecSelector.select(candidates) ?: return fail("Máy không có decoder H.264")
+        val choice = (forceCodec?.let { name -> candidates.firstOrNull { it.name == name } } ?: CodecSelector.select(candidates)) ?: return fail("Máy không có decoder H.264")
         val quirk = DecoderQuirks.forCodec(choice.name)
         val format = MediaFormat.createVideoFormat(AndroidCodecList.MIME_AVC, width, height).apply {
-            if (choice.supportsLowLatency) setInteger(MediaFormat.KEY_LOW_LATENCY, 1)
+            setInteger(MediaFormat.KEY_LOW_LATENCY, 1) // gửi cả khi không quảng bá FEATURE_LowLatency: codec không biết thì bỏ qua
             setInteger(MediaFormat.KEY_PRIORITY, 0)
             setInteger(MediaFormat.KEY_OPERATING_RATE, Short.MAX_VALUE.toInt())
             quirk?.maxInputSizeBytes?.let { setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, it) }
             quirk?.lowLatencyKeys?.forEach { (key, value) -> setInteger(key, value) }
+            extraFormat.forEach { (key, value) -> setInteger(key, value) }
         }
         return try {
             val created = MediaCodec.createByCodecName(choice.name)
@@ -51,6 +56,8 @@ class VideoDecoder(
             created.configure(format, surface, null, 0)
             created.start()
             codec = created
+            CodecDiagnostics.listDecoders(log)
+            CodecDiagnostics.vendorParameters(created, log)
             codecName = choice.name
             waitingForKeyframe = true
             log("decoder=${choice.name} hw=${choice.isHardwareAccelerated} lowLatency=${choice.supportsLowLatency} holdsFrames=${quirk?.mayHoldFrames == true}")

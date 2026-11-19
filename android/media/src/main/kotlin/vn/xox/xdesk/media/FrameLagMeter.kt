@@ -11,8 +11,11 @@ class FrameLagMeter(private val windowSize: Int = 120) {
     private val enteredAtNs = HashMap<Long, Long>()
     private val lagsMs = ArrayList<Double>()
     private val heldSamples = ArrayList<Int>()
-    private var inCount = 0L
-    private var outCount = 0L
+    @Volatile private var inCount = 0L
+    @Volatile private var outCount = 0L
+
+    /** Số frame đã vào decoder nhưng chưa ra (đọc được từ thread khác). */
+    val held: Int get() = (inCount - outCount).toInt()
 
     fun onInput(ptsUs: Long, nowNs: Long) {
         enteredAtNs[ptsUs] = nowNs

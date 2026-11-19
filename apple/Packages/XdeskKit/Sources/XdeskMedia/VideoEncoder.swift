@@ -63,6 +63,7 @@ public final class VideoEncoder: @unchecked Sendable {
         try set(kVTCompressionPropertyKey_MaxKeyFrameInterval, (s.fps * s.keyframeIntervalSeconds) as CFNumber)
         try set(kVTCompressionPropertyKey_MaxKeyFrameIntervalDuration, s.keyframeIntervalSeconds as CFNumber)
         try set(kVTCompressionPropertyKey_ProfileLevel, s.codec == .h264 ? kVTProfileLevel_H264_High_AutoLevel : kVTProfileLevel_HEVC_Main_AutoLevel)
+        try setSingleReferenceBuffer()
         try setBitrate(kbps: s.bitrateKbps)
     }
 
@@ -71,6 +72,17 @@ public final class VideoEncoder: @unchecked Sendable {
         let status = VTSessionSetProperty(session, key: kVTCompressionPropertyKey_MaxFrameDelayCount, value: 0 as CFNumber)
         guard status == noErr || (status == kVTPropertyNotSupportedErr && usesLowLatencyRateControl) else {
             throw MediaError.propertyRejected(name: kVTCompressionPropertyKey_MaxFrameDelayCount as String, status: status)
+        }
+    }
+
+    /// Một khung tham chiếu duy nhất: SPS ra `max_num_ref_frames = 1`, `max_dec_frame_buffering = 1`, không long-term ref.
+    /// Mặc định VideoToolbox (low-latency) khai báo 8 → decoder Unisoc/MediaTek giữ ~6 khung trước khi xuất.
+    /// Chỉ áp cho H.264; máy từ chối thuộc tính (macOS cũ) thì dùng mặc định, không lỗi.
+    private func setSingleReferenceBuffer() throws {
+        guard codec == .h264 else { return }
+        let status = VTSessionSetProperty(session, key: kVTCompressionPropertyKey_ReferenceBufferCount, value: 1 as CFNumber)
+        guard status == noErr || status == kVTPropertyNotSupportedErr else {
+            throw MediaError.propertyRejected(name: kVTCompressionPropertyKey_ReferenceBufferCount as String, status: status)
         }
     }
 
@@ -147,7 +159,7 @@ public final class VideoEncoder: @unchecked Sendable {
         let notSync = (CMSampleBufferGetSampleAttachmentsArray(sampleBuffer, createIfNecessary: false) as? [[CFString: Any]])?
             .first?[kCMSampleAttachmentKey_NotSync] as? Bool ?? false
         let (sets, lengthSize) = try ParameterSets.extract(from: fd, codec: codec)
-        var data = notSync ? [] : AnnexB.fromParameterSets(sets)
+                var data = notSync ? [] : AnnexB.fromParameterSets(sets)
         data += try AnnexB.fromAVCC(avcc, lengthSize: lengthSize)
         let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
         return EncodedFrame(data: data, isKeyframe: !notSync, ptsMs: UInt32(clamping: Int64(pts.seconds * 1000)))

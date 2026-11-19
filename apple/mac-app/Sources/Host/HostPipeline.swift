@@ -19,6 +19,7 @@ final class HostPipeline: @unchecked Sendable {
     private var latest: CapturedFrame?
     private var streaming = false
     private var lastPtsMs: UInt32 = 0
+    private lazy var idleRepeater = IdleFrameRepeater { [weak self] in self?.repeatLatest() }
 
     /// `audioSink` có thì capture cả âm thanh: mẫu s16 xen kẽ, mốc ghi và giờ hiện tại đều theo đồng hồ video (ms từ lúc mở pipeline).
     init(
@@ -59,6 +60,7 @@ final class HostPipeline: @unchecked Sendable {
     func stop() async {
         let service = lock.withLock { () -> CaptureService? in
             streaming = false
+            idleRepeater.cancel()
             defer { capture = nil; latest = nil }
             return capture
         }
@@ -74,15 +76,22 @@ final class HostPipeline: @unchecked Sendable {
         if active { encode(frame) }
     }
 
+    /// Màn hình đứng yên: mã hoá lại khung cuối một lần để đẩy khung đang kẹt trong decoder phần cứng của viewer.
+    private func repeatLatest() {
+        guard let frame = lock.withLock({ streaming ? latest : nil }) else { return }
+        encode(frame, flushable: false)
+    }
+
     private func handleAudio(_ sample: CMSampleBuffer) {
         guard let audioSink, let pcm = AudioCaptureTap.convert(sample) else { return }
         let nowMs = (ProcessInfo.processInfo.systemUptime - origin) * 1000
         audioSink(pcm.samples, nowMs - pcm.ageMs, nowMs)
     }
 
-    private func encode(_ frame: CapturedFrame) {
+    private func encode(_ frame: CapturedFrame, flushable: Bool = true) {
         do {
             try encoder.encode(frame.pixelBuffer, ptsMs: nextPtsMs())
+            if flushable { idleRepeater.frameEncoded() }
         } catch {
             log.error("encode failed: \(error.localizedDescription, privacy: .public)")
             onStop(error)
