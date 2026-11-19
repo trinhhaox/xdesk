@@ -17,6 +17,7 @@ extension ViewerSession {
                     await forgetRevokedHost()
                     throw TransportError.revokedByHost
                 case .rekeyResync(let resync): await channel?.handleResync(resync)
+                case .agentApprove(let approve) where approve.isRequest: receiveAgentApproval(approve)
                 default: break
                 }
             }

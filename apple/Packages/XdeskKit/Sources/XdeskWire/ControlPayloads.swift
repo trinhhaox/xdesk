@@ -127,3 +127,37 @@ public struct PairResult: Codable, Sendable, Equatable {
     public var accepted: Bool
     public init(accepted: Bool) { self.accepted = accepted }
 }
+
+/// Xin duyệt quyền điều khiển cho agent AI, hai chiều trên cùng một type (`agent.approve`).
+/// Yêu cầu (host → viewer): `requestId`, `agentName`, `summary`, `expiresAt` (ms Unix) và KHÔNG có `allow`.
+/// Trả lời (viewer → host): `requestId`, `allow`. Viewer cũ không biết type này sẽ bỏ qua (`.unknown`).
+public struct AgentApprove: Codable, Sendable, Equatable {
+    public static let maxIdBytes = 64
+    public static let maxNameBytes = 128
+    public static let maxSummaryBytes = 512
+
+    public var requestId: String
+    public var agentName: String?
+    public var summary: String?
+    public var expiresAt: Int64?
+    public var allow: Bool?
+
+    public init(requestId: String, agentName: String? = nil, summary: String? = nil, expiresAt: Int64? = nil, allow: Bool? = nil) {
+        self.requestId = requestId; self.agentName = agentName; self.summary = summary; self.expiresAt = expiresAt; self.allow = allow
+    }
+
+    public static func request(requestId: String, agentName: String, summary: String, expiresAt: Int64) -> AgentApprove {
+        AgentApprove(requestId: requestId, agentName: agentName, summary: summary, expiresAt: expiresAt)
+    }
+
+    public static func response(requestId: String, allow: Bool) -> AgentApprove { AgentApprove(requestId: requestId, allow: allow) }
+
+    /// `allow` vắng = đây là yêu cầu duyệt.
+    public var isRequest: Bool { allow == nil }
+
+    func validate() throws {
+        guard !requestId.isEmpty, requestId.utf8.count <= Self.maxIdBytes else { throw WireError.invalidField("agent.approve.requestId") }
+        guard (agentName?.utf8.count ?? 0) <= Self.maxNameBytes else { throw WireError.invalidField("agent.approve.agentName") }
+        guard (summary?.utf8.count ?? 0) <= Self.maxSummaryBytes else { throw WireError.invalidField("agent.approve.summary") }
+    }
+}

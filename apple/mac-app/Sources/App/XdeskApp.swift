@@ -16,6 +16,10 @@ struct XdeskApp: App {
             ViewerBrowserView(controller: viewer)
         }
         .windowResizability(.contentSize)
+        Window("Xdesk — Cài đặt agent AI", id: AgentSettingsWindow.id) {
+            AgentSettingsView(settings: agent.settings)
+        }
+        .windowResizability(.contentSize)
     }
 
     init() {
@@ -35,3 +39,4 @@ struct XdeskApp: App {
 }
 
 enum ViewerBrowserWindow { static let id = "viewer-browser" }
+enum AgentSettingsWindow { static let id = "agent-settings" }

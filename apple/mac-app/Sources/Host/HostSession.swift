@@ -23,6 +23,7 @@ actor HostSession {
     private let hostCaps: Capabilities
     private let report: @Sendable (HostSessionState) -> Void
     let onSecureInput: @Sendable (Bool) -> Void
+    private let onAgentAnswer: @Sendable (_ requestId: String, _ allow: Bool) -> Void
     let log = Logger(subsystem: "vn.xox.xdesk", category: "host-session")
     private(set) var channel: UdpMediaChannel?
     private var pipeline: HostPipeline?
@@ -36,8 +37,10 @@ actor HostSession {
     init(
         connection: ControlConnection, provider: VirtualDisplayProvider, caps: Capabilities,
         report: @escaping @Sendable (HostSessionState) -> Void,
-        onSecureInput: @escaping @Sendable (Bool) -> Void = { _ in }
+        onSecureInput: @escaping @Sendable (Bool) -> Void = { _ in },
+        onAgentAnswer: @escaping @Sendable (String, Bool) -> Void = { _, _ in }
     ) {
+        self.onAgentAnswer = onAgentAnswer
         self.connection = connection
         self.provider = provider
         self.hostCaps = caps
@@ -64,6 +67,14 @@ actor HostSession {
 
     /// Đóng kết nối điều khiển → `run()` thoát và dọn dẹp.
     func shutdown() async { await connection.close() }
+
+    /// Hỏi viewer này có duyệt quyền điều khiển cho agent AI không (chỉ khi đang stream và có quyền input).
+    func sendAgentApproval(_ request: AgentApprove) async {
+        guard viewerReady, permissions.input else { return }
+        do { _ = try await connection.send(.agentApprove(request)) } catch {
+            log.error("gửi agent.approve lỗi: \(error.localizedDescription, privacy: .public)")
+        }
+    }
 
     // MARK: Chuẩn bị (trong handshake)
 
@@ -139,6 +150,9 @@ actor HostSession {
                 _ = try await connection.send(.pong(pong), id: envelope.id)
             case .inputText(let t): await handleInputText(t.text)
             case .rekeyResync(let resync): await channel?.handleResync(resync)
+            case .agentApprove(let answer) where !answer.isRequest:
+                // Chỉ thiết bị có quyền điều khiển mới được duyệt quyền cho agent.
+                if permissions.input { onAgentAnswer(answer.requestId, answer.allow ?? false) }
             case .bye: return
             default: break
             }

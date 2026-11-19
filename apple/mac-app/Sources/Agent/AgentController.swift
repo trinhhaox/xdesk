@@ -28,12 +28,28 @@ final class AgentController {
     private let defaults: UserDefaults
     private let tokenStore = McpTokenStore()
     private let listener = McpHttpListener()
+    let settings = AgentSettings()
+    let runtime: AgentRuntime
 
     init(host: HostController, defaults: UserDefaults = .standard) {
         self.host = host
         self.defaults = defaults
         isEnabled = defaults.bool(forKey: Self.enabledKey)
+        runtime = AgentRuntime(host: host, settings: settings)
     }
+
+    var controlSummary: String { runtime.control.summary }
+    var hasAgentDisplay: Bool { runtime.displays.displayID != nil }
+    var inputMonitorMissing: Bool { runtime.control.phase != .none && !runtime.inputMonitorActive }
+    func removeAgentDisplay() { runtime.removeDisplay() }
+
+    #if DEBUG
+    /// Chỉ Debug: `--auto-approve-agent`.
+    func enableAutoApprove() { runtime.approvals.autoApprove = true }
+    func debugSetPaused(_ paused: Bool) {
+        if paused { runtime.pause("tín hiệu SIGUSR1 (kiểm thử)") } else { Task { await runtime.arbiter.resume() } }
+    }
+    #endif
 
     var port: UInt16 {
         let stored = defaults.integer(forKey: Self.portKey)
@@ -77,10 +93,12 @@ final class AgentController {
             let store = tokenStore
             let server = McpServer(
                 requestGuard: RequestGuard(port: port, token: { store.cachedToken }),
-                registry: ToolRegistry(handlers: ["xdesk_status": StatusTool(snapshot: { [host] in await host.agentSnapshot() })]),
+                registry: runtime.makeRegistry(host: host),
                 audit: AuditLog(directory: Self.auditDirectory),
-                serverVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0")
+                serverVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0",
+                onClientName: { [runtime] name in Task { @MainActor in runtime.setClientName(name) } })
             try await listener.start(port: port, server: server)
+            runtime.activate()
             status = .running(port: port)
             log.notice("MCP đang nghe 127.0.0.1:\(port, privacy: .public)")
         } catch {
@@ -91,6 +109,7 @@ final class AgentController {
 
     private func stop() {
         listener.stop()
+        runtime.shutdown()
         status = .stopped
         notice = nil
     }

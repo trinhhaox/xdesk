@@ -36,6 +36,8 @@ public final class ViewerSession {
     public internal(set) var refusedHostId: String?
     /// Fingerprint host của phiên hiện tại (đặt sau khi bắt tay mã hoá thành công).
     @ObservationIgnored var connectedHostId: String?
+    /// Yêu cầu duyệt quyền điều khiển cho agent AI đang chờ trả lời (xem `agent.approve`); nil khi không có/đã hết hạn.
+    public internal(set) var pendingAgentApproval: AgentApprovalRequest?
     public let renderer = VideoLayerRenderer()
 
     @ObservationIgnored let log = Logger(subsystem: "vn.xox.xdesk", category: "viewer-session")
@@ -141,6 +143,7 @@ public final class ViewerSession {
     }
 
     func teardown() async {
+        pendingAgentApproval = nil
         tasks.forEach { $0.cancel() }
         tasks.removeAll()
         inputOutbox?.finish()

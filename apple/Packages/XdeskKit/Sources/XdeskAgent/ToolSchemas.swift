@@ -28,7 +28,7 @@ public enum ToolSchemas {
 
     private static let stepSchema: JsonValue = [
         "type": "object",
-        "properties": ["tool": choice(["xdesk_pointer", "xdesk_scroll", "xdesk_type_text", "xdesk_press_keys"], "Tool của bước"), "arguments": object()],
+        "properties": ["tool": choice(["xdesk_pointer", "xdesk_scroll", "xdesk_type_text", "xdesk_press_keys"], "Tool của bước"), "arguments": ["type": "object", "description": "Tham số của tool đó"]],
         "required": ["tool", "arguments"],
     ]
 

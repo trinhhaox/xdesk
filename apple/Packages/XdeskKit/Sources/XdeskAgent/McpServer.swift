@@ -9,11 +9,14 @@ public final class McpServer: Sendable {
     private let sessions: McpSessionStore
     private let audit: AuditLog?
     private let serverVersion: String
+    private let onClientName: (@Sendable (String) -> Void)?
 
+    /// `onClientName` nhận `clientInfo.name` của agent khi initialize, để hộp thoại duyệt hiện đúng tên (Claude Code, Cursor…).
     public init(
         requestGuard: RequestGuard, registry: ToolRegistry, sessions: McpSessionStore = McpSessionStore(),
-        audit: AuditLog? = nil, serverVersion: String
+        audit: AuditLog? = nil, serverVersion: String, onClientName: (@Sendable (String) -> Void)? = nil
     ) {
+        self.onClientName = onClientName
         self.requestGuard = requestGuard
         self.registry = registry
         self.sessions = sessions
@@ -26,7 +29,7 @@ public final class McpServer: Sendable {
         let outcome = await route(request)
         let elapsed = ContinuousClock.now - started
         let ms = Int(elapsed.components.seconds * 1000 + elapsed.components.attoseconds / 1_000_000_000_000_000)
-        audit?.record(method: outcome.method, tool: outcome.tool, result: outcome.result, durationMs: ms)
+        audit?.record(method: outcome.method, tool: outcome.tool, result: outcome.result, durationMs: ms, detail: outcome.detail)
         return outcome.response
     }
 
@@ -35,8 +38,10 @@ public final class McpServer: Sendable {
         var method = "-"
         var tool: String?
         var result: String
+        var detail: String?
 
-        init(_ response: HttpResponse, method: String = "-", tool: String? = nil, result: String? = nil) {
+        init(_ response: HttpResponse, method: String = "-", tool: String? = nil, result: String? = nil, detail: String? = nil) {
+            self.detail = detail
             self.response = response
             self.method = method
             self.tool = tool
@@ -91,6 +96,7 @@ public final class McpServer: Sendable {
         guard let requested = params["protocolVersion"]?.stringValue else {
             return rpcError(id, JsonRpcErrorCode.invalidParams, "Thiếu protocolVersion", method: "initialize")
         }
+        if let name = params["clientInfo"]?["name"]?.stringValue { onClientName?(String(name.prefix(64))) }
         let version = McpProtocol.negotiate(requested)
         let session = sessions.create(version: version)
         let body = JsonRpcResponse.result(id: id, McpProtocol.initializeResult(version: version, serverVersion: serverVersion))
@@ -117,7 +123,7 @@ public final class McpServer: Sendable {
         guard let result = await registry.call(name: name, arguments: arguments) else {
             return rpcError(id, JsonRpcErrorCode.invalidParams, "Không có tool: \(name)", method: "tools/call")
         }
-        return Outcome(.json(JsonRpcResponse.result(id: id, result.json)), method: "tools/call", tool: name, result: result.isError ? "tool_error" : "ok")
+        return Outcome(.json(JsonRpcResponse.result(id: id, result.json)), method: "tools/call", tool: name, result: result.isError ? "tool_error" : "ok", detail: result.audit)
     }
 
     /// Thiếu header phiên → 400, phiên không tồn tại (hết hạn/đã đóng) → 404 để client khởi tạo lại.

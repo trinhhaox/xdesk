@@ -23,6 +23,8 @@ import XdeskViewer
 ///   --revoke-viewers-after <giây>  host thu hồi mọi viewer đã ghép → phiên phải bị cắt ≤ 1 s
 ///   --disconnect-after <giây>   viewer tự ngắt (host vẫn chạy) → màn hình ảo phải biến mất
 ///   --enable-mcp [tệp]          bật máy chủ MCP (không lưu cài đặt); có tệp thì ghi token vào đó (0600) cho script curl
+///   --auto-approve-agent        bỏ qua hộp thoại duyệt quyền/ứng dụng của agent (chỉ Debug, để kiểm thử tự động; không tồn tại ở Release)
+///   SIGUSR1 / SIGUSR2           tạm dừng / tiếp tục agent như phím tắt ⌃⌥⌘. (chỉ Debug, đo độ trễ "control paused")
 ///   --quit-after <giây>         tự thoát
 @MainActor
 enum AutomationHooks {
@@ -37,6 +39,8 @@ enum AutomationHooks {
             await host.start()
             log.notice("auto-host status: \(String(describing: host.status), privacy: .public)")
         }
+        if args.contains("--auto-approve-agent") { agent.enableAutoApprove() }
+        installAgentSignals(agent)
         if args.contains("--enable-mcp") {
             await agent.setEnabled(true, persist: false)
             log.notice("auto-mcp status: \(String(describing: agent.status), privacy: .public)")
@@ -79,6 +83,20 @@ enum AutomationHooks {
             await viewer.disconnect()
             await host.stop()
             NSApplication.shared.terminate(nil)
+        }
+    }
+
+    private static var signalSources: [DispatchSourceSignal] = []
+
+    private static func installAgentSignals(_ agent: AgentController) {
+        for (number, action) in [(SIGUSR1, true), (SIGUSR2, false)] {
+            signal(number, SIG_IGN)
+            let source = DispatchSource.makeSignalSource(signal: number, queue: .main)
+            source.setEventHandler {
+                MainActor.assumeIsolated { agent.debugSetPaused(action) }
+            }
+            source.resume()
+            signalSources.append(source)
         }
     }
 

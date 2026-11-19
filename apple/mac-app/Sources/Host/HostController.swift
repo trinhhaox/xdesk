@@ -25,6 +25,8 @@ final class HostController {
     private let log = Logger(subsystem: "vn.xox.xdesk", category: "host-controller")
     private let security: SecurityCenter
     private var listener: ControlListener?
+    /// AgentController đặt: nhận trả lời `agent.approve` từ điện thoại (requestId, allow).
+    var agentAnswerSink: (@MainActor (String, Bool) -> Void)?
     private var promptedAccessibility = false
     private var acceptTask: Task<Void, Never>?
     private var sessions: [UUID: (session: HostSession, task: Task<Void, Never>)] = [:]
@@ -88,6 +90,11 @@ final class HostController {
         status = .stopped
     }
 
+    /// Gửi yêu cầu duyệt tới mọi viewer đang xem; trả lời đầu tiên (kể cả từ Mac) thắng.
+    func broadcastAgentApproval(_ request: AgentApprove) async {
+        for entry in Array(sessions.values) { await entry.session.sendAgentApproval(request) }
+    }
+
     private func startListener(_ listener: ControlListener) async throws -> UInt16 {
         do { return try await listener.start(port: Self.preferredPort) } catch { return try await listener.start(port: 0) }
     }
@@ -97,7 +104,8 @@ final class HostController {
         let session = HostSession(
             connection: connection, provider: VirtualDisplayProvider(), caps: [.h264, .hevc],
             report: { [weak self] state in Task { @MainActor in self?.update(id, state) } },
-            onSecureInput: { [weak self] active in Task { @MainActor in self?.secureInputActive = active } }
+            onSecureInput: { [weak self] active in Task { @MainActor in self?.secureInputActive = active } },
+            onAgentAnswer: { [weak self] requestId, allow in Task { @MainActor in self?.agentAnswerSink?(requestId, allow) } }
         )
         sessions[id] = (session, Task { await session.run() })
     }

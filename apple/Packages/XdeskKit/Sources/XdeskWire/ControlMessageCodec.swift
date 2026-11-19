@@ -71,6 +71,7 @@ public enum ControlMessageCodec {
         case "rekey": return .rekey
         case "rekey.resync": return .rekeyResync(try body(RekeyResync.self))
         case "pair.result": return .pairResult(try body(PairResult.self))
+        case "agent.approve": return .agentApprove(try body(AgentApprove.self))
         default: return .unknown(type: type)
         }
     }

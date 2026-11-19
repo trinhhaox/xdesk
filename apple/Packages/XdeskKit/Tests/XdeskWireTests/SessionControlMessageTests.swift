@@ -39,3 +39,37 @@ import Testing
         #expect(throws: WireError.self) { _ = try ControlFrameCodec.decode(bytes) }
     }
 }
+
+@Suite struct AgentApproveMessageTests {
+    private func roundTrip(_ message: ControlMessage) throws -> ControlMessage {
+        try ControlMessageCodec.decode(ControlMessageCodec.encode(ControlEnvelope(id: 7, message: message))).message
+    }
+
+    @Test func requestAndResponseRoundTrip() throws {
+        let request = AgentApprove.request(requestId: "req-1", agentName: "Claude", summary: "Mở TextEdit", expiresAt: 1_700_000_060_000)
+        #expect(try roundTrip(.agentApprove(request)) == .agentApprove(request))
+        #expect(request.isRequest)
+        let response = AgentApprove.response(requestId: "req-1", allow: true)
+        #expect(try roundTrip(.agentApprove(response)) == .agentApprove(response))
+        #expect(!response.isRequest)
+    }
+
+    @Test func wireFormIsFlatSortedJson() throws {
+        let bytes = try ControlMessageCodec.encode(ControlEnvelope(id: 3, message: .agentApprove(.response(requestId: "r", allow: false))))
+        #expect(String(decoding: bytes, as: UTF8.self) == #"{"allow":false,"id":3,"requestId":"r","t":"agent.approve"}"#)
+    }
+
+    @Test func oversizedOrEmptyFieldsAreRejected() {
+        #expect(throws: WireError.self) { _ = try ControlMessageCodec.encode(ControlEnvelope(id: 1, message: .agentApprove(.response(requestId: "", allow: true)))) }
+        let long = String(repeating: "a", count: AgentApprove.maxSummaryBytes + 1)
+        #expect(throws: WireError.self) {
+            _ = try ControlMessageCodec.encode(ControlEnvelope(id: 1, message: .agentApprove(.request(requestId: "r", agentName: "a", summary: long, expiresAt: 1))))
+        }
+    }
+
+    @Test func olderViewerTreatsItAsUnknown() throws {
+        // Bộ giải mã của viewer cũ không có case này: type lạ phải ra `.unknown`, không lỗi.
+        let message = try ControlMessageCodec.decode(Array(#"{"id":9,"t":"agent.approve.v2","requestId":"x"}"#.utf8)).message
+        #expect(message == .unknown(type: "agent.approve.v2"))
+    }
+}

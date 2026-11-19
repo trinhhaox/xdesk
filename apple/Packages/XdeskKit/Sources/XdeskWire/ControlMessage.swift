@@ -18,6 +18,7 @@ public enum ControlMessage: Sendable, Equatable {
     case rekey
     case rekeyResync(RekeyResync)
     case pairResult(PairResult)
+    case agentApprove(AgentApprove)
     case unknown(type: String)
 
     /// Giá trị trường `t` trên wire.
@@ -44,6 +45,7 @@ public enum ControlMessage: Sendable, Equatable {
         case .rekey: ("rekey", nil)
         case .rekeyResync(let p): ("rekey.resync", p)
         case .pairResult(let p): ("pair.result", p)
+        case .agentApprove(let p): ("agent.approve", p)
         case .unknown(let type): (type, nil)
         }
     }
@@ -61,6 +63,8 @@ public enum ControlMessage: Sendable, Equatable {
             guard t.text.utf8.count <= InputText.maxBytes else { throw WireError.invalidField("input.text.text") }
         case .netReport(let n):
             guard n.lossPermille <= 1000 else { throw WireError.invalidField("net.report.lossPermille") }
+        case .agentApprove(let a):
+            try a.validate()
         default:
             break
         }

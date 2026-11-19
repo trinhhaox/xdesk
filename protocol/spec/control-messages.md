@@ -22,6 +22,7 @@ là "unknown" và bỏ qua (tương thích tiến). JSON hỏng / thiếu trư�
 | `bye` | cả hai | `reason` string? | |
 | `input.text` | V→H | `text` string (Unicode, IME/Telex) | ≤ 4096 byte UTF-8 |
 | `pair.result` | H→V | `accepted` bool | gửi một lần sau message 3 của XX/XXpsk3, trước mọi thứ khác (`crypto-handshake.md` §4) |
+| `agent.approve` | cả hai | yêu cầu H→V: `requestId` string (≤ 64 B), `agentName` string (≤ 128 B), `summary` string (≤ 512 B), `expiresAt` i64 (ms Unix, giờ host); trả lời V→H: `requestId`, `allow` bool | Host xin viewer duyệt quyền điều khiển cho agent AI (phase 08); bản yêu cầu không có `allow`. Host chỉ nhận trả lời từ viewer có quyền `input`, khớp `requestId` đang chờ; trả lời đầu tiên (Mac hoặc điện thoại) thắng, trả lời muộn bị bỏ. Viewer cũ bỏ qua type lạ (mục "Thêm trường tuỳ chọn…") nên yêu cầu hết hạn ở host |
 | `rekey` | cả hai | (không có trường riêng) | chỉ trên kênh mã hoá; frame cuối dưới khoá TCP cũ, bên nhận đổi khoá nhận rồi bỏ message (`crypto-handshake.md` §7). `id` = 0 |
 | `rekey.resync` | cả hai | `epoch` u32, `ask` bool | `ask:false` = "epoch gửi UDP của tôi là `epoch`" → bên nhận kéo khoá nhận lên epoch đó (≤ 64 epoch); `ask:true` = "hãy báo epoch gửi của bạn" (`epoch` = epoch nhận hiện tại của người hỏi) (`crypto-handshake.md` §8) |
 

@@ -28,6 +28,17 @@ struct StreamView: View {
         .ignoresSafeArea()
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
+        .alert("Agent AI xin quyền điều khiển", isPresented: approvalPresented, presenting: model.session.pendingAgentApproval) { _ in
+            Button("Cho phép") { Task { await model.session.answerAgentApproval(allow: true) } }
+            Button("Từ chối", role: .cancel) { Task { await model.session.answerAgentApproval(allow: false) } }
+        } message: { request in
+            Text("\(request.agentName): \(request.summary)\nChỉ cho phép nếu chính bạn vừa yêu cầu agent làm việc trên Mac.")
+        }
+    }
+
+    /// Hộp thoại hiện khi host có yêu cầu và tự tắt khi hết hạn; việc đóng do nút bấm xử lý nên setter không làm gì.
+    private var approvalPresented: Binding<Bool> {
+        Binding(get: { model.session.pendingAgentApproval != nil }, set: { _ in })
     }
 
     @ViewBuilder private var connectingOverlay: some View {

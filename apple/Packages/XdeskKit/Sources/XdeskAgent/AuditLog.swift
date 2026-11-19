@@ -8,8 +8,9 @@ public struct AuditEntry: Sendable, Equatable, Codable {
     public var tool: String?
     public var result: String
     public var durationMs: Int
+    public var detail: String?
 
-    enum CodingKeys: String, CodingKey { case timestamp = "ts", method, tool, result, durationMs = "ms" }
+    enum CodingKeys: String, CodingKey { case timestamp = "ts", method, tool, result, durationMs = "ms", detail }
 }
 
 /// JSONL theo ngày (UTC) trong thư mục riêng, xoá tệp cũ hơn `retentionDays`.
@@ -30,10 +31,10 @@ public final class AuditLog: Sendable {
         self.now = now
     }
 
-    public func record(method: String, tool: String?, result: String, durationMs: Int) {
+    public func record(method: String, tool: String?, result: String, durationMs: Int, detail: String? = nil) {
         let date = now()
         let entry = AuditEntry(
-            timestamp: Self.timestamp(date), method: method, tool: tool, result: result, durationMs: durationMs)
+            timestamp: Self.timestamp(date), method: method, tool: tool, result: result, durationMs: durationMs, detail: detail)
         do {
             var line = try JSONEncoder().encode(entry)
             line.append(0x0A)
