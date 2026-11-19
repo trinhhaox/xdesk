@@ -67,9 +67,28 @@ struct StreamView: View {
 
     @ViewBuilder private var connectingOverlay: some View {
         Group {
-            if model.isPairing { SasView(code: model.sasCode) } else { ProgressView("Đang kết nối…").tint(.white).foregroundStyle(.white) }
+            if model.isPairing { SasView(code: model.sasCode) } else { connectingCard }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// Từ lúc chạm máy Mac tới khung hình đầu tiên: tên máy, vòng quay và nút Huỷ quay về danh sách.
+    private var connectingCard: some View {
+        VStack(spacing: 16) {
+            ProgressView().controlSize(.large).tint(.white)
+            Text("Đang kết nối tới \(model.connectingName ?? "máy Mac")…")
+                .font(.headline).multilineTextAlignment(.center)
+            Button { Task { await model.disconnect() } } label: {
+                Text("Huỷ").frame(minWidth: 120, minHeight: 44)
+            }
+            .buttonStyle(.bordered)
+            .tint(.white)
+        }
+        .foregroundStyle(.white)
+        .padding(24)
+        .frame(maxWidth: 360)
+        .background(BrandPalette.overlaySurface.opacity(0.9), in: RoundedRectangle(cornerRadius: 18))
+        .accessibilityElement(children: .contain)
     }
 
     private func menuItems(_ close: @escaping () -> Void) -> some View {
@@ -88,7 +107,7 @@ struct StreamView: View {
     }
 
     private func item(_ title: String, _ symbol: String, _ close: @escaping () -> Void, action: @escaping () -> Void) -> some View {
-        Button { action(); close() } label: {
+        Button { Haptics.light(); action(); close() } label: {
             Label(title, systemImage: symbol)
                 .font(.body.weight(.medium))
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).padding(.horizontal, 10)
@@ -102,7 +121,7 @@ struct StreamView: View {
         Text(composer.preview)
             .font(.callout)
             .padding(.horizontal, 12).padding(.vertical, 6)
-            .background(.black.opacity(0.75), in: Capsule())
+            .background(BrandPalette.overlaySurface.opacity(0.85), in: Capsule())
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             .padding(.bottom, composer.obscuredHeight + 8)
@@ -114,7 +133,7 @@ struct StreamView: View {
         Text(text)
             .font(.callout)
             .padding(.horizontal, 14).padding(.vertical, 8)
-            .background(.black.opacity(0.7), in: Capsule())
+            .background(BrandPalette.overlaySurface.opacity(0.85), in: Capsule())
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             .allowsHitTesting(false)

@@ -26,7 +26,7 @@ struct PairWithMacView: View {
                     TextField("xdesk://pair?…", text: $pasted).textInputAutocapitalization(.never).autocorrectionDisabled()
                     Button("Ghép đôi") { accept(pasted) }.disabled(pasted.isEmpty)
                 }
-                if let problem { Section { Text(problem).foregroundStyle(.red) } }
+                if let problem { Section { Text(problem).foregroundStyle(BrandPalette.danger) } }
             }
             .navigationTitle("Quét mã QR trên Mac")
             .navigationBarTitleDisplayMode(.inline)

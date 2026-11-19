@@ -58,7 +58,10 @@ final class StreamViewModel {
 
     @ObservationIgnored private var browseTask: Task<Void, Never>?
     @ObservationIgnored var usbListener: UsbListener?
-    @ObservationIgnored private var target: ViewerTarget?
+    /// Đích của lần kết nối gần nhất; giữ sau khi lỗi để "Thử lại" / "Ghép đôi" trên thẻ lỗi.
+    @ObservationIgnored private(set) var target: ViewerTarget?
+    /// Tên hiển thị của đích gần nhất ("Đang kết nối tới …", thẻ lỗi).
+    private(set) var connectingName: String?
     /// Cấu hình màn hình đang dùng; cho lớp nhập liệu biết kích thước màn hình host theo điểm.
     var currentConfig: DisplayConfig?
     @ObservationIgnored private var isRestarting = false
@@ -120,10 +123,16 @@ final class StreamViewModel {
             return
         }
         self.target = target
+        connectingName = displayName(of: target)
         errorMessage = nil
         inStream = true
         currentConfig = config
         await first(config)
+        // Người dùng bấm Huỷ khi đang kết nối: nếu phiên vẫn kịp thành công thì đóng lại, không để stream chạy ngầm.
+        guard inStream else {
+            if session.state != .idle { await session.disconnect() }
+            return
+        }
         await refreshTrust()
         await recordManualConnection()
         self.target = session.connectedTarget ?? target
@@ -131,7 +140,7 @@ final class StreamViewModel {
         failIfNeeded()
     }
 
-    /// Thoát về danh sách host, gửi `bye` lịch sự.
+    /// Thoát về danh sách host, gửi `bye` lịch sự (cũng là nút Huỷ khi đang kết nối).
     func disconnect() async {
         inStream = false
         suspended = false

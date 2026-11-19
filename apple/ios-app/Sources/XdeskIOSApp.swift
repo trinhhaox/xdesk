@@ -10,6 +10,7 @@ struct XdeskIOSApp: App {
             Group {
                 if model.inStream { StreamView(model: model) } else { HostListView(model: model) }
             }
+            .tint(BrandPalette.primary)
             .onChange(of: model.session.state) { _, state in
                 UIApplication.shared.isIdleTimerDisabled = state == .streaming || state == .connecting
                 model.failIfNeeded()

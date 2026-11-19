@@ -33,6 +33,7 @@ extension StreamViewModel {
         isPairing = true
         await begin(first) { await self.session.pair(with: uri, config: $0) }
         isPairing = false
+        pairingFinished()
     }
 
     /// Ghép đôi bằng mã 6 số: `sasCode` hiện trên màn hình stream tới khi Mac bấm "Khớp".
@@ -46,6 +47,13 @@ extension StreamViewModel {
         }
         sasCode = nil
         isPairing = false
+        pairingFinished()
+    }
+
+    /// Rung báo kết quả ghép đôi; bấm Huỷ (không có lỗi) thì không rung.
+    private func pairingFinished() {
+        if inStream, session.state == .streaming { Haptics.result(success: true) }
+        else if errorMessage != nil { Haptics.result(success: false) }
     }
 
     func forgetHost(id: String) async {

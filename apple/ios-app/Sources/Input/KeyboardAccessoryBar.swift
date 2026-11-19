@@ -83,7 +83,7 @@ struct KeyboardAccessoryBar: View {
 
     private func modifierKey(_ symbol: String, _ name: String, _ modifier: InputModifiers) -> some View {
         let state = controller.modifiers.state(of: modifier)
-        return Button { controller.tapModifier(modifier) } label: { keyFace(.symbol(symbol), state: state) }
+        return Button { Haptics.light(); controller.tapModifier(modifier) } label: { keyFace(.symbol(symbol), state: state) }
             .buttonStyle(.plain)
             .accessibilityLabel(name)
             .accessibilityValue(state == .off ? "Tắt" : (state == .armed ? "Áp cho phím kế tiếp" : "Đã khoá"))
@@ -101,7 +101,7 @@ struct KeyboardAccessoryBar: View {
         }
         .frame(minWidth: Self.keySize, minHeight: Self.keySize)
         .foregroundStyle(state == .locked ? Color.white : Color(uiColor: .label))
-        .background(shape.fill(state == .locked ? BrandPalette.primary : (state == .armed ? BrandPalette.primary.opacity(0.22) : Self.keyColor)))
+        .background(shape.fill(state == .locked ? BrandPalette.primaryFill : (state == .armed ? BrandPalette.primary.opacity(0.22) : Self.keyColor)))
         .overlay(shape.stroke(state == .off ? Color(uiColor: .opaqueSeparator) : BrandPalette.primary, lineWidth: state == .off ? 1 : 2))
         .contentShape(shape)
     }

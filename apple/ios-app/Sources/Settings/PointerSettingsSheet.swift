@@ -1,13 +1,25 @@
 import SwiftUI
 import XdeskInput
 
-/// Cài đặt chuột/con trỏ: mở từ danh sách máy Mac (mục Điều khiển) hoặc thanh công cụ màn stream.
+/// Sheet cài đặt chuột trên màn stream (menu nút nổi); màn Cài đặt dùng thẳng `PointerSettingsForm`.
 struct PointerSettingsSheet: View {
     @Bindable var store: PointerSettingsStore
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
+            PointerSettingsForm(store: store)
+                .toolbar { Button("Xong") { dismiss() } }
+        }
+        .presentationDetents([.medium, .large])
+    }
+}
+
+/// Nội dung cài đặt chuột/con trỏ (không kèm NavigationStack để đẩy vào màn Cài đặt hoặc bọc trong sheet).
+struct PointerSettingsForm: View {
+    @Bindable var store: PointerSettingsStore
+
+    var body: some View {
             Form {
                 Section {
                     Picker("Chế độ", selection: $store.settings.mode) {
@@ -21,7 +33,7 @@ struct PointerSettingsSheet: View {
                         Slider(value: speedBinding, in: PointerSettings.speedRange, step: 0.1)
                             .accessibilityLabel("Tốc độ con trỏ")
                             .accessibilityValue(speedText)
-                        Text(speedText).monospacedDigit().frame(width: 48, alignment: .trailing)
+                        Text(speedText).monospacedDigit().frame(minWidth: 48, alignment: .trailing)
                     }
                     .disabled(store.settings.mode != .trackpad)
                     if store.settings.mode != .trackpad {
@@ -37,9 +49,6 @@ struct PointerSettingsSheet: View {
             }
             .navigationTitle("Chuột và con trỏ")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { Button("Xong") { dismiss() } }
-        }
-        .presentationDetents([.medium, .large])
     }
 
     private var modeHelp: String {

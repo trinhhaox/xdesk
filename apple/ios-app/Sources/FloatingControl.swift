@@ -30,7 +30,7 @@ final class FloatingControlStore {
 struct FloatingControl<Menu: View>: View {
     static var buttonSize: CGFloat { 44 }
     static var idleOpacity: Double { 0.7 }
-    static var surface: Color { Color(white: 0.09) }
+    static var surface: Color { BrandPalette.overlaySurface }
     let store: FloatingControlStore
     let container: CGSize
     @ViewBuilder let menu: (_ close: @escaping () -> Void) -> Menu
@@ -70,7 +70,7 @@ struct FloatingControl<Menu: View>: View {
             .opacity(idle && !expanded ? Self.idleOpacity : 1)
             .animation(.easeInOut(duration: 0.3), value: idle)
             .contentShape(Circle())
-            .onTapGesture { expanded.toggle(); activity += 1 }
+            .onTapGesture { Haptics.light(); expanded.toggle(); activity += 1 }
             .gesture(DragGesture(minimumDistance: 8, coordinateSpace: .named("floating"))
                 .onChanged { dragCenter = $0.location; expanded = false; activity += 1 }
                 .onEnded { value in
