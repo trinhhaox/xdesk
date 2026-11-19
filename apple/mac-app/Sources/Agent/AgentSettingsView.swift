@@ -1,14 +1,14 @@
 import SwiftUI
 import XdeskAgent
 
-/// Cài đặt agent: thời gian im lặng trước khi tự nhả quyền và luật theo app (allow/ask/never).
+/// Các mục cài đặt agent (nằm trong Form của tab Agent AI): thời gian im lặng trước khi tự nhả quyền và luật theo app (allow/ask/never).
 struct AgentSettingsView: View {
     @Bindable var settings: AgentSettings
     @State private var newBundleId = ""
     @State private var newRule: AppRule = .never
 
     var body: some View {
-        Form {
+        Group {
             Section("Quyền điều khiển") {
                 Stepper("Tự nhả quyền sau \(settings.idleSeconds) giây im lặng", value: $settings.idleSeconds, in: AgentSettings.idleRange, step: 15)
                 Text("Dừng nhanh bằng \(StopHotkey.label). Chạm chuột/bàn phím vào màn hình agent cũng tự tạm dừng.").font(.footnote).foregroundStyle(.secondary)
@@ -36,9 +36,6 @@ struct AgentSettingsView: View {
                 }
             }
         }
-        .formStyle(.grouped)
-        .frame(width: 520)
-        .padding(.vertical, 8)
     }
 
     private func ruleBinding(_ id: String) -> Binding<AppRule> {

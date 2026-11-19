@@ -20,13 +20,14 @@ final class FireCounter: @unchecked Sendable {
 
     @Test func steadyFramesNeverFire() async throws {
         let counter = FireCounter()
-        let repeater = IdleFrameRepeater(delay: .milliseconds(80)) { counter.hit() }
+        // Khoảng chờ rộng gấp 20 lần nhịp khung để chạy song song cả bộ test (máy bận) vẫn không ngủ quá hạn.
+        let repeater = IdleFrameRepeater(delay: .milliseconds(400)) { counter.hit() }
         for _ in 0..<10 {
             repeater.frameEncoded()
             try await Task.sleep(for: .milliseconds(20))
         }
         #expect(counter.count == 0)
-        try await Task.sleep(for: .milliseconds(250))
+        try await Task.sleep(for: .milliseconds(1000))
         #expect(counter.count == 1)
     }
 

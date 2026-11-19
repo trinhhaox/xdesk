@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Cửa sổ "Cập nhật": bật/tắt tự kiểm tra, tự tải và cài, xem phiên bản, lần kiểm tra gần nhất.
+/// Tab "Cập nhật": bật/tắt tự kiểm tra, tự tải và cài, xem phiên bản, lần kiểm tra gần nhất.
 struct UpdateSettingsView: View {
     let updater: UpdaterController
 
@@ -10,7 +10,7 @@ struct UpdateSettingsView: View {
                 Toggle("Tự động kiểm tra cập nhật", isOn: Binding(get: { updater.automaticallyChecks }, set: updater.setAutomaticallyChecks))
                 Toggle("Tự động tải và cài bản mới", isOn: Binding(get: { updater.automaticallyDownloads }, set: updater.setAutomaticallyDownloads))
                     .disabled(!updater.automaticallyChecks || !updater.allowsAutomaticUpdates)
-                Text("Xdesk kiểm tra mỗi 24 giờ. Khi tìm thấy bản mới lúc đang chạy nền, biểu tượng trên thanh menu đổi dấu và menu có mục để cài.")
+                Text("Xdesk kiểm tra mỗi 24 giờ. Khi tìm thấy bản mới lúc đang chạy nền, biểu tượng trên thanh menu đổi dấu và popover có nút để cài.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
             Section("Hiện tại") {
@@ -23,6 +23,5 @@ struct UpdateSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 460)
     }
 }

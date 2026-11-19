@@ -2,12 +2,22 @@ import SwiftUI
 import XdeskCrypto
 
 /// Cửa sổ "Thiết bị đã ghép": danh tính Mac, cảnh báo bảo mật, viewer được phép vào máy này, host đã ghép (khi Mac này là viewer).
-struct PairedDevicesSettings: View {
+struct PairedDevicesSettings<Extra: View>: View {
     let security: SecurityCenter
+    /// Cửa sổ riêng có khung cố định; khi nhúng vào Cài đặt thì khung do tab quyết định.
+    let embedded: Bool
+    @ViewBuilder let extra: Extra
     @State private var revoking: PairedDevice?
+
+    init(security: SecurityCenter, embedded: Bool = false, @ViewBuilder extra: () -> Extra) {
+        self.security = security
+        self.embedded = embedded
+        self.extra = extra()
+    }
 
     var body: some View {
         Form {
+            extra
             Section("Mac này") {
                 if let fingerprint = security.identityFingerprint {
                     LabeledContent("Dấu vân tay") {
@@ -29,7 +39,7 @@ struct PairedDevicesSettings: View {
             }
             Section("Thiết bị được phép kết nối vào Mac này") {
                 if security.pairedViewers.isEmpty {
-                    Text("Chưa có thiết bị nào. Chọn \"Ghép đôi thiết bị mới…\" trong menu Xdesk.").foregroundStyle(.secondary)
+                    Text("Chưa có thiết bị nào. Chọn \"Ghép đôi thiết bị mới…\" ở thanh menu Xdesk.").foregroundStyle(.secondary)
                 }
                 ForEach(security.pairedViewers, id: \.id) { device in
                     PairedViewerRow(device: device, security: security) { revoking = device }
@@ -50,7 +60,7 @@ struct PairedDevicesSettings: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 520, height: 560)
+        .frame(width: embedded ? nil : 520, height: embedded ? nil : 560)
         .task { await security.refresh() }
         .confirmationDialog(
             "Thu hồi \"\(revoking?.name ?? "")\"?", isPresented: Binding(get: { revoking != nil }, set: { if !$0 { revoking = nil } }),
@@ -65,4 +75,8 @@ struct PairedDevicesSettings: View {
     private func warning(_ text: String, tint: Color) -> some View {
         Label(text, systemImage: "exclamationmark.triangle.fill").foregroundStyle(tint).fixedSize(horizontal: false, vertical: true)
     }
+}
+
+extension PairedDevicesSettings where Extra == EmptyView {
+    init(security: SecurityCenter) { self.init(security: security, embedded: false) { EmptyView() } }
 }

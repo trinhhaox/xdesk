@@ -107,6 +107,18 @@ final class HostController {
         Task { await listener?.setAllowTailscale(allowed) }
     }
 
+    /// Ngắt riêng một viewer đang xem (nút ngắt trong popover).
+    func disconnect(sessionId: UUID) async {
+        await sessions[sessionId]?.session.shutdown()
+    }
+
+    /// Các viewer đang xem, theo thứ tự ổn định, để popover liệt kê.
+    var activeViewers: [(id: UUID, info: ViewerSessionInfo)] {
+        sessionStates.compactMap { id, state in
+            if case .streaming(_, _, _, let info) = state { (id, info) } else { nil }
+        }.sorted { ($0.info.name, $0.id.uuidString) < ($1.info.name, $1.id.uuidString) }
+    }
+
     func stop() async {
         acceptTask?.cancel()
         acceptTask = nil

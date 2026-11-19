@@ -9,7 +9,7 @@ import XdeskWire
 
 enum HostSessionState: Sendable, Equatable {
     case handshaking
-    case streaming(mode: DisplayMode, width: Int, height: Int)
+    case streaming(mode: DisplayMode, width: Int, height: Int, info: ViewerSessionInfo)
     case ended(String)
 }
 
@@ -35,6 +35,8 @@ actor HostSession {
     let audioSettings: HostAudioSettings
     var input: HostInputService?
     var viewerReady = false
+    /// Tên thiết bị viewer tự khai trong Hello (dự phòng khi chưa có peer đã xác thực).
+    private var helloName = ""
     /// Quyền của thiết bị đã ghép (plaintext Debug: mặc định). `view` tắt → từ chối phiên; `input` tắt → bỏ input.
     private(set) var permissions = DevicePermissions.default
     var bitrate = BitrateController(initialKbps: HostSession.initialBitrateKbps)
@@ -97,6 +99,7 @@ actor HostSession {
     // MARK: Chuẩn bị (trong handshake)
 
     private func prepare(_ hello: Hello, _ display: DisplayConfig) async throws -> DisplayReady {
+        helloName = hello.name
         permissions = await connection.peer?.permissions ?? .default
         guard permissions.view else { throw TransportError.rejected(reason: "permission", detail: "thiết bị này không có quyền xem") }
         if connection.isUsbTunnel {
@@ -147,7 +150,11 @@ actor HostSession {
                 }
             }
         })
-        report(.streaming(mode: acquired.mode, width: width, height: height))
+        let peerName = await connection.peer?.name
+        let info = ViewerSessionInfo.make(
+            name: peerName ?? helloName, config: config, isUsb: connection.isUsbTunnel,
+            isTailscale: InterfaceFilter.isTailscale(connection.remoteEndpoint))
+        report(.streaming(mode: acquired.mode, width: width, height: height, info: info))
     }
 
     private static func pumpFrames(_ encoder: VideoEncoder, to channel: UdpMediaChannel) async {

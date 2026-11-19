@@ -18,7 +18,7 @@ enum LocalAddress {
         return parts.count == 4 && parts[0] == 100 && (64...127).contains(parts[1])
     }
 
-    private static func interfaceIPv4s() -> [(name: String, ip: String)] {
+    static func interfaceIPv4s() -> [(name: String, ip: String)] {
         var head: UnsafeMutablePointer<ifaddrs>?
         guard getifaddrs(&head) == 0, let first = head else { return [] }
         defer { freeifaddrs(head) }
