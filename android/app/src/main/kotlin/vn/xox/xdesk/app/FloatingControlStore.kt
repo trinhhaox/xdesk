@@ -13,6 +13,12 @@ data class FloatingPlacement(val trailing: Boolean = true, val fraction: Float =
             FloatingPlacement(cx > width / 2, ((cy - size / 2) / maxOf(1f, height - size)).coerceIn(0f, 1f))
     }
 
+    /** Góc trên-trái của menu mở cạnh nút tại ([x], [y]): bên trong mép nút, ép vào container nên không bao giờ tràn khỏi màn hình. */
+    fun menuOrigin(x: Float, y: Float, button: Float, menuWidth: Float, menuHeight: Float, gap: Float, width: Float, height: Float): Pair<Float, Float> {
+        val left = if (trailing) x - menuWidth - gap else x + button + gap
+        return left.coerceIn(0f, maxOf(0f, width - menuWidth)) to y.coerceIn(gap, maxOf(gap, height - menuHeight - gap))
+    }
+
     /** Góc trên-trái của nút (px) cách mép `margin`. */
     fun origin(width: Float, height: Float, size: Float, margin: Float): Pair<Float, Float> =
         (if (trailing) width - size - margin else margin) to (fraction.coerceIn(0f, 1f) * maxOf(0f, height - size))

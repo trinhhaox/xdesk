@@ -2,17 +2,16 @@ package vn.xox.xdesk.app.ui
 
 import android.view.SurfaceHolder
 import android.view.Window
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -21,20 +20,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
@@ -45,60 +37,60 @@ import androidx.core.view.WindowInsetsControllerCompat
 import kotlinx.coroutines.delay
 import vn.xox.xdesk.app.FloatingControlStore
 import vn.xox.xdesk.app.PointerSettingsStore
-import vn.xox.xdesk.app.StreamInputRouter
 import vn.xox.xdesk.app.ViewerController
-import vn.xox.xdesk.app.input.VideoPan
-
-private const val CURSOR_VISIBLE_MS = 1500L
+import vn.xox.xdesk.app.nextFit
 
 /**
- * Toàn màn hình (immersive) trên một SurfaceView; xoay máy được Activity giữ nguyên (configChanges) và controller mở lại phiên với kích thước mới.
+ * Toàn màn hình (immersive): một [StreamViewport] aspect-fit trong vùng đã trừ tai thỏ, đúng vùng đã xin host qua `display.config`.
  * Khi bàn phím mở, video dịch lên (không thu nhỏ) để vùng vừa chạm nằm trên bàn phím; thanh phím phụ bám trên bàn phím theo animation IME.
+ * Nút nổi vẽ SAU khung video trong cùng Box nên luôn nằm trên và nhận chạm trước, ở mọi chế độ chuột, khi zoom và cả khi bàn phím mở.
  */
 @Composable
 fun StreamScreen(controller: ViewerController, window: Window) {
     val pointerStore = remember { PointerSettingsStore(window.context) }
     val floatingStore = remember { FloatingControlStore(window.context) }
     var showPointerSettings by remember { mutableStateOf(false) }
-    var viewRef by remember { mutableStateOf<StreamSurfaceView?>(null) }
-    var viewHeight by remember { mutableIntStateOf(0) }
+    var viewRef by remember { mutableStateOf<StreamViewport?>(null) }
+    var zoomed by remember { mutableStateOf(false) }
     val density = LocalDensity.current
     val imeBottom = WindowInsets.ime.getBottom(density)
-    val keyBarPx = with(density) { KeyBarHeight.toPx() }
-    val obscured = if (imeBottom > 0) imeBottom + keyBarPx else 0f
-    val focus = controller.input?.focusY
-    val targetPan = if (focus == null || viewHeight == 0) 0f else VideoPan.offset(focus * viewHeight, viewHeight.toFloat(), obscured, viewHeight.toFloat())
-    val pan by animateFloatAsState(targetPan, tween(120), label = "keyboard-pan")
+    val obscured = if (imeBottom > 0) imeBottom + with(density) { KeyBarHeight.toPx() } else 0f
+    controller.input?.focusY // đọc để tính lại độ dịch khi vùng thao tác đổi
+    val pan by animateFloatAsState(viewRef?.keyboardPan(obscured) ?: 0f, tween(120), label = "keyboard-pan")
 
-    SideEffect {
-        controller.input?.applySettings(pointerStore.settings)
-        viewRef?.translationY = -pan
-    }
     DisposableEffect(Unit) {
         val insets = WindowCompat.getInsetsController(window, window.decorView)
         insets.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         insets.hide(WindowInsetsCompat.Type.systemBars())
-        onDispose { insets.show(WindowInsetsCompat.Type.systemBars()) }
+        onDispose { insets.show(WindowInsetsCompat.Type.systemBars()); controller.clearViewport() }
     }
     LaunchedEffect(controller.streaming) {
         while (controller.streaming) { controller.refreshStats(); delay(1000) }
     }
+    LaunchedEffect(controller.input) { viewRef?.resetZoom() }
 
-    Box(Modifier.fillMaxSize().background(Color.Black).onSizeChanged { viewHeight = it.height }) {
+    Box(Modifier.fillMaxSize().background(Color.Black)) {
         AndroidView(modifier = Modifier.fillMaxSize(), factory = { ctx ->
-            StreamSurfaceView(ctx).also { view ->
-                view.router = controller.input
-                view.onSurface = { holder: SurfaceHolder?, w, h -> surfaceChanged(controller, holder, w, h) }
+            StreamViewport(ctx).also { view ->
+                view.surfaceView.onSurface = { holder: SurfaceHolder?, _, _ -> if (holder == null) controller.detachSurface() else controller.attachSurface(holder.surface) }
+                view.onViewportChanged = { zoomed = it }
+                view.onSizeChanged = controller::onViewportChanged
                 viewRef = view
             }
-        }, update = { it.router = controller.input })
+        }, update = {
+            it.router = controller.input
+            it.videoSize = controller.videoSize
+            it.zoomEnabled = controller.isNativeMirror
+            it.panY = pan
+            controller.input?.applySettings(pointerStore.settings)
+        })
 
-        CursorOverlay(controller.input) { pan }
         Overlay(controller)
         controller.agentApproval?.takeIf { controller.streaming }?.let { AgentApprovalDialog(it, controller::answerAgentApproval) }
-        if (imeBottom == 0) FloatingControl(floatingStore, controller.stats, floatingActions(controller, pointerStore, onKeyboard = { viewRef?.showKeyboard() }) { showPointerSettings = true })
+        val actions = floatingActions(controller, pointerStore, zoomed, onKeyboard = { viewRef?.surfaceView?.showKeyboard() }, onResetZoom = { viewRef?.resetZoom() }) { showPointerSettings = true }
+        FloatingControl(floatingStore, controller.stats, actions, Modifier.padding(bottom = with(density) { obscured.toDp() }))
         controller.input?.takeIf { imeBottom > 0 }?.let {
-            KeyBar(it, onHide = { viewRef?.hideKeyboard() }, modifier = Modifier.align(Alignment.BottomCenter).imePadding())
+            KeyBar(it, onHide = { viewRef?.surfaceView?.hideKeyboard() }, modifier = Modifier.align(Alignment.BottomCenter).imePadding())
         }
     }
     if (showPointerSettings) {
@@ -110,44 +102,16 @@ fun StreamScreen(controller: ViewerController, window: Window) {
     }
 }
 
-private fun surfaceChanged(controller: ViewerController, holder: SurfaceHolder?, w: Int, h: Int) {
-    if (holder == null) controller.detachSurface() else {
-        controller.attachSurface(holder.surface)
-        controller.onSurfaceResized(w, h)
-    }
+private fun floatingActions(
+    controller: ViewerController, store: PointerSettingsStore, zoomed: Boolean, onKeyboard: () -> Unit, onResetZoom: () -> Unit, onPointerSettings: () -> Unit,
+) = buildList {
+    add(FloatingAction("Ngắt kết nối", onClick = controller::disconnect))
+    add(FloatingAction("Bàn phím", onClick = onKeyboard))
+    add(FloatingAction("Chuột: ${store.settings.mode.title()}", "Đổi chế độ chuột, đang là ${store.settings.mode.title()}", onClick = store::toggleMode))
+    add(FloatingAction("Cài đặt chuột", "Cài đặt chuột và con trỏ", onClick = onPointerSettings))
+    if (zoomed) add(FloatingAction("Vừa khung", "Thu về vừa khung màn hình", onClick = onResetZoom))
+    controller.nextFit()?.let { next -> add(FloatingAction("Kiểu: ${controller.display.fit.title()}", "Đổi kiểu Bản sao sang ${next.title()}, kết nối lại") { controller.switchFit(next) }) }
 }
-
-/** Con trỏ cục bộ của chế độ trackpad: hiện khi đang trượt và 1,5 s sau đó; vẽ ngay không chờ video có con trỏ Mac. */
-@Composable
-private fun CursorOverlay(router: StreamInputRouter?, pan: () -> Float) {
-    val cursor = router?.cursor ?: return
-    var visible by remember { mutableStateOf(false) }
-    LaunchedEffect(router.cursorStamp) { visible = true; delay(CURSOR_VISIBLE_MS); visible = false }
-    if (!visible) return
-    Canvas(Modifier.fillMaxSize().graphicsLayer { translationY = -pan() }) {
-        val tip = Offset(cursor.first * size.width, cursor.second * size.height)
-        val unit = density
-        val arrow = Path().apply {
-            moveTo(tip.x, tip.y)
-            lineTo(tip.x, tip.y + 17 * unit)
-            lineTo(tip.x + 4.2f * unit, tip.y + 13.2f * unit)
-            lineTo(tip.x + 7 * unit, tip.y + 19.5f * unit)
-            lineTo(tip.x + 9.8f * unit, tip.y + 18.3f * unit)
-            lineTo(tip.x + 7 * unit, tip.y + 12.2f * unit)
-            lineTo(tip.x + 12 * unit, tip.y + 12.2f * unit)
-            close()
-        }
-        drawPath(arrow, Color.White)
-        drawPath(arrow, Color.Black, style = Stroke(1.2f * unit))
-    }
-}
-
-private fun floatingActions(controller: ViewerController, store: PointerSettingsStore, onKeyboard: () -> Unit, onPointerSettings: () -> Unit) = listOf(
-    FloatingAction("Ngắt kết nối", onClick = controller::disconnect),
-    FloatingAction("Bàn phím", onClick = onKeyboard),
-    FloatingAction("Chuột: ${store.settings.mode.title()}", "Đổi chế độ chuột, đang là ${store.settings.mode.title()}", onClick = store::toggleMode),
-    FloatingAction("Cài đặt chuột", "Cài đặt chuột và con trỏ", onClick = onPointerSettings),
-)
 
 @Composable
 private fun Overlay(controller: ViewerController) {

@@ -28,6 +28,8 @@ import androidx.compose.ui.unit.dp
 import vn.xox.xdesk.app.PointerSettingsStore
 import vn.xox.xdesk.app.Screen
 import vn.xox.xdesk.app.ViewerController
+import vn.xox.xdesk.app.connectManual
+import vn.xox.xdesk.app.openPairing
 import vn.xox.xdesk.app.discovery.HostBadge
 import vn.xox.xdesk.transport.KnownHost
 import vn.xox.xdesk.transport.ViewerTarget

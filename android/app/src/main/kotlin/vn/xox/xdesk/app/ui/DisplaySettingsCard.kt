@@ -25,14 +25,14 @@ import vn.xox.xdesk.app.input.PointerMode
 import vn.xox.xdesk.wire.MirrorFit
 import vn.xox.xdesk.wire.ScreenMode
 
-private fun MirrorFit.title() = when (this) {
+fun MirrorFit.title() = when (this) {
     MirrorFit.NATIVE -> "Giống màn hình Mac"
     MirrorFit.FIT_DEVICE -> "Vừa với điện thoại"
     MirrorFit.TOUCH -> "Tối ưu thao tác"
 }
 
 private fun MirrorFit.summary() = when (this) {
-    MirrorFit.NATIVE -> "Giữ nguyên Mac, xem cả màn hình rồi phóng to."
+    MirrorFit.NATIVE -> "Giữ nguyên Mac, xem cả màn hình rồi phóng to bằng hai ngón."
     MirrorFit.FIT_DEVICE -> "Mac đổi theo kích thước và chiều xoay của điện thoại."
     MirrorFit.TOUCH -> "Như Vừa với điện thoại nhưng nút và chữ to hơn, dễ chạm."
 }

@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import vn.xox.xdesk.app.Screen
 import vn.xox.xdesk.app.ViewerController
+import vn.xox.xdesk.app.pairWithQr
 import vn.xox.xdesk.transport.ViewerTarget
 
 /** Ghép đôi: quét QR (xin quyền camera chỉ ở đây) hoặc so mã 6 số với host đã chọn/nhập tay. */

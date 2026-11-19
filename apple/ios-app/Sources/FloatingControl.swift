@@ -23,10 +23,14 @@ final class FloatingControlStore {
     }
 }
 
-/// Một nút nổi 44 pt thay cho thanh công cụ cố định (thanh cũ che menu bar Mac). Chạm mở menu gọn; kéo rồi thả thì dính mép
-/// trái/phải gần nhất; mờ còn 35% sau 3 s không chạm. Chỉ nút và menu nhận chạm, mọi nơi khác chạm xuyên xuống Mac.
+/// Một nút nổi 44 pt thay cho thanh công cụ cố định (thanh cũ che menu bar Mac): đĩa đặc tối, glyph trắng, viền sáng và bóng nên đọc được
+/// trên mọi nền Mac. Chạm mở menu đặc; kéo rồi thả thì dính mép trái/phải gần nhất; sau 3 s không chạm chỉ nhạt còn 70%.
+/// Vẽ TRÊN video trong ZStack nên nhận chạm trước lớp cảm ứng ở mọi chế độ chuột, khi zoom và cả khi bàn phím mở (`container` đã trừ bàn phím).
+/// Chỉ nút và menu nhận chạm, mọi nơi khác chạm xuyên xuống Mac.
 struct FloatingControl<Menu: View>: View {
     static var buttonSize: CGFloat { 44 }
+    static var idleOpacity: Double { 0.7 }
+    static var surface: Color { Color(white: 0.09) }
     let store: FloatingControlStore
     let container: CGSize
     @ViewBuilder let menu: (_ close: @escaping () -> Void) -> Menu
@@ -58,11 +62,12 @@ struct FloatingControl<Menu: View>: View {
 
     private var button: some View {
         Image(systemName: expanded ? "xmark" : "ellipsis")
-            .font(.system(size: 18, weight: .semibold)).foregroundStyle(.white)
+            .font(.system(size: 20, weight: .bold)).foregroundStyle(.white)
             .frame(width: Self.buttonSize, height: Self.buttonSize)
-            .background(Circle().fill(.black.opacity(0.6)))
-            .overlay(Circle().stroke(.white.opacity(0.35), lineWidth: 1))
-            .opacity(idle ? 0.35 : 1)
+            .background(Circle().fill(Self.surface))
+            .overlay(Circle().stroke(.white.opacity(0.55), lineWidth: 1.5))
+            .shadow(color: .black.opacity(0.45), radius: 4, y: 1)
+            .opacity(idle && !expanded ? Self.idleOpacity : 1)
             .animation(.easeInOut(duration: 0.3), value: idle)
             .contentShape(Circle())
             .onTapGesture { expanded.toggle(); activity += 1 }
@@ -88,7 +93,9 @@ struct FloatingControl<Menu: View>: View {
         let y = min(max(center.y, menuSize.height / 2 + 8), container.height - menuSize.height / 2 - 8)
         return menu { expanded = false; activity += 1 }
             .padding(6)
-            .background(RoundedRectangle(cornerRadius: 14).fill(.black.opacity(0.78)))
+            .background(RoundedRectangle(cornerRadius: 14).fill(Self.surface))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(.white.opacity(0.35), lineWidth: 1))
+            .shadow(color: .black.opacity(0.45), radius: 8, y: 2)
             .foregroundStyle(.white)
             .fixedSize()
             .background(GeometryReader { proxy in Color.clear.onAppear { menuSize = proxy.size }.onChange(of: proxy.size) { _, new in menuSize = new } })

@@ -14,7 +14,6 @@ class DisplaySettingsStore(context: Context) {
     var mode by mutableStateOf(ScreenMode.entries.firstOrNull { it.name == prefs.getString(MODE, null) } ?: ScreenMode.MIRROR)
         private set
 
-    /** Android chưa có letterbox + zoom nên chỉ cung cấp [SUPPORTED_FITS]; giá trị lưu khác (vd. NATIVE) về mặc định. */
     var fit by mutableStateOf(MirrorFit.entries.firstOrNull { it.name == prefs.getString(FIT, null) && it in SUPPORTED_FITS } ?: MirrorFit.FIT_DEVICE)
         private set
 
@@ -27,7 +26,7 @@ class DisplaySettingsStore(context: Context) {
     }
 
     companion object {
-        val SUPPORTED_FITS = listOf(MirrorFit.FIT_DEVICE, MirrorFit.TOUCH)
+        val SUPPORTED_FITS = listOf(MirrorFit.NATIVE, MirrorFit.FIT_DEVICE, MirrorFit.TOUCH)
         private const val FILE = "xdesk_display"
         private const val MODE = "mode"
         private const val FIT = "mirror_fit"

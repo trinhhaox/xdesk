@@ -33,9 +33,7 @@ struct StreamView: View {
                 if model.session.state != .streaming {
                     connectingOverlay
                 }
-                if !composer.isActive {
-                    FloatingControl(store: floating, container: proxy.size) { close in menuItems(close) }
-                }
+                FloatingControl(store: floating, container: floatingArea(proxy.size)) { close in menuItems(close) }
                 if !composer.preview.isEmpty { composingPreview }
                 if let notice = modeNotice ?? model.clipboardNotice { toast(notice) }
             }
@@ -43,6 +41,7 @@ struct StreamView: View {
                 model.screenChanged(ScreenMetrics(size: size, scale: displayScale))
             }
         }
+        .ignoresSafeArea(.keyboard)
         .background(Color.black.ignoresSafeArea())
         .sheet(isPresented: $showPointerSettings) { PointerSettingsSheet(store: pointer) }
         .statusBarHidden(true)
@@ -53,6 +52,12 @@ struct StreamView: View {
         } message: { request in
             Text("\(request.agentName): \(request.summary)\nChỉ cho phép nếu chính bạn vừa yêu cầu agent làm việc trên Mac.")
         }
+    }
+
+    /// Vùng nút nổi được di chuyển: bàn phím không làm đổi cỡ vùng stream (`ignoresSafeArea(.keyboard)`, nếu đổi sẽ phải xin lại cấu hình
+    /// với host) nên tự trừ phần bàn phím che; nhờ vậy nút nổi và menu vẫn thấy được khi gõ.
+    private func floatingArea(_ size: CGSize) -> CGSize {
+        CGSize(width: size.width, height: max(FloatingControl<EmptyView>.buttonSize, size.height - composer.obscuredHeight))
     }
 
     /// Hộp thoại hiện khi host có yêu cầu và tự tắt khi hết hạn; việc đóng do nút bấm xử lý nên setter không làm gì.
@@ -84,8 +89,12 @@ struct StreamView: View {
 
     private func item(_ title: String, _ symbol: String, _ close: @escaping () -> Void, action: @escaping () -> Void) -> some View {
         Button { action(); close() } label: {
-            Label(title, systemImage: symbol).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).padding(.horizontal, 10)
+            Label(title, systemImage: symbol)
+                .font(.body.weight(.medium))
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).padding(.horizontal, 10)
+                .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
     }
 
     /// Chữ Telex đang soạn: chỉ xem trước nhỏ ngay trên bàn phím, chữ chốt mới gửi sang Mac.

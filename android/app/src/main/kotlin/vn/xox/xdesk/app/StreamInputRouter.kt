@@ -44,6 +44,9 @@ class StreamInputRouter(private val session: ViewerSession) {
     var focusY by mutableStateOf<Float?>(null)
         private set
 
+    /** Đang ở chế độ trackpad (con trỏ cục bộ): chạm chỉ cần độ dời, không cần nằm trong khung video. */
+    val isTrackpad: Boolean get() = gestures?.cursor != null
+
     /** Đổi kích thước host (điểm) mỗi khi `display.config` đổi: ngưỡng và delta cuộn tính theo điểm host. */
     fun configure(hostWidthPoints: Float, hostHeightPoints: Float) {
         hostWidth = hostWidthPoints

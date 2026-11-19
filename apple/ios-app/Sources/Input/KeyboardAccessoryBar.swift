@@ -95,14 +95,14 @@ struct KeyboardAccessoryBar: View {
         let shape = RoundedRectangle(cornerRadius: 8)
         return Group {
             switch face {
-            case .text(let text): Text(text).font(.system(size: 16, weight: .semibold))
-            case .symbol(let name): Image(systemName: name).font(.system(size: 18, weight: .semibold))
+            case .text(let text): Text(text).font(.system(size: 17, weight: .bold))
+            case .symbol(let name): Image(systemName: name).font(.system(size: 19, weight: .bold))
             }
         }
         .frame(minWidth: Self.keySize, minHeight: Self.keySize)
         .foregroundStyle(state == .locked ? Color.white : Color(uiColor: .label))
         .background(shape.fill(state == .locked ? BrandPalette.primary : (state == .armed ? BrandPalette.primary.opacity(0.22) : Self.keyColor)))
-        .overlay(shape.stroke(state == .off ? Color(uiColor: .separator) : BrandPalette.primary, lineWidth: state == .off ? 0.5 : 2))
+        .overlay(shape.stroke(state == .off ? Color(uiColor: .opaqueSeparator) : BrandPalette.primary, lineWidth: state == .off ? 1 : 2))
         .contentShape(shape)
     }
 }

@@ -1,10 +1,8 @@
 package vn.xox.xdesk.app.ui
 
 import android.content.Context
-import android.os.SystemClock
 import android.text.InputType
 import android.view.KeyEvent
-import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.inputmethod.BaseInputConnection
@@ -13,23 +11,14 @@ import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodManager
 import vn.xox.xdesk.app.StreamInputRouter
 import vn.xox.xdesk.app.input.HidKeys
-import vn.xox.xdesk.app.input.TouchPhase
-import vn.xox.xdesk.app.input.TouchSample
 
 /**
- * SurfaceView (không TextureView: đường compositor ngắn nhất) nhận cảm ứng → [StreamInputRouter] và đóng vai ô gõ cho IME:
+ * SurfaceView (không TextureView: đường compositor ngắn nhất) vẽ video, và đóng vai ô gõ cho IME (cảm ứng do [StreamViewport] xử lý):
  * chữ chốt của bộ gõ Telex đi `input.text`, phím cứng/đặc biệt đi HID. Bản thân view không giữ chữ nào.
  */
 class StreamSurfaceView(context: Context) : SurfaceView(context) {
     var router: StreamInputRouter? = null
     var onSurface: (SurfaceHolder?, Int, Int) -> Unit = { _, _, _ -> }
-    private val tick = object : Runnable {
-        override fun run() {
-            router?.tick()
-            postDelayed(this, TICK_MS)
-        }
-    }
-
     init {
         isFocusable = true
         isFocusableInTouchMode = true
@@ -39,38 +28,6 @@ class StreamSurfaceView(context: Context) : SurfaceView(context) {
             override fun surfaceDestroyed(h: SurfaceHolder) = onSurface(null, 0, 0)
         })
     }
-
-    override fun onAttachedToWindow() {
-        super.onAttachedToWindow()
-        post(tick)
-    }
-
-    override fun onDetachedFromWindow() {
-        removeCallbacks(tick)
-        super.onDetachedFromWindow()
-    }
-
-    override fun onTouchEvent(event: MotionEvent): Boolean {
-        val target = router ?: return false
-        val phase = when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> TouchPhase.BEGAN
-            MotionEvent.ACTION_MOVE -> TouchPhase.MOVED
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> TouchPhase.ENDED
-            MotionEvent.ACTION_CANCEL -> TouchPhase.CANCELLED
-            else -> return false
-        }
-        val now = SystemClock.uptimeMillis()
-        val indices = when (phase) {
-            TouchPhase.MOVED, TouchPhase.CANCELLED -> (0 until event.pointerCount).toList()
-            else -> listOf(event.actionIndex)
-        }
-        target.onTouch(indices.map { sample(event, it, phase, now) })
-        return true
-    }
-
-    private fun sample(e: MotionEvent, index: Int, phase: TouchPhase, now: Long) = TouchSample(
-        e.getPointerId(index), (e.getX(index) / width).coerceIn(0f, 1f), (e.getY(index) / height).coerceIn(0f, 1f), phase, now,
-    )
 
     fun showKeyboard() {
         requestFocus()
@@ -108,6 +65,4 @@ class StreamSurfaceView(context: Context) : SurfaceView(context) {
             return forwardKey(event.keyCode, event)
         }
     }
-
-    private companion object { const val TICK_MS = 50L }
 }

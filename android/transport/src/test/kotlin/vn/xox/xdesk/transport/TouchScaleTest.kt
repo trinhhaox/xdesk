@@ -37,14 +37,19 @@ class TouchScaleTest {
     }
 
     @Test
-    fun fitDeviceIsOmittedExtendIgnoresFitAndNativeIsRejected() {
+    fun fitDeviceIsOmittedExtendIgnoresFitAndNativeSendsLongShortHint() {
         val fit = checkNotNull(DisplayConfigPlanner.config(1080.0, 2400.0, 2.75, mode = ScreenMode.MIRROR, mirrorFit = MirrorFit.FIT_DEVICE))
         assertNull(fit.mirrorFit)
         assertEquals(MirrorFit.FIT_DEVICE, fit.fit)
         assertEquals(1080L to 2400L, fit.w to fit.h)
         val extend = checkNotNull(DisplayConfigPlanner.config(1080.0, 2400.0, 2.75, mode = ScreenMode.EXTEND, mirrorFit = MirrorFit.TOUCH))
         assertNull(extend.mirrorFit)
-        assertNull(DisplayConfigPlanner.config(1080.0, 2400.0, 2.75, mode = ScreenMode.MIRROR, mirrorFit = MirrorFit.NATIVE))
+        val native = checkNotNull(DisplayConfigPlanner.config(1080.0, 2400.0, 2.75, mode = ScreenMode.MIRROR, mirrorFit = MirrorFit.NATIVE))
+        assertEquals(MirrorFit.NATIVE, native.mirrorFit)
+        assertEquals(2400L to 1080L, native.w to native.h)
+        val rotated = checkNotNull(DisplayConfigPlanner.config(2400.0, 1080.0, 2.75, mode = ScreenMode.MIRROR, mirrorFit = MirrorFit.NATIVE))
+        assertEquals(native, rotated)
+        assertNull(DisplayConfigPlanner.config(1080.0, 2400.0, 2.75, mode = ScreenMode.EXTEND, mirrorFit = MirrorFit.NATIVE)?.mirrorFit)
         assertTrue(extend is ControlMessage.DisplayConfig)
     }
 }

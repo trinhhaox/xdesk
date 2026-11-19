@@ -35,8 +35,9 @@ import vn.xox.xdesk.app.input.StickyModifiers.State
 import vn.xox.xdesk.transport.InputModifiers
 
 private val Brand = Color(0xFF2F6BFF)
-private val BarBackground = Color(0xFF1C1E26)
-private val KeyBackground = Color(0xFF353A47)
+private val BarBackground = Color(0xFF0E1015)
+private val KeyBackground = Color(0xFF4A5063)
+private val KeyOutline = Color(0x66FFFFFF)
 val KeyBarHeight = 48.dp
 
 /**
@@ -92,8 +93,8 @@ private fun Key(label: String, name: String, state: State, hint: String?, modifi
         modifier
             .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
             .padding(2.dp)
-            .background(if (state == State.LOCKED) Brand else if (state == State.ARMED) Brand.copy(alpha = 0.3f) else KeyBackground, shape)
-            .border(if (state == State.OFF) 0.dp else 2.dp, Brand, shape)
+            .background(if (state == State.LOCKED) Brand else if (state == State.ARMED) Brand.copy(alpha = 0.5f) else KeyBackground, shape)
+            .border(if (state == State.OFF) 1.dp else 2.dp, if (state == State.OFF) KeyOutline else Color.White, shape)
             .clickable(onClickLabel = name, onClick = onClick)
             .semantics {
                 role = Role.Button
@@ -105,6 +106,6 @@ private fun Key(label: String, name: String, state: State, hint: String?, modifi
             },
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(horizontal = 6.dp))
+        Text(label, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp))
     }
 }
