@@ -1,6 +1,7 @@
 package vn.xox.xdesk.app
 
 import android.app.Application
+import android.util.Log
 import android.content.Context
 import java.io.File
 import vn.xox.xdesk.app.identity.IdentityUnavailableException
@@ -53,5 +54,6 @@ class XdeskApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        Log.i("XdeskCrypto", vn.xox.xdesk.crypto.CryptoDiagnostics.describe())
     }
 }

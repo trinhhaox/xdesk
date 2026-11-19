@@ -1,17 +1,11 @@
 package vn.xox.xdesk.crypto
 
-import java.math.BigInteger
 import java.security.GeneralSecurityException
-import java.security.KeyFactory
 import java.security.MessageDigest
 import java.security.NoSuchAlgorithmException
 import java.security.SecureRandom
-import java.security.spec.NamedParameterSpec
-import java.security.spec.XECPrivateKeySpec
-import java.security.spec.XECPublicKeySpec
 import javax.crypto.AEADBadTagException
 import javax.crypto.Cipher
-import javax.crypto.KeyAgreement
 import javax.crypto.Mac
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
@@ -102,6 +96,13 @@ internal object Primitives {
         Cipher.getInstance("ChaCha20/Poly1305/NoPadding")
     }
 
+    /** Một dòng chẩn đoán cho log khởi động: đường X25519 đang dùng và cipher AEAD đã resolve (không chứa khoá). */
+    fun describePaths(): String {
+        val x = if (preferJca && X25519Jca.available) "JCA(XDH,DER)" else "fallback-Kotlin"
+        val aead = try { newAead().let { "${it.algorithm}@${it.provider.name}" } } catch (e: GeneralSecurityException) { "KHÔNG-resolve" }
+        return "x25519=$x aead=$aead"
+    }
+
     fun x25519PublicKey(privateKey: ByteArray): ByteArray = agree(privateKey, basePoint)
 
     /** DH X25519. Kết quả toàn số 0 (điểm bậc thấp) bị từ chối tường minh, bất kể provider có tự ném hay không. */
@@ -117,32 +118,14 @@ internal object Primitives {
     private fun agree(privateKey: ByteArray, publicKey: ByteArray): ByteArray {
         if (privateKey.size != KEY_LENGTH) cryptoError(CryptoErrorCode.invalidKeyLength)
         if (publicKey.size != KEY_LENGTH) cryptoError(CryptoErrorCode.invalidPublicKey)
-        if (preferJca) {
+        if (preferJca && X25519Jca.available) {
             try {
-                return agreeJca(privateKey, publicKey)
-            } catch (e: NoSuchAlgorithmException) {
-                preferJca = false
-            } catch (e: LinkageError) {
-                preferJca = false // API < 33: thiếu XECPrivateKeySpec/NamedParameterSpec
+                return X25519Jca.agree(privateKey, publicKey)
+            } catch (e: GeneralSecurityException) {
+                // Provider đã qua tự kiểm mà vẫn từ chối khoá này (ví dụ điểm bậc thấp): kết quả của bản Kotlin
+                // giống hệt, và x25519() vẫn chặn bí mật toàn số 0.
             }
         }
         return X25519Fallback.scalarMult(privateKey, publicKey)
-    }
-
-    private fun agreeJca(privateKey: ByteArray, publicKey: ByteArray): ByteArray {
-        return try {
-            val params = NamedParameterSpec.X25519
-            val factory = KeyFactory.getInstance("XDH")
-            val little = publicKey.reversedArray()
-            little[0] = (little[0].toInt() and 0x7F).toByte() // RFC 7748: bỏ bit cao của u
-            val agreement = KeyAgreement.getInstance("XDH")
-            agreement.init(factory.generatePrivate(XECPrivateKeySpec(params, privateKey)))
-            agreement.doPhase(factory.generatePublic(XECPublicKeySpec(params, BigInteger(1, little))), true)
-            agreement.generateSecret().also { if (it.size != KEY_LENGTH) cryptoError(CryptoErrorCode.invalidDiffieHellman) }
-        } catch (e: NoSuchAlgorithmException) {
-            throw e
-        } catch (e: GeneralSecurityException) {
-            cryptoError(CryptoErrorCode.invalidDiffieHellman)
-        }
     }
 }
