@@ -22,17 +22,17 @@ class ViewerConnector(private val trust: ViewerTrust, private val deviceName: St
 
     fun connect(candidates: List<ViewerTarget>, auth: ViewerAuth, timeoutMs: Int = 5000): ConnectedHost {
         refusedHostId = null
-        var lastError: TransportException? = null
+        val failures = mutableListOf<Pair<ViewerTarget, TransportException>>()
         for (target in candidates) {
             val conn = try {
                 ControlConnection.connect(target.host, target.port, timeoutMs)
             } catch (e: TransportException) {
-                lastError = e
+                failures += target to e
                 continue
             }
             return authenticate(conn, target, auth)
         }
-        throw lastError ?: TransportException(TransportErrorCode.CONNECTION_FAILED, "không có địa chỉ")
+        throw connectFailure(failures)
     }
 
     private fun authenticate(conn: ControlConnection, target: ViewerTarget, auth: ViewerAuth): ConnectedHost {
@@ -74,5 +74,13 @@ class ViewerConnector(private val trust: ViewerTrust, private val deviceName: St
             is ViewerTrust.HostState.KeyChanged -> transportError(TransportErrorCode.HOST_KEY_MISMATCH)
             ViewerTrust.HostState.Unknown -> transportError(TransportErrorCode.PAIRING_REQUIRED)
         }
+    }
+
+    /** Một địa chỉ: giữ nguyên lỗi. Nhiều địa chỉ: liệt kê từng địa chỉ đã thử để người dùng thấy cả LAN lẫn Tailscale. */
+    private fun connectFailure(failures: List<Pair<ViewerTarget, TransportException>>): TransportException {
+        if (failures.isEmpty()) return TransportException(TransportErrorCode.CONNECTION_FAILED, "không có địa chỉ")
+        if (failures.size == 1) return failures[0].second
+        val detail = failures.joinToString("; ") { (t, e) -> "${t.host}:${t.port} (${e.code.name.lowercase()})" }
+        return TransportException(TransportErrorCode.CONNECTION_FAILED, "đã thử $detail")
     }
 }

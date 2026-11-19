@@ -4,8 +4,23 @@ import Darwin
 enum LocalAddress {
     /// IPv4 đầu tiên trên giao diện đang bật (ưu tiên en0 Wi-Fi), bỏ qua loopback và link-local.
     static func primaryIPv4() -> String? {
+        let found = interfaceIPv4s().filter { !isTailscale($0.ip) }
+        return (found.first { $0.name == "en0" } ?? found.first)?.ip
+    }
+
+    /// IPv4 Tailscale (100.64.0.0/10, CGNAT) của Mac nếu đang bật Tailscale; dùng cho mã QR khi cho phép kết nối qua Tailscale.
+    static func tailscaleIPv4() -> String? {
+        interfaceIPv4s().first { isTailscale($0.ip) }?.ip
+    }
+
+    static func isTailscale(_ ip: String) -> Bool {
+        let parts = ip.split(separator: ".").compactMap { Int($0) }
+        return parts.count == 4 && parts[0] == 100 && (64...127).contains(parts[1])
+    }
+
+    private static func interfaceIPv4s() -> [(name: String, ip: String)] {
         var head: UnsafeMutablePointer<ifaddrs>?
-        guard getifaddrs(&head) == 0, let first = head else { return nil }
+        guard getifaddrs(&head) == 0, let first = head else { return [] }
         defer { freeifaddrs(head) }
         var found: [(name: String, ip: String)] = []
         for entry in sequence(first: first, next: { $0.pointee.ifa_next }) {
@@ -18,6 +33,6 @@ enum LocalAddress {
             if ip.hasPrefix("169.254.") { continue }
             found.append((String(cString: ifa.ifa_name), ip))
         }
-        return (found.first { $0.name == "en0" } ?? found.first)?.ip
+        return found
     }
 }

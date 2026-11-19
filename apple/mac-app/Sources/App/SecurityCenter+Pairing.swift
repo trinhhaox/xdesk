@@ -10,8 +10,15 @@ extension SecurityCenter {
     @discardableResult
     func startQrPairing(port: UInt16) async -> PairingURI? {
         guard let hostAuthenticator else { return nil }
-        var addresses = ["127.0.0.1:\(port)"]
-        if let lan = LocalAddress.primaryIPv4() { addresses.insert("\(lan):\(port)", at: 0) }
+        // Thứ tự thử của điện thoại: LAN trước, rồi Tailscale (chỉ khi host cho phép), loopback chỉ cho kiểm thử cùng máy (Debug).
+        var addresses: [String] = []
+        if let lan = LocalAddress.primaryIPv4() { addresses.append("\(lan):\(port)") }
+        if UserDefaults.standard.bool(forKey: "xdesk.host.allowTailscale"), let tailnet = LocalAddress.tailscaleIPv4() {
+            addresses.append("\(tailnet):\(port)")
+        }
+        #if DEBUG
+        addresses.append("127.0.0.1:\(port)")
+        #endif
         do {
             return try await hostAuthenticator.startQrPairing(addresses: addresses)
         } catch {
