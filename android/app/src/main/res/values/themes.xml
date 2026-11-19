@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- DayNight theo hệ thống nhưng không có ActionBar gốc: thanh tiêu đề do Compose (TopAppBar) vẽ. -->
-    <style name="Theme.Xdesk" parent="@android:style/Theme.DeviceDefault.DayNight">
+    <!-- Mặc định tối (nền #101218 ngay từ lúc khởi động) và không có ActionBar gốc: thanh trên do Compose vẽ. -->
+    <style name="Theme.Xdesk" parent="@android:style/Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">@color/xdesk_background_dark</item>
         <item name="android:windowActionBar">false</item>
         <item name="android:windowNoTitle">true</item>
     </style>

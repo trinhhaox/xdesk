@@ -10,6 +10,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.ui.unit.sp
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -41,16 +42,13 @@ fun UpdatePrompt(updates: UpdateController) {
     }
 }
 
-/** Thẻ trong màn Bảo mật: phiên bản hiện tại, trạng thái và nút kiểm tra thủ công. */
+/** Nhóm "Cập nhật" cuối màn Cài đặt (chỉ có ở Android): phiên bản hiện tại, trạng thái và nút kiểm tra thủ công. */
 @Composable
-fun UpdateCard(updates: UpdateController) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Cập nhật", style = MaterialTheme.typography.titleSmall)
-            Text("Phiên bản hiện tại: ${updates.installedVersionName} (${updates.installedVersionCode})")
-            Text(statusText(updates.state), style = MaterialTheme.typography.bodySmall)
-            OutlinedButton(onClick = updates::checkNow, enabled = updates.state != UpdateState.Checking) { Text("Kiểm tra cập nhật") }
-        }
+fun UpdateCard(updates: UpdateController) = Group("Cập nhật", footer = statusText(updates.state)) {
+    GroupRow { Text("Phiên bản hiện tại", Modifier.weight(1f), fontSize = 17.sp); Text("${updates.installedVersionName} (${updates.installedVersionCode})", fontSize = 17.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    GroupDivider()
+    GroupRow(if (updates.state != UpdateState.Checking) updates::checkNow else null) {
+        Text("Kiểm tra cập nhật", fontSize = 17.sp, color = MaterialTheme.colorScheme.primary)
     }
 }
 

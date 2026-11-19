@@ -3,6 +3,8 @@ package vn.xox.xdesk.app.ui
 import android.view.SurfaceHolder
 import android.view.Window
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -42,6 +44,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -49,6 +55,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import kotlinx.coroutines.delay
 import vn.xox.xdesk.app.FloatingControlStore
 import vn.xox.xdesk.app.PointerSettingsStore
+import vn.xox.xdesk.app.input.PointerMode
 import vn.xox.xdesk.app.ViewerController
 import vn.xox.xdesk.app.clearViewport
 import vn.xox.xdesk.app.onViewportChanged
@@ -102,7 +109,7 @@ fun StreamScreen(controller: ViewerController, window: Window) {
 
         Overlay(controller)
         controller.agentApproval?.takeIf { controller.streaming }?.let { AgentApprovalDialog(it, controller::answerAgentApproval) }
-        val actions = floatingActions(controller, pointerStore, zoomed, onKeyboard = { viewRef?.surfaceView?.showKeyboard() }, onResetZoom = { viewRef?.resetZoom() }) { showPointerSettings = true }
+        val actions = floatingActions(controller, pointerStore, zoomed, keyboardShown = imeBottom > 0, onKeyboard = { if (imeBottom > 0) viewRef?.surfaceView?.hideKeyboard() else viewRef?.surfaceView?.showKeyboard() }, onResetZoom = { viewRef?.resetZoom() }) { showPointerSettings = true }
         if (!controller.awaitingFrame && controller.sasCode == null) FloatingControl(floatingStore, controller.stats, actions, Modifier.padding(bottom = with(density) { obscured.toDp() }))
         controller.input?.takeIf { imeBottom > 0 }?.let {
             KeyBar(it, onHide = { viewRef?.surfaceView?.hideKeyboard() }, modifier = Modifier.align(Alignment.BottomCenter).imePadding())
@@ -111,21 +118,22 @@ fun StreamScreen(controller: ViewerController, window: Window) {
     if (showPointerSettings) {
         AlertDialog(
             onDismissRequest = { showPointerSettings = false },
-            text = { PointerSettingsCard(pointerStore) },
+            title = { Text("Chuột và con trỏ") }, text = { PointerSettingsGroups(pointerStore, Modifier.verticalScroll(rememberScrollState())) },
             confirmButton = { TextButton(onClick = { showPointerSettings = false }) { Text("Xong") } },
         )
     }
 }
 
 private fun floatingActions(
-    controller: ViewerController, store: PointerSettingsStore, zoomed: Boolean, onKeyboard: () -> Unit, onResetZoom: () -> Unit, onPointerSettings: () -> Unit,
+    controller: ViewerController, store: PointerSettingsStore, zoomed: Boolean, keyboardShown: Boolean,
+    onKeyboard: () -> Unit, onResetZoom: () -> Unit, onPointerSettings: () -> Unit,
 ) = buildList {
-    add(FloatingAction("Ngắt kết nối", onClick = controller::disconnect))
-    add(FloatingAction("Bàn phím", onClick = onKeyboard))
-    add(FloatingAction("Chuột: ${store.settings.mode.title()}", "Đổi chế độ chuột, đang là ${store.settings.mode.title()}", onClick = store::toggleMode))
-    add(FloatingAction("Cài đặt chuột", "Cài đặt chuột và con trỏ", onClick = onPointerSettings))
-    if (zoomed) add(FloatingAction("Vừa khung", "Thu về vừa khung màn hình", onClick = onResetZoom))
-    controller.nextFit()?.let { next -> add(FloatingAction("Kiểu: ${controller.display.fit.title()}", "Đổi kiểu Bản sao sang ${next.title()}, kết nối lại") { controller.switchFit(next) }) }
+    add(FloatingAction("Ngắt kết nối", XdeskIcons.Stop, onClick = controller::disconnect))
+    add(FloatingAction(if (keyboardShown) "Ẩn bàn phím" else "Bàn phím", XdeskIcons.Keyboard, onClick = onKeyboard))
+    add(FloatingAction("Chuột: ${store.settings.mode.title()}", if (store.settings.mode == PointerMode.DIRECT) XdeskIcons.HandTap else XdeskIcons.Cursor, "Đổi chế độ chuột, đang là ${store.settings.mode.title()}", onClick = store::toggleMode))
+    add(FloatingAction("Cài đặt chuột", XdeskIcons.Sliders, "Cài đặt chuột và con trỏ", onClick = onPointerSettings))
+    if (zoomed) add(FloatingAction("Vừa khung màn hình", XdeskIcons.FitScreen, "Thu về vừa khung màn hình", onClick = onResetZoom))
+    controller.nextFit()?.let { next -> add(FloatingAction("Kiểu: ${controller.display.fit.title()}", XdeskIcons.Laptop, "Đổi kiểu Bản sao sang ${next.title()}, kết nối lại") { controller.switchFit(next) }) }
 }
 
 /** Mã SAS có lớp phủ riêng; còn lại, từ lúc chạm Mac tới khung hình đầu tiên là lớp phủ "Đang kết nối" có nút Huỷ. */
@@ -133,29 +141,26 @@ private fun floatingActions(
 private fun Overlay(controller: ViewerController) {
     val code = controller.sasCode
     if (code != null) {
-        Column(Modifier.fillMaxSize().background(XdeskOverlay.scrim), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-            SasCodeView(code)
-        }
+        Box(Modifier.fillMaxSize().background(XdeskOverlay.scrim), contentAlignment = Alignment.Center) { SasCodeView(code) }
     } else if (controller.awaitingFrame) {
         ConnectingOverlay(controller.progress.targetName, onCancel = controller::disconnect)
     }
 }
 
-/** Nền đặc để không lộ khung hình dở dang; chặn chạm để không gửi click xuống Mac khi chưa có hình. */
+/** Nền đen đặc để không lộ khung hình dở dang và chặn chạm (không gửi click xuống Mac khi chưa có hình); thẻ giữa giống iOS: vòng quay, tên máy, "Huỷ". */
 @Composable
 private fun ConnectingOverlay(name: String, onCancel: () -> Unit) {
-    Column(
-        Modifier.fillMaxSize().background(Color.Black).pointerInput(Unit) { detectTapGestures { } },
-        verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        CircularProgressIndicator(color = XdeskOverlay.accentLight)
-        Text(
-            if (name.isBlank()) "Đang kết nối…" else "Đang kết nối tới $name…", color = XdeskOverlay.content, style = MaterialTheme.typography.titleMedium,
-            textAlign = TextAlign.Center, modifier = Modifier.padding(top = 16.dp, start = 24.dp, end = 24.dp).semantics { liveRegion = LiveRegionMode.Polite },
-        )
-        OutlinedButton(
-            onCancel, Modifier.padding(top = 24.dp), border = BorderStroke(1.dp, XdeskOverlay.outline),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = XdeskOverlay.content),
-        ) { Text("Huỷ") }
+    Box(Modifier.fillMaxSize().background(Color.Black).pointerInput(Unit) { detectTapGestures { } }, contentAlignment = Alignment.Center) {
+        OverlayCard {
+            CircularProgressIndicator(color = XdeskOverlay.accentLight)
+            Text(
+                if (name.isBlank()) "Đang kết nối…" else "Đang kết nối tới $name…", color = XdeskOverlay.content, fontSize = 17.sp, fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+            )
+            OutlinedButton(
+                onCancel, Modifier.widthIn(min = 120.dp).heightIn(min = 48.dp), border = BorderStroke(1.dp, XdeskOverlay.outline),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = XdeskOverlay.content),
+            ) { Text("Huỷ") }
+        }
     }
 }

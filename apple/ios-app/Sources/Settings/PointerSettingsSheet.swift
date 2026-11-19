@@ -47,6 +47,8 @@ struct PointerSettingsForm: View {
                     Text("Cuộn tự nhiên: nội dung đi theo ngón tay. Hai ngón chạm cùng lúc luôn là chuột phải.")
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(BrandPalette.background)
             .navigationTitle("Chuột và con trỏ")
             .navigationBarTitleDisplayMode(.inline)
     }

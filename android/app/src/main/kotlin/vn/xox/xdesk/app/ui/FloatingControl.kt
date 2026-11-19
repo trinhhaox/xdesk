@@ -8,6 +8,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -21,7 +22,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,7 +35,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -58,11 +60,12 @@ import vn.xox.xdesk.app.ui.theme.XdeskOverlay
 private val ButtonSize = 48.dp
 private val Panel = XdeskOverlay.panel
 private val Outline = XdeskOverlay.outline
+private val PanelOutline = Color.White.copy(alpha = 0.35f)
 private const val IDLE_ALPHA = 0.7f
 private const val IDLE_MS = 3000L
 private const val EXPANDED_MS = 8000L
 
-class FloatingAction(val label: String, val description: String = label, val enabled: Boolean = true, val onClick: () -> Unit)
+class FloatingAction(val label: String, val icon: ImageVector, val description: String = label, val enabled: Boolean = true, val onClick: () -> Unit)
 
 /**
  * Một nút nổi 48 dp thay thanh công cụ cố định (thanh cũ che biểu tượng trạng thái trên menu bar Mac): đĩa đặc tối, chữ trắng, viền sáng
@@ -96,7 +99,7 @@ fun FloatingControl(store: FloatingControlStore, status: String, actions: List<F
             Column(
                 Modifier.offset { IntOffset(menuX.roundToInt(), menuY.roundToInt()) }.width(240.dp).heightIn(max = with(density) { (height - margin * 4).toDp() })
                     .onSizeChanged { menuSize = it }
-                    .shadow(8.dp, RoundedCornerShape(14.dp)).background(Panel, RoundedCornerShape(14.dp)).border(1.dp, Outline, RoundedCornerShape(14.dp))
+                    .shadow(8.dp, RoundedCornerShape(14.dp)).background(Panel, RoundedCornerShape(14.dp)).border(1.dp, PanelOutline, RoundedCornerShape(14.dp))
                     .verticalScroll(rememberScrollState()).padding(6.dp),
             ) {
                 if (status.isNotBlank()) Text(status, color = XdeskOverlay.contentMuted, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
@@ -106,7 +109,13 @@ fun FloatingControl(store: FloatingControlStore, status: String, actions: List<F
                             .pointerInput(a) { detectTapGestures(onTap = { if (a.enabled) { a.onClick(); expanded = false; activity++ } }) }
                             .semantics { contentDescription = a.description; role = Role.Button; onClick { if (a.enabled) { a.onClick(); expanded = false; activity++ }; true } },
                         contentAlignment = Alignment.CenterStart,
-                    ) { Text(a.label, color = if (a.enabled) XdeskOverlay.content else XdeskOverlay.contentDisabled, fontSize = 16.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(horizontal = 12.dp)) }
+                    ) {
+                        val tint = if (a.enabled) XdeskOverlay.content else XdeskOverlay.contentDisabled
+                        Row(Modifier.padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(a.icon, contentDescription = null, Modifier.size(22.dp), tint = tint)
+                            Text(a.label, color = tint, fontSize = 17.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 12.dp))
+                        }
+                    }
                 }
             }
         }
@@ -134,6 +143,6 @@ fun FloatingControl(store: FloatingControlStore, status: String, actions: List<F
                     onClick { expanded = !expanded; activity++; true }
                 },
             contentAlignment = Alignment.Center,
-        ) { Icon(if (expanded) Icons.Filled.Close else Icons.Filled.MoreVert, contentDescription = null, tint = XdeskOverlay.content, modifier = Modifier.size(28.dp)) }
+        ) { Icon(if (expanded) Icons.Filled.Close else XdeskIcons.Ellipsis, contentDescription = null, tint = XdeskOverlay.content, modifier = Modifier.size(24.dp)) }
     }
 }

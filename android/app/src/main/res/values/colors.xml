@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Cùng giá trị với token background tối trong docs/design-tokens.md: nền cửa sổ lúc khởi động, không loé trắng. -->
+    <color name="xdesk_background_dark">#101218</color>
+</resources>

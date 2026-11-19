@@ -2,6 +2,12 @@
 
 Định dạng theo từng giai đoạn (phase) của kế hoạch `plans/261118-2215-xdesk-clean-room/`.
 
+## Chưa phát hành: giao diện Android theo iOS, mặc định Tối
+
+- Android dựng lại màn chính, Cài đặt, Chuột và con trỏ, Bảo mật, ghép đôi, thẻ lỗi, nút nổi và thanh phím theo iOS (bản tham chiếu).
+- Mục mới "Giao diện" ở Cài đặt (cả iOS và Android): Tối (mặc định) | Sáng | Theo hệ thống. Android có nền cửa sổ tối ngay lúc khởi động.
+- Bảng token dùng chung `docs/design-tokens.md`; màu primary/accent/warning/danger của Android khớp `BrandPalette.swift`.
+
 ## 0.1.0-beta (2026-11-19)
 
 Bản beta công khai đầu tiên: DMG Mac (notarize, cập nhật qua Sparkle) và APK Android ký bằng khoá riêng.

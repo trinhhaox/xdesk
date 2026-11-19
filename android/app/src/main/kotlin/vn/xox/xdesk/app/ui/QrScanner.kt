@@ -12,6 +12,16 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Button
+import vn.xox.xdesk.app.ui.theme.extras
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.Alignment
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -48,9 +58,15 @@ fun QrScanner(modifier: Modifier, onResult: (String) -> Unit) {
     val request = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted = it; denied = !it }
     LaunchedEffect(Unit) { if (!granted) request.launch(Manifest.permission.CAMERA) }
     if (!granted) {
-        Column(modifier) {
-            Text(if (denied) "Cần quyền camera để quét mã QR. Bạn vẫn có thể ghép đôi bằng so mã 6 số." else "Đang xin quyền camera…")
-            if (denied) Button(onClick = { request.launch(Manifest.permission.CAMERA) }) { Text("Cấp quyền") }
+        Column(modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                if (denied) "Cần quyền Camera để quét mã. Bạn vẫn có thể dán liên kết hoặc so mã 6 số ở dưới." else "Đang xin quyền camera…",
+                color = MaterialTheme.colorScheme.onSurface, textAlign = TextAlign.Center,
+            )
+            if (denied) Button(
+                onClick = { request.launch(Manifest.permission.CAMERA) }, Modifier.heightIn(min = 48.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.extras.primaryFill, contentColor = Color.White),
+            ) { Text("Cấp quyền") }
         }
         return
     }

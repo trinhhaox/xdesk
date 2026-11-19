@@ -28,6 +28,8 @@ struct SecuritySettingsView: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(BrandPalette.background)
             .navigationTitle("Bảo mật")
             .navigationBarTitleDisplayMode(.inline)
             .task { await model.refreshTrust() }

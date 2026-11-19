@@ -4,6 +4,7 @@ import SwiftUI
 struct XdeskIOSApp: App {
     @State private var model = StreamViewModel()
     @Environment(\.scenePhase) private var scenePhase
+    @AppStorage(AppearanceSetting.storageKey) private var appearanceRaw = AppearanceSetting.dark.rawValue
 
     var body: some Scene {
         WindowGroup {
@@ -11,6 +12,7 @@ struct XdeskIOSApp: App {
                 if model.inStream { StreamView(model: model) } else { HostListView(model: model) }
             }
             .tint(BrandPalette.primary)
+            .preferredColorScheme((AppearanceSetting(rawValue: appearanceRaw) ?? .dark).colorScheme)
             .onChange(of: model.session.state) { _, state in
                 UIApplication.shared.isIdleTimerDisabled = state == .streaming || state == .connecting
                 model.failIfNeeded()

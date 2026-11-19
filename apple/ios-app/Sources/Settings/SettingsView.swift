@@ -24,6 +24,7 @@ struct SettingsView: View {
                      : "Điện thoại hiện đúng màn hình Mac. Chọn bên dưới Mac giữ nguyên hay đổi theo điện thoại.")
             }
             if model.screenMode == .mirror { MirrorFitPicker(fit: $model.mirrorFit, pointer: pointer) }
+            AppearancePicker()
             Section("Điều khiển") {
                 NavigationLink {
                     PointerSettingsForm(store: pointer)
@@ -39,6 +40,8 @@ struct SettingsView: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(BrandPalette.background)
         .navigationTitle("Cài đặt")
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.refreshTrust() }

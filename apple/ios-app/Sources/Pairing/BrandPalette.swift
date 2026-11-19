@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-/// Màu thương hiệu theo docs/brand-guide.md, dùng như token ngữ nghĩa. Màu chữ/biểu tượng có biến thể sáng/tối riêng để đạt tương phản
+/// Màu thương hiệu theo docs/brand-guide.md và docs/design-tokens.md (cùng giá trị với XdeskTheme.kt bên Android), dùng như token ngữ nghĩa. Màu chữ/biểu tượng có biến thể sáng/tối riêng để đạt tương phản
 /// ≥ 4.5:1 trên nền #F6F7FA (sáng) và #101218 (tối); `primaryFill` giữ nguyên #2F6BFF của brand cho nền nút/phím (chữ trắng trên đó).
 enum BrandPalette {
     /// Màu nhấn/tint toàn app (chữ, liên kết, viền). Sáng: #2457E6, tối: #5B8CFF.

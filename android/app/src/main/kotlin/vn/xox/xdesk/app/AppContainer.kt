@@ -23,6 +23,7 @@ class AppContainer(context: Context) {
 
     val updates = UpdateController(context)
     val display = DisplaySettingsStore(context)
+    val appearance = AppearanceStore(context)
 
     /** `null` kèm [identityError] khi Keystore mất khoá: UI cho người dùng chọn đặt lại danh tính. */
     var identity: DeviceIdentity? = null

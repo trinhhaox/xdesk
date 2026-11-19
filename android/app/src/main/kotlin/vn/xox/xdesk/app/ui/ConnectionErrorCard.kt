@@ -2,24 +2,29 @@ package vn.xox.xdesk.app.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.sp
+import vn.xox.xdesk.app.ui.theme.XdeskCard
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,47 +44,45 @@ import vn.xox.xdesk.app.technicalDetail
 import vn.xox.xdesk.app.ui.theme.extras
 
 /**
- * Lỗi kết nối nằm trong danh sách: biểu tượng, câu giải thích dễ hiểu, gợi ý khắc phục, nút "Thử lại" (hoặc "Ghép đôi lại" khi lỗi do ghép đôi)
- * và "Chi tiết" mở ra câu kỹ thuật gốc. Khoá host đổi dùng màu cảnh báo thay vì màu lỗi vì đó là cảnh báo bảo mật, không phải sự cố mạng.
+ * Lỗi kết nối trong danh sách, dựng như ConnectionErrorCard của iOS: biểu tượng, câu giải thích, gợi ý, nút đóng ✕, nút chính toàn chiều rộng
+ * ("Thử lại" hoặc "Ghép đôi" khi lỗi do ghép đôi) và "Chi tiết" mở ra câu kỹ thuật gốc. Khoá host đổi dùng màu cảnh báo thay vì màu lỗi.
  */
 @Composable
-fun ConnectionErrorCard(failure: ConnectionFailure, canRepair: Boolean, onRetry: () -> Unit, onRepair: () -> Unit, modifier: Modifier = Modifier) {
+fun ConnectionErrorCard(failure: ConnectionFailure, canRepair: Boolean, onRetry: () -> Unit, onRepair: () -> Unit, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
     val text = failure.describe()
-    val container = if (text.warning) MaterialTheme.extras.warningContainer else MaterialTheme.colorScheme.errorContainer
-    val content = if (text.warning) MaterialTheme.extras.onWarningContainer else MaterialTheme.colorScheme.onErrorContainer
+    val tint = if (text.warning) MaterialTheme.extras.warning else MaterialTheme.colorScheme.error
     val detail = failure.technicalDetail()
     var showDetail by remember(failure) { mutableStateOf(false) }
-    Card(
-        modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite },
-        colors = CardDefaults.cardColors(containerColor = container, contentColor = content),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Icon(Icons.Filled.Warning, contentDescription = null, Modifier.size(24.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(text.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Text(text.hint, style = MaterialTheme.typography.bodyMedium)
+    XdeskCard(modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite }) {
+        Column(Modifier.padding(start = XdeskDims.rowPad, top = 12.dp, end = 4.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Icon(Icons.Filled.Warning, contentDescription = null, Modifier.padding(top = 10.dp).size(24.dp), tint = tint)
+                Column(Modifier.weight(1f).padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(text.title, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                    Text(text.hint, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+                IconButton(onDismiss) { Icon(Icons.Filled.Close, contentDescription = "Đóng thông báo lỗi", tint = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (failure.repairable) {
-                    if (canRepair) Button(onClick = onRepair) { Text("Ghép đôi lại") }
-                } else if (failure.code != null) {
-                    Button(onClick = onRetry) {
-                        Icon(Icons.Filled.Refresh, contentDescription = null, Modifier.size(18.dp))
-                        Text("Thử lại", Modifier.padding(start = 8.dp))
-                    }
-                }
+            Column(Modifier.padding(end = XdeskDims.rowPad - 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (failure.repairable && canRepair) ActionButton("Ghép đôi", null, onRepair)
+                else if (!failure.repairable && failure.code != null) ActionButton("Thử lại", Icons.Filled.Refresh, onRetry)
                 if (detail != null) {
-                    TextButton({ showDetail = !showDetail }, colors = ButtonDefaults.textButtonColors(contentColor = content)) {
-                        Text("Chi tiết")
-                        Icon(if (showDetail) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown, contentDescription = if (showDetail) "Thu gọn" else "Mở rộng")
+                    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).clickable { showDetail = !showDetail }, verticalAlignment = Alignment.CenterVertically) {
+                        Text("Chi tiết", Modifier.weight(1f), fontSize = 15.sp)
+                        Icon(XdeskIcons.Chevron, contentDescription = if (showDetail) "Thu gọn" else "Mở rộng", Modifier.rotate(if (showDetail) 90f else 0f).size(14.dp), tint = MaterialTheme.extras.tertiaryLabel)
                     }
+                    AnimatedVisibility(showDetail) { Text(detail, fontSize = 13.sp, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 }
-            }
-            if (detail != null) {
-                AnimatedVisibility(showDetail) { Text(detail, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace) }
             }
         }
     }
+}
+
+@Composable
+private fun ActionButton(label: String, icon: ImageVector?, onClick: () -> Unit) = Button(
+    onClick, Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = CircleShape,
+    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.extras.primaryFill, contentColor = Color.White),
+) {
+    if (icon != null) Icon(icon, contentDescription = null, Modifier.size(18.dp))
+    Text(label, Modifier.padding(start = if (icon != null) 8.dp else 0.dp), fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
 }

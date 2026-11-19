@@ -49,7 +49,7 @@ val KeyBarHeight = 48.dp
  */
 @Composable
 fun KeyBar(router: StreamInputRouter, onHide: () -> Unit, modifier: Modifier = Modifier) {
-    Column(modifier.fillMaxWidth().background(XdeskOverlay.panel)) {
+    Column(modifier.fillMaxWidth().background(XdeskOverlay.bar)) {
         if (router.composingPreview.isNotEmpty()) {
             Text(
                 router.composingPreview, color = XdeskOverlay.content, fontSize = 15.sp,
@@ -72,7 +72,7 @@ fun KeyBar(router: StreamInputRouter, onHide: () -> Unit, modifier: Modifier = M
                 PlainKey("→", "Mũi tên phải", router, HidKeys.RIGHT)
             }
             Divider()
-            Key("Ẩn", "Ẩn bàn phím", State.OFF, null, Modifier.padding(horizontal = 4.dp), onHide)
+            Key("⌄", "Ẩn bàn phím", State.OFF, null, Modifier.padding(horizontal = 4.dp), onHide)
         }
     }
 }
@@ -102,8 +102,8 @@ private fun Key(label: String, name: String, state: State, hint: String?, modifi
         modifier
             .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
             .padding(2.dp)
-            .background(if (state == State.LOCKED) XdeskOverlay.accent else if (state == State.ARMED) XdeskOverlay.accent.copy(alpha = 0.5f) else XdeskOverlay.key, shape)
-            .border(if (state == State.OFF) 1.dp else 2.dp, if (state == State.OFF) XdeskOverlay.outline else XdeskOverlay.content, shape)
+            .background(if (state == State.LOCKED) XdeskOverlay.accent else if (state == State.ARMED) XdeskOverlay.accentLight.copy(alpha = 0.22f) else XdeskOverlay.key, shape)
+            .border(if (state == State.OFF) 1.dp else 2.dp, if (state == State.OFF) XdeskOverlay.divider else XdeskOverlay.accentLight, shape)
             .clickable(onClickLabel = name, onClick = onClick)
             .semantics {
                 role = Role.Button

@@ -17,7 +17,9 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.graphics.luminance
+import vn.xox.xdesk.app.ui.LocalAppearance
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.platform.LocalView
@@ -73,10 +75,13 @@ class MainActivity : ComponentActivity() {
         setContent {
             val stream = controller.screen == Screen.STREAM
             val insets = if (stream) Modifier.windowInsetsPadding(WindowInsets.displayCutout) else Modifier.safeDrawingPadding()
-            XdeskTheme {
-                val dark = isSystemInDarkTheme()
+            val appearance = (application as XdeskApplication).container.appearance
+            XdeskTheme(appearance.setting) {
+                val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
                 SideEffect { WindowCompat.getInsetsController(window, window.decorView).apply { isAppearanceLightStatusBars = !dark; isAppearanceLightNavigationBars = !dark } }
-                Surface(Modifier.fillMaxSize(), color = if (stream) Color.Black else MaterialTheme.colorScheme.background) { Box(insets) { Root() } }
+                CompositionLocalProvider(LocalAppearance provides appearance) {
+                    Surface(Modifier.fillMaxSize(), color = if (stream) Color.Black else MaterialTheme.colorScheme.background) { Box(insets) { Root() } }
+                }
             }
         }
     }
@@ -105,7 +110,7 @@ class MainActivity : ComponentActivity() {
             else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
         when (controller.screen) {
-            Screen.HOSTS -> HostListScreen(controller)
+            Screen.HOSTS -> HostListScreen(controller) { browser.stop(); browser.start() }
             Screen.PAIR -> PairingScreen(controller)
             Screen.STREAM -> StreamScreen(controller, window)
             Screen.SECURITY -> SecuritySettingsScreen(controller, (application as XdeskApplication).container.updates)

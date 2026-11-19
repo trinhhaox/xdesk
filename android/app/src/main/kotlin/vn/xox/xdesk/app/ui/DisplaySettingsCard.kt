@@ -1,29 +1,18 @@
 package vn.xox.xdesk.app.ui
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import vn.xox.xdesk.app.DisplaySettingsStore
 import vn.xox.xdesk.app.PointerSettingsStore
 import vn.xox.xdesk.app.input.PointerMode
-import vn.xox.xdesk.app.ui.theme.XdeskCard
 import vn.xox.xdesk.wire.MirrorFit
 import vn.xox.xdesk.wire.ScreenMode
 
@@ -39,52 +28,42 @@ private fun MirrorFit.summary() = when (this) {
     MirrorFit.TOUCH -> "Như Vừa với điện thoại nhưng nút và chữ to hơn, dễ chạm."
 }
 
+private fun MirrorFit.icon(): ImageVector = when (this) {
+    MirrorFit.NATIVE -> XdeskIcons.Laptop
+    MirrorFit.FIT_DEVICE -> XdeskIcons.Phone
+    MirrorFit.TOUCH -> XdeskIcons.HandTap
+}
+
 fun ScreenMode.title() = if (this == ScreenMode.MIRROR) "Bản sao" else "Mở rộng"
 
 /** Một dòng tóm tắt cài đặt hiển thị cho màn chính, ví dụ "Bản sao · Vừa với điện thoại · Chạm trực tiếp". */
 fun settingsSummary(mode: ScreenMode, fit: MirrorFit, pointer: PointerMode): String =
     listOfNotNull(mode.title(), fit.title().takeIf { mode == ScreenMode.MIRROR }, pointer.title()).joinToString(" · ")
 
-/** Chế độ hiển thị: Bản sao / Mở rộng là một lựa chọn duy nhất (nút phân đoạn, vai trò radio); với Bản sao là kiểu vừa khung (nhóm radio). */
+/** "Chế độ hiển thị": nút phân đoạn Bản sao | Mở rộng và chú thích giải thích chế độ đang chọn. */
 @Composable
-fun DisplaySettingsCard(display: DisplaySettingsStore, pointer: PointerSettingsStore, modifier: Modifier = Modifier) {
-    XdeskCard(modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            val modes = listOf(ScreenMode.MIRROR, ScreenMode.EXTEND)
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                modes.forEachIndexed { index, mode ->
-                    SegmentedButton(
-                        selected = display.mode == mode, onClick = { display.selectMode(mode) },
-                        shape = SegmentedButtonDefaults.itemShape(index, modes.size), modifier = Modifier.heightIn(min = 48.dp),
-                    ) { Text(mode.title()) }
-                }
-            }
-            if (display.mode == ScreenMode.EXTEND) {
-                Text("Điện thoại là màn hình thứ hai bên phải Mac. Kéo cửa sổ sang để dùng.", style = MaterialTheme.typography.bodyMedium)
-            } else {
-                FitOptions(display)
-                if (display.fit == MirrorFit.TOUCH && pointer.settings.mode != PointerMode.DIRECT) {
-                    TextButton({ pointer.update { it.copy(mode = PointerMode.DIRECT) } }) { Text("Gợi ý: dùng chế độ chuột Chạm trực tiếp") }
-                }
-            }
+internal fun DisplayModeGroup(display: DisplaySettingsStore) {
+    val footer = if (display.mode == ScreenMode.EXTEND) "Điện thoại là màn hình thứ hai bên phải Mac. Kéo cửa sổ sang để dùng."
+    else "Điện thoại hiện đúng màn hình Mac. Chọn bên dưới Mac giữ nguyên hay đổi theo điện thoại."
+    Group("Chế độ hiển thị", footer) {
+        Box(Modifier.padding(12.dp)) {
+            SegmentedPicker(listOf(ScreenMode.MIRROR, ScreenMode.EXTEND).map { it to it.title() }, display.mode) { display.selectMode(it) }
         }
     }
 }
 
+/** "Kiểu bản sao": ba lựa chọn có biểu tượng và mô tả; chọn "Tối ưu thao tác" thì gợi ý (không ép) dùng chuột Chạm trực tiếp. */
 @Composable
-private fun FitOptions(display: DisplaySettingsStore) {
-    Column(Modifier.selectableGroup()) {
-        DisplaySettingsStore.SUPPORTED_FITS.forEach { fit ->
-            Row(
-                Modifier.fillMaxWidth().heightIn(min = 56.dp).selectable(display.fit == fit, onClick = { display.selectFit(fit) }, role = Role.RadioButton),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                RadioButton(display.fit == fit, onClick = null)
-                Column(Modifier.padding(start = 12.dp, top = 8.dp, bottom = 8.dp)) {
-                    Text(fit.title(), style = MaterialTheme.typography.bodyLarge)
-                    Text(fit.summary(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        }
+internal fun MirrorFitGroup(display: DisplaySettingsStore, pointer: PointerSettingsStore) = Group("Kiểu bản sao") {
+    DisplaySettingsStore.SUPPORTED_FITS.forEachIndexed { index, fit ->
+        if (index > 0) GroupDivider(ChoiceDividerIndent)
+        ChoiceRow(fit.icon(), fit.title(), fit.summary(), display.fit == fit) { display.selectFit(fit) }
+    }
+    if (display.fit == MirrorFit.TOUCH && pointer.settings.mode != PointerMode.DIRECT) {
+        GroupDivider()
+        Text(
+            "Gợi ý: dùng chế độ chuột Chạm trực tiếp", Modifier.clickable { pointer.update { it.copy(mode = PointerMode.DIRECT) } }.padding(XdeskDims.rowPad),
+            fontSize = 14.sp, color = MaterialTheme.colorScheme.primary,
+        )
     }
 }

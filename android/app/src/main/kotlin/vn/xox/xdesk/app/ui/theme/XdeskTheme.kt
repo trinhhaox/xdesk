@@ -10,52 +10,59 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import vn.xox.xdesk.app.AppearanceSetting
 
-/**
- * Bảng màu Xdesk theo docs/brand-guide.md (chính #2F6BFF, nền sáng #F6F7FA, nền tối #101218, nhấn #18C29C, cảnh báo #F5A524).
- * Chữ xanh chính phải đạt tương phản 4.5:1 trên nền, mà #2F6BFF chỉ đạt 4.2:1 trên #F6F7FA và 4.2:1 trên #101218, nên:
- * sáng dùng primary đậm hơn một chút (#2A60EC), tối dùng primary sáng hơn (#6B96FF) và để #2F6BFF làm primaryContainer.
- */
-private val Brand = Color(0xFF2F6BFF)
+/** Bảng màu theo docs/design-tokens.md (cùng giá trị với BrandPalette.swift). Sửa một nơi thì sửa cả hai. */
+private val PrimaryFill = Color(0xFF2F6BFF)
 
 private val LightScheme = lightColorScheme(
-    primary = Color(0xFF2A60EC), onPrimary = Color.White,
+    primary = Color(0xFF2457E6), onPrimary = Color.White,
     primaryContainer = Color(0xFFDCE6FF), onPrimaryContainer = Color(0xFF0B2A78),
-    secondary = Color(0xFF4B5470), onSecondary = Color.White,
-    secondaryContainer = Color(0xFFE3E6F0), onSecondaryContainer = Color(0xFF1B2030),
-    tertiary = Color(0xFF0B7A62), onTertiary = Color.White,
+    secondary = Color(0xFF6C6C70), onSecondary = Color.White,
+    secondaryContainer = Color(0xFFEEEEF0), onSecondaryContainer = Color(0xFF1B2030),
+    tertiary = Color(0xFF0B7A63), onTertiary = Color.White,
     tertiaryContainer = Color(0xFFC4F3E5), onTertiaryContainer = Color(0xFF00382B),
-    background = Color(0xFFF6F7FA), onBackground = Color(0xFF14171F),
-    surface = Color(0xFFF6F7FA), onSurface = Color(0xFF14171F),
-    surfaceVariant = Color(0xFFE6E9F1), onSurfaceVariant = Color(0xFF454B5C),
+    background = Color(0xFFF6F7FA), onBackground = Color.Black,
+    surface = Color(0xFFF6F7FA), onSurface = Color.Black,
+    surfaceVariant = Color(0xFFE6E9F1), onSurfaceVariant = Color(0xFF6C6C70),
     surfaceContainerLowest = Color.White, surfaceContainerLow = Color.White, surfaceContainer = Color.White,
     surfaceContainerHigh = Color(0xFFEDEFF6), surfaceContainerHighest = Color(0xFFE6E9F1),
-    outline = Color(0xFF6B7285), outlineVariant = Color(0xFFD3D7E3),
-    error = Color(0xFFB3261E), onError = Color.White, errorContainer = Color(0xFFFCE1DE), onErrorContainer = Color(0xFF5C0A05),
+    outline = Color(0xFF6C6C70), outlineVariant = Color(0xFFD8D8DC),
+    error = Color(0xFFC62828), onError = Color.White, errorContainer = Color(0xFFFCE1DE), onErrorContainer = Color(0xFF5C0A05),
 )
 
 private val DarkScheme = darkColorScheme(
-    primary = Color(0xFF6B96FF), onPrimary = Color(0xFF08142E),
-    primaryContainer = Brand, onPrimaryContainer = Color.White,
-    secondary = Color(0xFFB4BCD6), onSecondary = Color(0xFF1B2030),
-    secondaryContainer = Color(0xFF2A3042), onSecondaryContainer = Color(0xFFDFE3F0),
+    primary = Color(0xFF5B8CFF), onPrimary = Color(0xFF08142E),
+    primaryContainer = PrimaryFill, onPrimaryContainer = Color.White,
+    secondary = Color(0xFF98989F), onSecondary = Color(0xFF1B2030),
+    secondaryContainer = Color(0xFF2C2C2E), onSecondaryContainer = Color(0xFFDFE3F0),
     tertiary = Color(0xFF18C29C), onTertiary = Color(0xFF062B22),
     tertiaryContainer = Color(0xFF0B4B3C), onTertiaryContainer = Color(0xFFBFF2E4),
-    background = Color(0xFF101218), onBackground = Color(0xFFE6E8F0),
-    surface = Color(0xFF101218), onSurface = Color(0xFFE6E8F0),
-    surfaceVariant = Color(0xFF252A38), onSurfaceVariant = Color(0xFFC3C8D6),
-    surfaceContainerLowest = Color(0xFF0C0E13), surfaceContainerLow = Color(0xFF181B23), surfaceContainer = Color(0xFF1B1E27),
+    background = Color(0xFF101218), onBackground = Color.White,
+    surface = Color(0xFF101218), onSurface = Color.White,
+    surfaceVariant = Color(0xFF252A38), onSurfaceVariant = Color(0xFF98989F),
+    surfaceContainerLowest = Color(0xFF0C0E13), surfaceContainerLow = Color(0xFF181B23), surfaceContainer = Color(0xFF1C1C1E),
     surfaceContainerHigh = Color(0xFF232733), surfaceContainerHighest = Color(0xFF2A2F3D),
-    outline = Color(0xFF8C93A6), outlineVariant = Color(0xFF3A4052),
-    error = Color(0xFFFFB4AB), onError = Color(0xFF540C07), errorContainer = Color(0xFF7A1E17), onErrorContainer = Color(0xFFFFDAD6),
+    outline = Color(0xFF98989F), outlineVariant = Color(0xFF38383A),
+    error = Color(0xFFFF6B6B), onError = Color(0xFF540C07), errorContainer = Color(0xFF7A1E17), onErrorContainer = Color(0xFFFFDAD6),
 )
 
-/** Cảnh báo (#F5A524) không có trong Material 3 nên đi kèm riêng: dùng cho "Khoá đã đổi" và lỗi cần người dùng cân nhắc. */
-data class XdeskExtraColors(val warningContainer: Color, val onWarningContainer: Color, val warning: Color)
+/** Token ngoài Material 3: cảnh báo, nhãn phụ/ba, nền nút phân đoạn, viên thuốc toolbar và nền nút chính. */
+data class XdeskExtraColors(
+    val warning: Color, val warningContainer: Color, val onWarningContainer: Color,
+    val tertiaryLabel: Color, val separator: Color, val segmentTrack: Color, val segmentSelected: Color, val toolbarPill: Color,
+    val primaryFill: Color,
+)
 
-private val LightExtras = XdeskExtraColors(Color(0xFFFFEBC8), Color(0xFF5B3A00), Color(0xFFF5A524))
-private val DarkExtras = XdeskExtraColors(Color(0xFF5B3A00), Color(0xFFFFE2B0), Color(0xFFF5A524))
-private val LocalExtras = staticCompositionLocalOf { LightExtras }
+private val LightExtras = XdeskExtraColors(
+    Color(0xFF8A5A00), Color(0xFFFFEBC8), Color(0xFF5B3A00), Color(0xFFB4B4B9), Color(0xFFD8D8DC),
+    Color(0xFFEEEEF0), Color.White, Color(0xFFE4E7F0), PrimaryFill,
+)
+private val DarkExtras = XdeskExtraColors(
+    Color(0xFFF5A524), Color(0xFF5B3A00), Color(0xFFFFE2B0), Color(0xFF5C5C61), Color(0xFF38383A),
+    Color(0xFF2C2C2E), Color(0xFF636366), Color(0xFF2B2E38), PrimaryFill,
+)
+private val LocalExtras = staticCompositionLocalOf { DarkExtras }
 
 val MaterialTheme.extras: XdeskExtraColors @Composable @ReadOnlyComposable get() = LocalExtras.current
 
@@ -64,22 +71,33 @@ val MaterialTheme.extras: XdeskExtraColors @Composable @ReadOnlyComposable get()
  * lấy từ bảng màu tối để cùng một nguồn.
  */
 object XdeskOverlay {
-    val panel = DarkScheme.surfaceContainer
+    /** overlay #101218: nút nổi, menu và thẻ trên video (iOS `overlaySurface`). */
+    val panel = DarkScheme.background
+    /** Thanh phím phụ (iOS `secondarySystemBackground`). */
+    val bar = DarkScheme.surfaceContainer
     val key = DarkScheme.secondaryContainer
     val content = Color.White
     val contentMuted = DarkScheme.onSurfaceVariant
     val contentDisabled = DarkScheme.onSurface.copy(alpha = 0.5f)
     val outline = Color(0x8CFFFFFF)
     val divider = DarkScheme.outlineVariant
-    val accent = Brand
-    /** Vòng xoay tiến trình trên nền đen: cần sáng hơn #2F6BFF để đủ tương phản. */
+    val accent = PrimaryFill
+    /** Vòng xoay tiến trình trên nền đen: cần sáng hơn #2F6BFF để đủ tương phản (cùng primaryOnOverlay của iOS). */
     val accentLight = DarkScheme.primary
     val scrim = Color(0xE6000000)
 }
 
-/** Giao diện Xdesk, theo cài đặt Sáng/Tối của hệ thống. */
+/** Nền cửa sổ lúc khởi động và khi giao diện tối: cùng `background` tối. */
+val XdeskDarkBackground: Color = DarkScheme.background
+
+/** Giao diện Xdesk: mặc định Tối, người dùng đổi trong Cài đặt → Giao diện. */
 @Composable
-fun XdeskTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
+fun XdeskTheme(appearance: AppearanceSetting = AppearanceSetting.DARK, content: @Composable () -> Unit) {
+    val dark = when (appearance) {
+        AppearanceSetting.DARK -> true
+        AppearanceSetting.LIGHT -> false
+        AppearanceSetting.SYSTEM -> isSystemInDarkTheme()
+    }
     val scheme: ColorScheme = if (dark) DarkScheme else LightScheme
     CompositionLocalProvider(LocalExtras provides if (dark) DarkExtras else LightExtras) {
         MaterialTheme(colorScheme = scheme, content = content)
