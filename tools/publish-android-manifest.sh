@@ -17,7 +17,8 @@ ASSET="$(basename "$(jq -er .apkUrl "$MANIFEST")")"
 gh release view "v$VERSION" --repo "$REPO" --json assets --jq '.assets[].name' | grep -qxF "$ASSET" \
     || { echo "Release v$VERSION chưa có asset $ASSET; chạy release-android.sh --publish trước." >&2; exit 1; }
 
-SHA="$(gh api "repos/$REPO/contents/android-update.json" --jq .sha 2>/dev/null || true)"
+# gh in thân lỗi 404 ra stdout (không qua --jq) nên phải dựa vào mã thoát: chưa có tệp → SHA rỗng.
+SHA="$(gh api "repos/$REPO/contents/android-update.json" --jq .sha 2>/dev/null)" || SHA=""
 if [[ -n "$SHA" && $FORCE -eq 0 ]]; then
     LIVE="$(gh api "repos/$REPO/contents/android-update.json" -H "Accept: application/vnd.github.raw" | jq -er .versionCode)"
     ((CODE >= LIVE)) || { echo "versionCode $CODE thấp hơn bản đang đăng ($LIVE); dùng --force nếu cố ý." >&2; exit 1; }
