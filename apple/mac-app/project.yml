@@ -43,6 +43,7 @@ targets:
       path: Sources/Xdesk.entitlements
       properties:
         com.apple.security.app-sandbox: false
+        keychain-access-groups: ["$(AppIdentifierPrefix)vn.xox.xdesk"]
     settings:
       base:
         PRODUCT_NAME: Xdesk

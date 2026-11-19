@@ -52,7 +52,7 @@ final class CaptureService: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
             PermissionsCheck.requestScreenRecording()
             throw CaptureError.permissionDenied
         }
-        let display = try await findDisplay()
+        let (display, content) = try await findDisplay()
         let configuration = SCStreamConfiguration()
         configuration.width = width
         configuration.height = height
@@ -60,7 +60,10 @@ final class CaptureService: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
         configuration.queueDepth = 3
         configuration.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(fps))
         configuration.showsCursor = true
-        let stream = SCStream(filter: SCContentFilter(display: display, excludingWindows: []), configuration: configuration, delegate: self)
+        // Cửa sổ ghép đôi (mã QR, mã so khớp) không bao giờ được đưa vào luồng gửi cho viewer.
+        let secure = SecureWindowRegistry.shared.windowIDs
+        let excluded = content.windows.filter { secure.contains($0.windowID) }
+        let stream = SCStream(filter: SCContentFilter(display: display, excludingWindows: excluded), configuration: configuration, delegate: self)
         try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: sampleQueue)
         try await stream.startCapture()
         lock.withLock { self.stream = stream }
@@ -76,7 +79,7 @@ final class CaptureService: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
     }
 
     /// Màn hình ảo mới tạo có thể chưa xuất hiện trong danh sách SCK ngay → thử lại tối đa ~3 s.
-    private func findDisplay() async throws -> SCDisplay {
+    private func findDisplay() async throws -> (SCDisplay, SCShareableContent) {
         for attempt in 0..<Self.lookupAttempts {
             let content: SCShareableContent
             do {
@@ -84,7 +87,7 @@ final class CaptureService: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
             } catch {
                 throw CaptureError.permissionDenied
             }
-            if let display = content.displays.first(where: { $0.displayID == displayID }) { return display }
+            if let display = content.displays.first(where: { $0.displayID == displayID }) { return (display, content) }
             if attempt < Self.lookupAttempts - 1 { try await Task.sleep(for: .milliseconds(200)) }
         }
         throw CaptureError.displayNotFound(displayID)

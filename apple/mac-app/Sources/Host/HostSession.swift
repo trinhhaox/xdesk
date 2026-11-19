@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 import os
+import XdeskCrypto
 import XdeskMedia
 import XdeskTransport
 import XdeskWire
@@ -27,6 +28,8 @@ actor HostSession {
     private var pipeline: HostPipeline?
     var input: HostInputService?
     var viewerReady = false
+    /// Quyền của thiết bị đã ghép (plaintext Debug: mặc định). `view` tắt → từ chối phiên; `input` tắt → bỏ input.
+    private(set) var permissions = DevicePermissions.default
     private var bitrate = BitrateController(initialKbps: HostSession.initialBitrateKbps)
     private var tasks: [Task<Void, Never>] = []
 
@@ -65,8 +68,16 @@ actor HostSession {
     // MARK: Chuẩn bị (trong handshake)
 
     private func prepare(_ display: DisplayConfig) async throws -> DisplayReady {
-        let channel = try await UdpMediaChannel.listen(streamId: Self.streamId, allowedPeerHost: connection.remoteHost)
+        permissions = await connection.peer?.permissions ?? .default
+        guard permissions.view else { throw TransportError.rejected(reason: "permission", detail: "thiết bị này không có quyền xem") }
+        let channel = try await UdpMediaChannel.listen(
+            streamId: Self.streamId, allowedPeerHost: connection.remoteHost, keys: await connection.udpKeys)
         self.channel = channel
+        await channel.setResyncSink { [connection] resync in
+            do { _ = try await connection.send(.rekeyResync(resync)) } catch {
+                // Kênh control đã đóng: phiên sắp kết thúc.
+            }
+        }
         return DisplayReady(udpPort: await channel.localPort, streamId: Self.streamId)
     }
 
@@ -94,6 +105,7 @@ actor HostSession {
                     viewerReady = true
                     pipeline?.beginStreaming()
                 case .packet(let packet): await handleInputPacket(packet)
+                case .linkLost: await connection.close()
                 default: break
                 }
             }
@@ -126,6 +138,7 @@ actor HostSession {
                 let pong = ClockSync.makePong(for: ping, receivedAtMs: t1, sentAtMs: ClockSync.wallClockMs())
                 _ = try await connection.send(.pong(pong), id: envelope.id)
             case .inputText(let t): await handleInputText(t.text)
+            case .rekeyResync(let resync): await channel?.handleResync(resync)
             case .bye: return
             default: break
             }

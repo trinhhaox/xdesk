@@ -1,5 +1,6 @@
 import Observation
 import UIKit
+import XdeskCrypto
 import XdeskTransport
 import XdeskViewer
 import XdeskWire
@@ -10,14 +11,34 @@ import XdeskWire
 final class StreamViewModel {
     private(set) var hosts: [DiscoveredHost] = []
     private(set) var localNetworkDenied = false
-    private(set) var errorMessage: String?
+    var errorMessage: String?
     /// `true` từ lúc bấm kết nối tới khi người dùng thoát hoặc kết nối hỏng → màn hình stream thay danh sách host.
     private(set) var inStream = false
     /// Mở rộng hay bản sao màn hình Mac; nhớ giữa các lần mở app.
     var screenMode: ScreenMode = ScreenMode(rawValue: UserDefaults.standard.string(forKey: "xdesk.screenMode") ?? "") ?? .extend {
         didSet { UserDefaults.standard.set(screenMode.rawValue, forKey: "xdesk.screenMode") }
     }
-    let session = ViewerSession(security: AppSecurity.current, deviceName: UIDevice.current.name)
+    let session: ViewerSession
+    /// Danh tính + host đã ghép của iPhone/iPad; nil khi không mở được Keychain/file (xem `securityError`).
+    let security: DeviceSecurityStores?
+    let securityError: String?
+    let trust: ViewerTrust?
+    /// Trạng thái ghép đôi của từng host Bonjour (theo `DiscoveredHost.id`); rỗng khi chạy không mã hoá.
+    var hostStates: [String: ViewerTrust.HostState] = [:]
+    /// Các host đã ghép (cho màn Cài đặt bảo mật).
+    var knownHosts: [PairedDevice] = []
+    /// Mã 6 số đang hiển thị để so với màn hình Mac (nil = không đang so mã).
+    var sasCode: String?
+    /// Đang ghép đôi (QR hoặc mã 6 số): màn hình stream hiện "Đang chờ Mac xác nhận…".
+    var isPairing = false
+    /// Mac đã ghép vừa từ chối kết nối (thường do đã thu hồi): danh sách hỏi có ghép đôi lại không.
+    var refusedHost: RefusedHost?
+
+    struct RefusedHost: Identifiable {
+        let target: ViewerTarget
+        let hostId: String
+        var id: String { hostId }
+    }
 
     @ObservationIgnored private var browseTask: Task<Void, Never>?
     @ObservationIgnored private var target: ViewerTarget?
@@ -27,6 +48,22 @@ final class StreamViewModel {
     @ObservationIgnored private var suspended = false
     @ObservationIgnored private lazy var orientation = OrientationObserver { [weak self] _ in self?.screenSettled() }
 
+    init() {
+        do {
+            let stores = try DeviceSecurityStores.openDefault()
+            let trust = ViewerTrust(identity: stores.identity, knownHosts: stores.knownHosts)
+            security = stores
+            securityError = nil
+            self.trust = trust
+            session = ViewerSession(security: AppSecurity.current, deviceName: UIDevice.current.name, trust: trust)
+        } catch {
+            security = nil
+            trust = nil
+            securityError = error.localizedDescription
+            session = ViewerSession(security: AppSecurity.current, deviceName: UIDevice.current.name)
+        }
+    }
+
     // MARK: Bonjour
 
     func startBrowsing() {
@@ -34,7 +71,10 @@ final class StreamViewModel {
         browseTask = Task { [weak self] in
             for await update in BonjourBrowser().updates() {
                 switch update {
-                case .hosts(let list): self?.hosts = list; self?.localNetworkDenied = false
+                case .hosts(let list):
+                    self?.hosts = list
+                    self?.localNetworkDenied = false
+                    await self?.refreshTrust()
                 case .localNetworkDenied: self?.localNetworkDenied = true
                 }
             }
@@ -48,7 +88,12 @@ final class StreamViewModel {
 
     // MARK: Kết nối
 
+    /// Kết nối tới host đã ghép (IK). Host chưa ghép → `pairingRequired`.
     func connect(to target: ViewerTarget) async {
+        await begin(target) { await self.session.connect(to: target, config: $0) }
+    }
+
+    func begin(_ target: ViewerTarget, _ first: (DisplayConfig) async -> Void) async {
         guard !inStream, let metrics = ScreenMetrics.current(), let config = plan(metrics) else {
             if !inStream { errorMessage = "Không đọc được kích thước màn hình." }
             return
@@ -56,7 +101,12 @@ final class StreamViewModel {
         self.target = target
         errorMessage = nil
         inStream = true
-        await start(target, config)
+        currentConfig = config
+        await first(config)
+        await refreshTrust()
+        self.target = session.connectedTarget ?? target
+        if let hostId = session.refusedHostId { refusedHost = RefusedHost(target: target, hostId: hostId) }
+        failIfNeeded()
     }
 
     /// Thoát về danh sách host, gửi `bye` lịch sự.
@@ -77,7 +127,11 @@ final class StreamViewModel {
         guard inStream, case .failed(let message) = session.state else { return }
         inStream = false
         errorMessage = message
-        Task { await session.disconnect() }
+        // Phiên có thể vừa bị thu hồi (host đã bị xoá khỏi danh sách) → cập nhật nhãn "Đã ghép"/"Chưa ghép".
+        Task {
+            await session.disconnect()
+            await refreshTrust()
+        }
     }
 
     // MARK: Vòng đời scene
@@ -124,10 +178,11 @@ final class StreamViewModel {
     }
 }
 
+/// Luôn `.encrypted`; plaintext chỉ tồn tại ở build Debug và chỉ khi truyền `--plaintext`.
 enum AppSecurity {
     static var current: TransportSecurity {
         #if DEBUG
-        .devPlaintext
+        CommandLine.arguments.contains("--plaintext") ? .devPlaintext : .encrypted
         #else
         .encrypted
         #endif

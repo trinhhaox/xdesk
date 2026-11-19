@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import XdeskCrypto
 import XdeskTransport
 import XdeskViewer
 import XdeskWire
@@ -8,6 +9,17 @@ import XdeskWire
 struct HostListView: View {
     let model: StreamViewModel
     @AppStorage("xdesk.lastManualHost") private var manualText = ""
+    /// Đích chưa ghép đôi đang chờ người dùng chọn cách ghép.
+    @State private var choosing: ViewerTarget?
+    @State private var changedKey: KeyChange?
+    @State private var showScanner = false
+    @State private var showSettings = false
+
+    private struct KeyChange: Identifiable {
+        let host: DiscoveredHost
+        let expected: PairedDevice
+        var id: String { host.id }
+    }
 
     var body: some View {
         NavigationStack {
@@ -19,7 +31,7 @@ struct HostListView: View {
                         Text("Đang tìm… (trên Mac cần bật \"Bắt đầu chia sẻ\")").foregroundStyle(.secondary)
                     }
                     ForEach(model.hosts) { host in
-                        Button { connect(.discovered(host)) } label: { Label(host.name, systemImage: "desktopcomputer") }
+                        Button { tap(host) } label: { hostLabel(host) }
                     }
                 }
                 Section("Nhập địa chỉ") {
@@ -35,7 +47,35 @@ struct HostListView: View {
             .navigationTitle("Xdesk")
             .refreshable { model.stopBrowsing(); model.startBrowsing() }
             .toolbar {
+                Button("Bảo mật", systemImage: "lock.shield") { showSettings = true }
                 Button("Tìm lại", systemImage: "arrow.clockwise") { model.stopBrowsing(); model.startBrowsing() }
+            }
+            .sheet(isPresented: $showScanner) { PairWithMacView(model: model) }
+            .sheet(isPresented: $showSettings) { SecuritySettingsView(model: model) }
+            .confirmationDialog("Chưa ghép đôi với máy này", isPresented: Binding(get: { choosing != nil }, set: { if !$0 { choosing = nil } }),
+                                titleVisibility: .visible, presenting: choosing) { target in
+                Button("Quét mã QR trên Mac") { showScanner = true }
+                Button("So mã 6 số") { Task { await model.pairWithCode(to: target) } }
+            } message: { _ in
+                Text("Ghép đôi một lần, những lần sau Xdesk tự kết nối.")
+            }
+            .alert("Khoá của máy này đã đổi", isPresented: Binding(get: { changedKey != nil }, set: { if !$0 { changedKey = nil } }), presenting: changedKey) { change in
+                Button("Quên khoá cũ", role: .destructive) { Task { await model.forgetHost(id: change.expected.id) } }
+                Button("Đóng", role: .cancel) {}
+            } message: { change in
+                Text("\"\(change.host.name)\" có khoá khác lần ghép trước: máy được cài lại hoặc có thiết bị khác đang mạo danh. Xdesk không kết nối. Chỉ chọn \"Quên khoá cũ\" nếu bạn biết máy đó vừa được cài lại.")
+            }
+            .alert("Mac từ chối kết nối", isPresented: Binding(get: { model.refusedHost != nil }, set: { if !$0 { model.refusedHost = nil } }),
+                   presenting: model.refusedHost) { refused in
+                Button("Ghép đôi lại") {
+                    Task {
+                        await model.forgetHost(id: refused.hostId)
+                        choosing = refused.target
+                    }
+                }
+                Button("Đóng", role: .cancel) {}
+            } message: { _ in
+                Text("Máy Mac không còn nhận thiết bị này, thường là do đã bấm \"Thu hồi\" trên Mac. Chọn \"Ghép đôi lại\" để quét mã QR hoặc so mã 6 số.")
             }
         }
         .onAppear { model.startBrowsing() }
@@ -68,9 +108,37 @@ struct HostListView: View {
         }
     }
 
+    private func hostLabel(_ host: DiscoveredHost) -> some View {
+        HStack {
+            Label(host.name, systemImage: "desktopcomputer")
+            Spacer()
+            if let badge = model.hostStates[host.id]?.badge {
+                Text(badge.title).font(.caption.bold()).foregroundStyle(color(badge))
+            }
+        }
+    }
+
+    private func color(_ badge: HostBadge) -> Color {
+        switch badge {
+        case .paired: BrandPalette.accent
+        case .unpaired: BrandPalette.warning
+        case .keyChanged: .red
+        }
+    }
+
+    private func tap(_ host: DiscoveredHost) {
+        switch model.hostStates[host.id] {
+        case .none, .paired?: connect(.discovered(host))
+        case .unknown?: choosing = .discovered(host)
+        case .keyChanged(let expected)?: changedKey = KeyChange(host: host, expected: expected)
+        }
+    }
+
     private func connectManual() {
         guard let target = ViewerTarget.parse(manual: manualText) else { return }
-        connect(target)
+        Task {
+            if await model.isPaired(address: target) { await model.connect(to: target) } else { choosing = target }
+        }
     }
 
     private func connect(_ target: ViewerTarget) {

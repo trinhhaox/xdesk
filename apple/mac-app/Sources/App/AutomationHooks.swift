@@ -2,6 +2,7 @@
 import AppKit
 import Foundation
 import os
+import XdeskCrypto
 import XdeskInput
 import XdeskViewer
 
@@ -11,13 +12,22 @@ import XdeskViewer
 ///   --auto-connect bonjour      viewer kết nối tới host đầu tiên tìm thấy qua Bonjour
 ///   --input-probe x,y           sau khi kết nối: gửi move tới (x,y) chuẩn hoá rồi log quyền Trợ năng + vị trí con trỏ thật
 ///   --input-click x,y           sau khi kết nối: click trái tại (x,y) chuẩn hoá rồi cuộn +60/-60; log vị trí con trỏ và delta cuộn thấy được ở app khác
+///   --plaintext                 tắt mã hoá (chỉ Debug; mặc định Debug cũng mã hoá và dùng ghép đôi thật)
+///   --open-pairing-window       mở cửa sổ "Ghép đôi thiết bị mới" sau khi host bật (kèm --snapshot-pairing-window <png> để ghi ảnh nội dung; thêm --snapshot-when-streaming để chụp sau khi có viewer)
+///   --snapshot-approval <png>   ghi ảnh hộp thoại cho phép ghép đôi khi nó hiện
+///   --open-devices-window       mở cửa sổ "Thiết bị đã ghép"
+///   --auto-approve-pairing      host tự "Cho phép"/"Khớp" mọi yêu cầu ghép đôi (chỉ để kiểm thử)
+///   --print-pair-uri [file]     host giữ QR mở: in `xdesk-pair-uri <uri>` ra stdout (và ghi vào file nếu có), tự đổi khi hết hạn
+///   --pair-token <uri|self|@file>  viewer ghép đôi bằng QR (self = QR của host trong cùng tiến trình)
+///   --pair-sas host:port        viewer ghép đôi bằng so mã 6 số (in `xdesk-sas-viewer-code NNN NNN`; host in `xdesk-sas-host-code`)
+///   --revoke-viewers-after <giây>  host thu hồi mọi viewer đã ghép → phiên phải bị cắt ≤ 1 s
 ///   --disconnect-after <giây>   viewer tự ngắt (host vẫn chạy) → màn hình ảo phải biến mất
 ///   --quit-after <giây>         tự thoát
 @MainActor
 enum AutomationHooks {
     private static let log = Logger(subsystem: "vn.xox.xdesk", category: "automation")
 
-    static func run(host: HostController, viewer: ViewerController) async {
+    static func run(host: HostController, viewer: ViewerController, security: SecurityCenter, pairing: PairingCoordinator) async {
         let args = CommandLine.arguments
         viewer.options.retina = args.contains("--retina")
         viewer.options.fullScreen = args.contains("--fullscreen")
@@ -26,7 +36,25 @@ enum AutomationHooks {
             await host.start()
             log.notice("auto-host status: \(String(describing: host.status), privacy: .public)")
         }
-        if let value = value(after: "--auto-connect", in: args) {
+        if let path = value(after: "--snapshot-approval", in: args) {
+            Task { await snapshotApproval(pairing, to: path) }
+        }
+        if args.contains("--open-devices-window") { pairing.showDevicesWindow() }
+        if args.contains("--open-pairing-window") {
+            await pairing.showQrWindow()
+            let path = value(after: "--snapshot-pairing-window", in: args)
+            let waitForStream = args.contains("--snapshot-when-streaming")
+            Task { await snapshotPairingWindow(pairing, host: host, to: path, waitForStream: waitForStream) }
+        }
+        if args.contains("--print-pair-uri") { Task { await keepPairUriOpen(host: host, security: security, file: value(after: "--print-pair-uri", in: args)) } }
+        if let seconds = value(after: "--revoke-viewers-after", in: args).flatMap(Double.init) {
+            Task { await revokeViewers(after: seconds, security: security) }
+        }
+        if let token = value(after: "--pair-token", in: args) {
+            await pairWithToken(token, viewer: viewer, security: security)
+        } else if let sas = value(after: "--pair-sas", in: args) {
+            await pairWithSas(sas, viewer: viewer)
+        } else if let value = value(after: "--auto-connect", in: args) {
             await autoConnect(value, viewer: viewer)
         }
         if let probe = value(after: "--input-probe", in: args) {
@@ -48,6 +76,24 @@ enum AutomationHooks {
         }
     }
 
+    /// Chờ hộp thoại "muốn ghép đôi" xuất hiện rồi ghi PNG nội dung.
+    private static func snapshotApproval(_ pairing: PairingCoordinator, to path: String) async {
+        for _ in 0..<240 where pairing.approvalWindowForTesting == nil { try? await Task.sleep(for: .milliseconds(250)) }
+        try? await Task.sleep(for: .seconds(1))
+        log.notice("approval snapshot written=\(pairing.approvalWindowForTesting?.writeSnapshot(to: path) ?? false, privacy: .public)")
+    }
+
+    /// In trạng thái cửa sổ ghép đôi và (nếu có đường dẫn) vẽ nội dung ra PNG trong tiến trình.
+    private static func snapshotPairingWindow(_ pairing: PairingCoordinator, host: HostController, to path: String?, waitForStream: Bool) async {
+        if waitForStream { for _ in 0..<60 where host.activeViewerCount == 0 { try? await Task.sleep(for: .milliseconds(250)) } }
+        for _ in 0..<20 where pairing.security.qrURI == nil && pairing.availability.blockedMessage == nil { try? await Task.sleep(for: .milliseconds(250)) }
+        try? await Task.sleep(for: .seconds(1.5))
+        let state = pairing.availability.blockedMessage ?? "qr=\(pairing.security.qrURI != nil)"
+        log.notice("pairing-window: \(state, privacy: .public) frame=\(pairing.qrWindowForTesting?.windowFrameDescription ?? "-", privacy: .public)")
+        guard let path, !path.hasPrefix("--"), let window = pairing.qrWindowForTesting else { return }
+        log.notice("pairing-window snapshot written=\(window.writeSnapshot(to: path), privacy: .public)")
+    }
+
     private static func autoConnect(_ value: String, viewer: ViewerController) async {
         try? await Task.sleep(for: .seconds(1))
         let target: ViewerTarget?
@@ -62,6 +108,52 @@ enum AutomationHooks {
         guard let target else { log.error("auto-connect: no target for \(value, privacy: .public)"); return }
         await viewer.connect(to: target, title: value)
         log.notice("auto-connect state: \(String(describing: viewer.session?.state), privacy: .public) error: \(viewer.errorMessage ?? "-", privacy: .public)")
+    }
+
+    /// Giữ một QR mở trong suốt phiên kiểm thử và in URI mỗi khi đổi (stdout, không qua os_log).
+    private static func keepPairUriOpen(host: HostController, security: SecurityCenter, file: String?) async {
+        var printed: String?
+        while !Task.isCancelled {
+            if case .listening(let port) = host.status, security.qrURI == nil { await security.startQrPairing(port: port) }
+            if let uri = security.qrURI?.string, uri != printed {
+                printed = uri
+                print("xdesk-pair-uri \(uri)")
+                fflush(stdout)
+                if let file, !file.hasPrefix("--") { try? Data(uri.utf8).write(to: URL(fileURLWithPath: file), options: .atomic) }
+            }
+            try? await Task.sleep(for: .milliseconds(500))
+        }
+    }
+
+    private static func pairWithToken(_ token: String, viewer: ViewerController, security: SecurityCenter) async {
+        try? await Task.sleep(for: .seconds(1.5))
+        var text = token
+        if token == "self" {
+            for _ in 0..<40 where security.qrURI == nil { try? await Task.sleep(for: .milliseconds(250)) }
+            text = security.qrURI?.string ?? ""
+        } else if token.hasPrefix("@") {
+            text = (try? String(contentsOfFile: String(token.dropFirst()), encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        }
+        guard let uri = try? PairingURI.parse(text) else { log.error("pair-token: URI không hợp lệ"); return }
+        await viewer.pair(with: uri, title: "pair")
+        log.notice("pair-token state: \(String(describing: viewer.session?.state), privacy: .public) error: \(viewer.errorMessage ?? "-", privacy: .public)")
+    }
+
+    private static func pairWithSas(_ hostPort: String, viewer: ViewerController) async {
+        try? await Task.sleep(for: .seconds(1.5))
+        guard let target = ViewerTarget.parse(manual: hostPort) else { log.error("pair-sas: sai định dạng"); return }
+        await viewer.connect(to: target, title: "sas", auth: .sas(onCode: { code in
+            print("xdesk-sas-viewer-code \(code)")
+            fflush(stdout)
+        }))
+        log.notice("pair-sas state: \(String(describing: viewer.session?.state), privacy: .public) error: \(viewer.errorMessage ?? "-", privacy: .public)")
+    }
+
+    private static func revokeViewers(after seconds: Double, security: SecurityCenter) async {
+        try? await Task.sleep(for: .seconds(seconds))
+        await security.refresh()
+        for device in security.pairedViewers { await security.revoke(deviceId: device.id) }
+        log.notice("revoked \(security.pairedViewers.count, privacy: .public) remaining viewers")
     }
 
     private static func inputProbe(_ value: String, viewer: ViewerController) async {

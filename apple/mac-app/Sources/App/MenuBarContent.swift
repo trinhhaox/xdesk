@@ -3,6 +3,7 @@ import SwiftUI
 struct MenuBarContent: View {
     let host: HostController
     let viewer: ViewerController
+    let pairing: PairingCoordinator
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -27,6 +28,8 @@ struct MenuBarContent: View {
             NSApp.activate(ignoringOtherApps: true)
             openWindow(id: ViewerBrowserWindow.id)
         }
+        Button("Ghép đôi thiết bị mới…") { Task { await pairing.showQrWindow() } }
+        Button("Thiết bị đã ghép…") { pairing.showDevicesWindow() }
         if viewer.session != nil {
             Button("Ngắt kết nối viewer") { Task { await viewer.disconnect() } }
         }

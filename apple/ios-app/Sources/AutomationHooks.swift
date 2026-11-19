@@ -1,10 +1,13 @@
 #if DEBUG
 import Foundation
+import XdeskCrypto
 import XdeskViewer
 import XdeskWire
 
 /// Chỉ build Debug: điều khiển bằng tham số dòng lệnh để kiểm thử qua `devicectl ... launch --console`.
 ///   --auto-connect host:port   tự kết nối khi mở app
+///   --plaintext                tắt mã hoá (chỉ Debug; mặc định Debug cũng mã hoá và dùng ghép đôi thật)
+///   --pair-token <uri|@file>   ghép đôi bằng QR (URI xdesk://pair?... hoặc đường dẫn file chứa URI)
 ///   --mode extend|mirror       chọn chế độ hiển thị trước khi kết nối
 ///   --quit-after <giây>        tự thoát (kèm bye)
 /// In `xdesk-stats ...` mỗi 2 giây ra stderr để đọc từ console.
@@ -13,10 +16,18 @@ enum AutomationHooks {
     static func run(_ model: StreamViewModel) async {
         let args = CommandLine.arguments
         if let mode = value(after: "--mode", in: args).flatMap(ScreenMode.init(rawValue:)) { model.screenMode = mode }
-        guard let hostPort = value(after: "--auto-connect", in: args) else { return }
-        guard let target = ViewerTarget.parse(manual: hostPort) else { report("auto-connect: sai định dạng \(hostPort)"); return }
+        if let backend = model.security?.identityBackend { report("xdesk-security identityBackend=\(backend) dataProtection=\(model.security?.usesDataProtectionKeychain ?? false)") }
+        if let error = model.securityError { report("xdesk-security error=\(error)") }
         try? await Task.sleep(for: .seconds(1))
-        await model.connect(to: target)
+        if let token = value(after: "--pair-token", in: args) {
+            let text = token.hasPrefix("@") ? ((try? String(contentsOfFile: String(token.dropFirst()), encoding: .utf8)) ?? "") : token
+            guard let uri = try? PairingURI.parse(text.trimmingCharacters(in: .whitespacesAndNewlines)) else { report("pair-token: URI không hợp lệ"); return }
+            await model.pair(with: uri)
+        } else {
+            guard let hostPort = value(after: "--auto-connect", in: args) else { return }
+            guard let target = ViewerTarget.parse(manual: hostPort) else { report("auto-connect: sai định dạng \(hostPort)"); return }
+            await model.connect(to: target)
+        }
         report("auto-connect state=\(model.session.state) error=\(model.errorMessage ?? "-")")
         let quitAfter = value(after: "--quit-after", in: args).flatMap(Double.init)
         let started = ContinuousClock.now

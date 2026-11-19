@@ -5,7 +5,7 @@
 - Chuẩn: Noise rev 34 (`XX`, `IK`), X25519, ChaCha20-Poly1305, SHA-256, HKDF. Apple: CryptoKit. Android (phase 07): JCA `XDH` + `ChaCha20-Poly1305` (API 31+, cần xác nhận) hoặc thư viện nhỏ đã kiểm định nếu thiếu.
 
 ## Overview
-- Ưu tiên: P1 · pending · 5d
+- Ưu tiên: P1 · in-progress (06a thư viện, 06b-1 transport xong; 06b-2 UI còn lại) · 5d
 - Mọi kết nối Release bắt buộc mã hoá + xác thực thiết bị. Ghép đôi 1 lần, lần sau tự kết nối.
 
 ## Key insights
@@ -48,10 +48,10 @@ Viewer ──Noise msg1──► Host
 ## Todo
 - [x] Noise + vectors (06a: XX/XXpsk3/IK pass cacophony 3/3, spec hoàn thiện)
 - [x] DatagramCipher + replay (06a: cửa sổ 1024, epoch/rekey, vector crypto-session.json)
-- [ ] Tích hợp transport
-- [ ] UI QR + SAS
-- [ ] Quản lý thiết bị + quyền
-- [ ] Rekey + giới hạn lỗi
+- [x] Tích hợp transport (06b-1: Noise qua kênh control, TCP/UDP mã hoá, IK/XXpsk3/SAS ở tầng transport, thu hồi ≤ 1 s, M4/M5/M6; kiểm bằng test + live Mac loopback; live iPhone chưa chạy được vì máy khoá)
+- [ ] UI QR + SAS (06b-2: code + test xong, Mac live OK: QR render, SAS panel, QR bị chặn khi đang stream, cửa sổ không chụp được; iOS đã cài lên iPhone nhưng chưa chạy live vì máy khoá, chờ ghép tay)
+- [x] Quản lý thiết bị + quyền (06b-2: cửa sổ "Thiết bị đã ghép" trên Mac render + toggle quyền + thu hồi; iOS: màn Bảo mật quên host)
+- [x] Rekey + giới hạn lỗi (rekey TCP, UDP `rekey.resync`, UDP lỗi chỉ đếm/`linkLost` 10 s; test xanh)
 
 ## Success criteria
 - Test vectors Noise xanh 100%.

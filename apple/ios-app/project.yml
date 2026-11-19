@@ -38,6 +38,7 @@ targets:
         UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
         NSLocalNetworkUsageDescription: Xdesk dùng mạng nội bộ để tìm và kết nối với máy Mac của bạn.
         NSBonjourServices: [_xdesk._tcp]
+        NSCameraUsageDescription: Xdesk dùng camera để quét mã QR ghép đôi hiện trên màn hình máy Mac của bạn.
     settings:
       base:
         PRODUCT_NAME: Xdesk

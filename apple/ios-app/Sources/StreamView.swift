@@ -17,7 +17,7 @@ struct StreamView: View {
                 Color.black
                 VideoSurface(renderer: model.session.renderer, session: model.session, config: model.currentConfig)
                 if model.session.state != .streaming {
-                    ProgressView("Đang kết nối…").tint(.white).foregroundStyle(.white).frame(maxWidth: .infinity, maxHeight: .infinity)
+                    connectingOverlay
                 }
                 topBar
             }
@@ -28,6 +28,13 @@ struct StreamView: View {
         .ignoresSafeArea()
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
+    }
+
+    @ViewBuilder private var connectingOverlay: some View {
+        Group {
+            if model.isPairing { SasView(code: model.sasCode) } else { ProgressView("Đang kết nối…").tint(.white).foregroundStyle(.white) }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var topBar: some View {

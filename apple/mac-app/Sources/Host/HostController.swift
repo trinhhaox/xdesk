@@ -4,17 +4,6 @@ import os
 import XdeskTransport
 import XdeskWire
 
-/// Chế độ bảo mật của app: plaintext chỉ có ở build Debug; Release dùng `.encrypted` (chưa có tới phase 06 → từ chối chạy).
-enum AppSecurity {
-    static var current: TransportSecurity {
-        #if DEBUG
-        .devPlaintext
-        #else
-        .encrypted
-        #endif
-    }
-}
-
 /// Bật/tắt host: Bonjour + listener TCP; mỗi kết nối vào thành một `HostSession`.
 @MainActor
 @Observable
@@ -34,10 +23,13 @@ final class HostController {
     private(set) var secureInputActive = false
 
     private let log = Logger(subsystem: "vn.xox.xdesk", category: "host-controller")
+    private let security: SecurityCenter
     private var listener: ControlListener?
     private var promptedAccessibility = false
     private var acceptTask: Task<Void, Never>?
     private var sessions: [UUID: (session: HostSession, task: Task<Void, Never>)] = [:]
+
+    init(security: SecurityCenter) { self.security = security }
 
     var isHosting: Bool {
         switch status {
@@ -62,8 +54,15 @@ final class HostController {
             promptedAccessibility = true
             AccessibilityPermission.requestPrompt()
         }
-        let advertiser = BonjourAdvertiser(id: HostIdentity.shortId, name: HostIdentity.displayName)
-        let listener = ControlListener(security: AppSecurity.current, advertiser: advertiser)
+        let encrypted = AppSecurity.current == .encrypted
+        if encrypted, security.hostAuthenticator == nil {
+            status = .failed(security.startupError ?? "Không mở được kho khoá bảo mật")
+            return
+        }
+        await security.attach()
+        let advertiser = BonjourAdvertiser(id: security.identityFingerprint.flatMap { encrypted ? $0 : nil } ?? HostIdentity.shortId, name: HostIdentity.displayName)
+        let listener = ControlListener(
+            security: AppSecurity.current, advertiser: advertiser, authenticator: encrypted ? security.hostAuthenticator : nil)
         do {
             let port = try await startListener(listener)
             self.listener = listener

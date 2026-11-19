@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import XdeskCrypto
 import XdeskTransport
 import XdeskViewer
 import XdeskWire
@@ -17,17 +18,28 @@ final class ViewerController {
     private(set) var hosts: [DiscoveredHost] = []
     private(set) var session: ViewerSession?
     private(set) var errorMessage: String?
+    /// Trạng thái ghép đôi của từng host Bonjour (theo `DiscoveredHost.id`); rỗng khi chạy không mã hoá.
+    private(set) var hostStates: [String: ViewerTrust.HostState] = [:]
+    /// Mã 6 số đang hiển thị để so với màn hình host (nil = không đang so mã).
+    private(set) var sasCode: String?
     var options = Options()
 
+    @ObservationIgnored private let security: SecurityCenter
     @ObservationIgnored private var browseTask: Task<Void, Never>?
     @ObservationIgnored private var window: ViewerWindow?
 
+    init(security: SecurityCenter) { self.security = security }
+
+    var requiresPairing: Bool { AppSecurity.current == .encrypted }
     var isConnecting: Bool { session?.state == .connecting }
 
     func startBrowsing() {
         guard browseTask == nil else { return }
         browseTask = Task { [weak self] in
-            for await list in BonjourBrowser().hosts() { self?.hosts = list }
+            for await list in BonjourBrowser().hosts() {
+                self?.hosts = list
+                await self?.refreshTrust()
+            }
         }
     }
 
@@ -36,12 +48,49 @@ final class ViewerController {
         browseTask = nil
     }
 
-    func connect(to target: ViewerTarget, title: String) async {
+    func refreshTrust() async {
+        guard let trust = security.viewerTrust, AppSecurity.current == .encrypted else {
+            hostStates = [:]
+            return
+        }
+        var next: [String: ViewerTrust.HostState] = [:]
+        for host in hosts { next[host.id] = await trust.state(of: host) }
+        hostStates = next
+    }
+
+    /// Ghép đôi bằng mã 6 số: hiện mã trong `sasCode` tới khi host bấm "Khớp"/"Không khớp" hoặc quá hạn.
+    func pairWithCode(to target: ViewerTarget, title: String) async {
+        sasCode = nil
+        await connect(to: target, title: title, auth: .sas(onCode: { [weak self] code in
+            await MainActor.run { self?.sasCode = code }
+        }))
+        sasCode = nil
+    }
+
+    /// Bỏ khoá cũ của host đã đổi khoá; lần kết nối sau sẽ phải ghép đôi lại.
+    func forgetKnownHost(id: String) async {
+        await security.forgetHost(deviceId: id)
+        await refreshTrust()
+    }
+
+    /// `auth`: `.automatic` = host đã ghép → IK; `.sas` = so mã 6 số (UI nhận mã qua `onCode`).
+    func connect(to target: ViewerTarget, title: String, auth: ViewerAuth = .automatic) async {
+        await run(title: title) { await $0.connect(to: target, config: $1, auth: auth) }
+    }
+
+    /// Ghép đôi bằng URI QR (`xdesk://pair?...`), thử lần lượt các địa chỉ trong QR.
+    func pair(with uri: PairingURI, title: String) async {
+        await run(title: title) { await $0.pair(with: uri, config: $1) }
+    }
+
+    private func run(title: String, _ start: (ViewerSession, DisplayConfig) async -> Void) async {
         guard session == nil else { return }
         errorMessage = nil
-        let session = ViewerSession(security: AppSecurity.current, deviceName: HostIdentity.displayName)
+        let session = ViewerSession(security: AppSecurity.current, deviceName: HostIdentity.displayName, trust: security.viewerTrust)
         self.session = session
-        await session.connect(to: target, config: displayConfig())
+        await start(session, displayConfig())
+        await security.refresh()
+        await refreshTrust()
         guard case .streaming = session.state else {
             if case .failed(let message) = session.state { errorMessage = message }
             self.session = nil
