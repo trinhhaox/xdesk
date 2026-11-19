@@ -12,11 +12,24 @@ android {
         minSdk = 31
         targetSdk = 36
         versionCode = 1
-        versionName = "0.1.0"
+        versionName = "0.1.0-beta"
     }
     buildFeatures { compose = true }
+    // Khoá ký đọc từ biến môi trường do tools/release-android.sh đặt; không bao giờ nằm trong repo.
+    val keystorePath: String? = System.getenv("XDESK_KEYSTORE_PATH")
+    signingConfigs {
+        if (keystorePath != null) {
+            create("release") {
+                storeFile = file(keystorePath)
+                storePassword = System.getenv("XDESK_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("XDESK_KEY_ALIAS")
+                keyPassword = System.getenv("XDESK_KEYSTORE_PASSWORD")
+            }
+        }
+    }
     buildTypes {
         release {
+            if (keystorePath != null) signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
