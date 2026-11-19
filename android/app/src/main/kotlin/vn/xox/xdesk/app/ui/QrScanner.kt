@@ -34,6 +34,7 @@ import com.google.zxing.PlanarYUVLuminanceSource
 import com.google.zxing.common.HybridBinarizer
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Quét QR bằng CameraX + ZXing core (chạy cả trên máy không có Google Play Services, không phụ thuộc model tải về).
@@ -65,17 +66,28 @@ private fun CameraPreview(modifier: Modifier, onResult: (String) -> Unit) {
     val reader = remember {
         MultiFormatReader().apply { setHints(mapOf(DecodeHintType.POSSIBLE_FORMATS to listOf(BarcodeFormat.QR_CODE))) }
     }
-    DisposableEffect(Unit) { onDispose { executor.shutdown() } }
+    val bound = remember { AtomicReference<ProcessCameraProvider?>(null) }
+    val disposed = remember { AtomicBoolean(false) }
+    // Rời màn ghép đôi (đổi tab, điều hướng) → composable bị huỷ → nhả camera ngay, không chờ vòng đời Activity.
+    DisposableEffect(Unit) {
+        onDispose {
+            disposed.set(true)
+            bound.getAndSet(null)?.unbindAll()
+            executor.shutdown()
+        }
+    }
     AndroidView(modifier = modifier, factory = { ctx ->
         PreviewView(ctx).also { view ->
             val future = ProcessCameraProvider.getInstance(ctx)
             future.addListener({
+                if (disposed.get()) return@addListener
                 val provider = future.get()
                 val preview = Preview.Builder().build().also { it.setSurfaceProvider(view.surfaceProvider) }
                 val analysis = ImageAnalysis.Builder().setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build()
                 analysis.setAnalyzer(executor) { image -> decode(reader, image)?.let { if (done.compareAndSet(false, true)) onResult(it) } }
                 provider.unbindAll()
                 provider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
+                bound.set(provider)
             }, ContextCompat.getMainExecutor(context))
         }
     })

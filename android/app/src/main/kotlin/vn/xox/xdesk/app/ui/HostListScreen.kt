@@ -71,7 +71,7 @@ fun HostListScreen(controller: ViewerController) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Nhập địa chỉ", style = MaterialTheme.typography.titleMedium)
-                OutlinedTextField(manual, { manual = it }, Modifier.fillMaxWidth(), label = { Text("host:port, ví dụ 192.168.1.10:5555") }, singleLine = true)
+                OutlinedTextField(manual, { manual = it }, Modifier.fillMaxWidth(), label = { Text("host:port, ví dụ 192.168.1.10:47800") }, singleLine = true)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = { controller.connectManual(manual) }, enabled = manual.isNotBlank()) { Text("Kết nối") }
                     OutlinedButton(onClick = { controller.openPairing(ViewerTarget.parse(manual)) }) { Text("Ghép đôi") }
