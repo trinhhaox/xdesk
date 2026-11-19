@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Biểu tượng Xdesk: màn hình Mac + điện thoại, vẽ theo vùng an toàn 66dp của adaptive icon. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <group android:translateX="8.548" android:translateY="6.832" android:scaleX="0.088" android:scaleY="0.088">
+        <path android:fillColor="#FFFFFF" android:pathData="M246,348 H599 A28,28 0 0 1 627,376 V614 A28,28 0 0 1 599,642 H246 A28,28 0 0 1 218,614 V376 A28,28 0 0 1 246,348 Z" />
+        <path android:fillColor="#FFFFFF" android:pathData="M388.1,640 H454.9 A0.1,0.1 0 0 1 455,640.1 V699.9 A0.1,0.1 0 0 1 454.9,700 H388.1 A0.1,0.1 0 0 1 388,699.9 V640.1 A0.1,0.1 0 0 1 388.1,640 Z" />
+        <path android:fillColor="#FFFFFF" android:pathData="M335,696 H508 A12,12 0 0 1 520,708 V712 A12,12 0 0 1 508,724 H335 A12,12 0 0 1 323,712 V708 A12,12 0 0 1 335,696 Z" />
+        <path android:fillColor="#FFFFFF" android:pathData="M673,413 H785 A30,30 0 0 1 815,443 V677 A30,30 0 0 1 785,707 H673 A30,30 0 0 1 643,677 V443 A30,30 0 0 1 673,413 Z" />
+        <path android:fillColor="#171A22" android:pathData="M252,368 H593 A14,14 0 0 1 607,382 V608 A14,14 0 0 1 593,622 H252 A14,14 0 0 1 238,608 V382 A14,14 0 0 1 252,368 Z" />
+        <path android:fillColor="#171A22" android:pathData="M676,434 H783 A16,16 0 0 1 799,450 V672 A16,16 0 0 1 783,688 H676 A16,16 0 0 1 660,672 V450 A16,16 0 0 1 676,434 Z" />
+        <path android:fillColor="#18C29C" android:pathData="M458,463 H590 A12,12 0 0 1 602,475 V499 A12,12 0 0 1 590,511 H458 A12,12 0 0 1 446,499 V475 A12,12 0 0 1 458,463 Z" />
+        <path android:fillColor="#18C29C" android:pathData="M680,463 H754 A12,12 0 0 1 766,475 V499 A12,12 0 0 1 754,511 H680 A12,12 0 0 1 668,499 V475 A12,12 0 0 1 680,463 Z" />
+        <path android:fillColor="#6B6D73" android:pathData="M266,549 H414 A8,8 0 0 1 422,557 V569 A8,8 0 0 1 414,577 H266 A8,8 0 0 1 258,569 V557 A8,8 0 0 1 266,549 Z" />
+        <path android:fillColor="#6B6D73" android:pathData="M676,566 H758 A8,8 0 0 1 766,574 V585 A8,8 0 0 1 758,593 H676 A8,8 0 0 1 668,585 V574 A8,8 0 0 1 676,566 Z" />
+    </group>
+</vector>
