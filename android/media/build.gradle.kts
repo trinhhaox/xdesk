@@ -15,5 +15,7 @@ android {
 }
 
 dependencies {
+    api(project(":wire"))
+    testImplementation(kotlin("test"))
     testImplementation(libs.junit)
 }
