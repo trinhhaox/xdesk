@@ -36,6 +36,7 @@ targets:
       properties:
         CFBundleDisplayName: Xdesk
         UILaunchScreen: {}
+        ITSAppUsesNonExemptEncryption: true
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
         UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
         NSLocalNetworkUsageDescription: Xdesk dùng mạng nội bộ để tìm và kết nối với máy Mac của bạn.

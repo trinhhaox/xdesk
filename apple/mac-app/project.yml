@@ -6,6 +6,9 @@ options:
 packages:
   XdeskKit:
     path: ../Packages/XdeskKit
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.10.1
 settings:
   base:
     SWIFT_VERSION: "6.0"
@@ -33,11 +36,21 @@ targets:
         product: XdeskClipboard
       - package: XdeskKit
         product: XdeskAgent
+      - package: Sparkle
+        product: Sparkle
     info:
       path: Sources/Info.plist
       properties:
         CFBundleDisplayName: Xdesk
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        SUFeedURL: https://raw.githubusercontent.com/trinhhaox/xdesk-releases/main/appcast.xml
+        SUPublicEDKey: 0XSjDfyqlPwck1B2l1vEUM47fqblteePURtvIzwiGRE=
+        SUEnableAutomaticChecks: true
+        SUScheduledCheckInterval: 86400
+        SUVerifyUpdateBeforeExtraction: true
         LSUIElement: true
+        ITSAppUsesNonExemptEncryption: true
         LSMinimumSystemVersion: "14.0"
         NSLocalNetworkUsageDescription: Xdesk dùng mạng nội bộ để tìm và kết nối thiết bị của bạn.
         NSBonjourServices: [_xdesk._tcp]
@@ -50,6 +63,8 @@ targets:
       base:
         PRODUCT_NAME: Xdesk
         PRODUCT_BUNDLE_IDENTIFIER: vn.xox.xdesk
+        MARKETING_VERSION: 0.1.0-beta
+        CURRENT_PROJECT_VERSION: 1
         ENABLE_HARDENED_RUNTIME: true
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: false

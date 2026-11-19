@@ -6,6 +6,7 @@ struct MenuBarContent: View {
     let viewer: ViewerController
     let pairing: PairingCoordinator
     let agent: AgentController
+    let updater: UpdaterController
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -47,6 +48,8 @@ struct MenuBarContent: View {
         Divider()
         AgentMenuSection(agent: agent)
         Divider()
+        Button("Kiểm tra cập nhật…") { updater.checkForUpdates() }
+            .disabled(!updater.canCheckForUpdates)
         Button("Thoát Xdesk") { NSApplication.shared.terminate(nil) }
             .keyboardShortcut("q")
     }
