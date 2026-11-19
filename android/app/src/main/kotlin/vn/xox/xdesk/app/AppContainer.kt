@@ -5,6 +5,7 @@ import android.content.Context
 import java.io.File
 import vn.xox.xdesk.app.identity.IdentityUnavailableException
 import vn.xox.xdesk.app.identity.KeystoreIdentityStore
+import vn.xox.xdesk.app.update.UpdateController
 import vn.xox.xdesk.crypto.DeviceIdentity
 import vn.xox.xdesk.crypto.IdentityStore
 import vn.xox.xdesk.transport.FileKnownHostStore
@@ -15,6 +16,8 @@ import vn.xox.xdesk.transport.ViewerTrust
 class AppContainer(context: Context) {
     val identityStore: IdentityStore = KeystoreIdentityStore(File(context.filesDir, "identity.v1"))
     val knownHosts: KnownHostStore = FileKnownHostStore(File(context.filesDir, "known-hosts.txt"))
+
+    val updates = UpdateController(context)
 
     /** `null` kèm [identityError] khi Keystore mất khoá: UI cho người dùng chọn đặt lại danh tính. */
     var identity: DeviceIdentity? = null

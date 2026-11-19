@@ -2,7 +2,9 @@
 # Dùng: tools/release-android.sh [--publish]
 # Dựng APK release, ký bằng ~/.xdesk/keys/xdesk-release.jks, kiểm tra bằng apksigner.
 # Lần đầu tự tạo keystore với mật khẩu ngẫu nhiên lưu trong Keychain (dịch vụ xdesk-android-release).
-# --publish: đính APK vào GitHub Release v<versionName> của trinhhaox/xdesk-releases (phải có sẵn, chạy sau release-mac.sh).
+# Sinh thêm android-update.json (manifest cho bộ cập nhật trong app) cạnh APK.
+# --publish: đính APK vào GitHub Release v<versionName> của trinhhaox/xdesk-releases (phải có sẵn, chạy sau release-mac.sh),
+#            rồi đăng android-update.json lên nhánh main (sau khi APK đã có trên release).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -55,6 +57,9 @@ APKSIGNER="$(ls -d "$SDK_DIR"/build-tools/*/apksigner | sort -V | tail -1)"
 "$APKSIGNER" verify --verbose --print-certs "$APK" | tee "$OUT/apksigner.txt" | grep -E "^(Verifies|Verified using v2|V2 Signer: certificate (DN|SHA-256))"
 echo "APK: $APK ($(stat -f %z "$APK") byte)"
 
+"$ROOT/tools/generate-android-manifest.sh" "$APK" "$OUT/android-update.json"
+
 if ((PUBLISH)); then
     gh release upload "v$VERSION" "$APK" --repo "$REPO" --clobber
+    "$ROOT/tools/publish-android-manifest.sh" "$OUT/android-update.json"
 fi

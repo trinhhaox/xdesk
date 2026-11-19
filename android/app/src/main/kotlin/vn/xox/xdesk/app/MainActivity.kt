@@ -20,6 +20,7 @@ import vn.xox.xdesk.app.ui.HostListScreen
 import vn.xox.xdesk.app.ui.PairingScreen
 import vn.xox.xdesk.app.ui.SecuritySettingsScreen
 import vn.xox.xdesk.app.ui.StreamScreen
+import vn.xox.xdesk.app.ui.UpdatePrompt
 
 class MainActivity : ComponentActivity() {
     private val controller: ViewerController by viewModels {
@@ -40,6 +41,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         browser = NsdBrowser(this, controller::updateHosts)
+        val updates = (application as XdeskApplication).container.updates
+        updates.isSessionActive = { controller.streaming || controller.connecting }
+        if (savedInstanceState == null) updates.checkOnStart()
         // targetSdk 35+ ép edge-to-edge: chừa vùng an toàn (tai thỏ, thanh hệ thống) cho các màn danh sách; màn stream tự lo immersive.
         setContent { MaterialTheme { Surface(Modifier.safeDrawingPadding()) { Root() } } }
     }
@@ -67,7 +71,8 @@ class MainActivity : ComponentActivity() {
             Screen.HOSTS -> HostListScreen(controller)
             Screen.PAIR -> PairingScreen(controller)
             Screen.STREAM -> StreamScreen(controller, window)
-            Screen.SECURITY -> SecuritySettingsScreen(controller)
+            Screen.SECURITY -> SecuritySettingsScreen(controller, (application as XdeskApplication).container.updates)
         }
+        if (controller.screen == Screen.HOSTS || controller.screen == Screen.SECURITY) UpdatePrompt((application as XdeskApplication).container.updates)
     }
 }

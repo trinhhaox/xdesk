@@ -6,6 +6,8 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <!-- Chỉ xin lúc mở màn quét QR; app vẫn dùng được (so mã 6 số) khi không có camera. -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Cho phép tự cài bản cập nhật qua PackageInstaller; người dùng vẫn phải bật "nguồn không rõ" cho Xdesk. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application

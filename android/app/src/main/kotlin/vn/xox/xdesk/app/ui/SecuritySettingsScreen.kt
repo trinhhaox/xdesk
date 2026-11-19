@@ -26,11 +26,12 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import vn.xox.xdesk.app.Screen
 import vn.xox.xdesk.app.ViewerController
+import vn.xox.xdesk.app.update.UpdateController
 import vn.xox.xdesk.transport.KnownHost
 
 /** Bảo mật: dấu vân tay của thiết bị này, host đã ghép (quên từng host) và đặt lại danh tính. */
 @Composable
-fun SecuritySettingsScreen(controller: ViewerController) {
+fun SecuritySettingsScreen(controller: ViewerController, updates: UpdateController) {
     var confirmReset by remember { mutableStateOf(false) }
     var forgetting by remember { mutableStateOf<KnownHost?>(null) }
     LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -55,6 +56,7 @@ fun SecuritySettingsScreen(controller: ViewerController) {
                 TextButton(onClick = { forgetting = host }) { Text("Quên") }
             }
         }
+        item { UpdateCard(updates) }
         item { Button(onClick = { confirmReset = true }) { Text("Đặt lại danh tính") } }
         item { OutlinedButton(onClick = { controller.screen = Screen.HOSTS }, modifier = Modifier.fillMaxWidth()) { Text("Quay lại") } }
     }
