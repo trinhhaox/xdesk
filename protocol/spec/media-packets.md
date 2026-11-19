@@ -74,7 +74,13 @@ Viewer: jitter buffer mục tiêu **40 ms** (bắt đầu phát khi đủ 40 ms;
 - Lưu mảnh theo `frameNo`; mảnh trùng bỏ qua; `fragCnt` khác nhau cho cùng `frameNo` → `inconsistentFragmentCount`.
 - `watermark` = frame nhỏ nhất chưa xong; gói của frame < watermark bị bỏ. Cửa sổ 256 frame (vượt → bỏ frame cũ nhất);
   tổng byte đang ghép dở bị chặn (mặc định 32 MiB).
-- Frame hoàn tất giao ngay (có thể sai thứ tự giữa các frame; tầng trên quyết định).
+- Bộ ghép trả frame theo thứ tự hoàn tất (có thể sai thứ tự `frameNo`). Viewer đặt **cổng thứ tự** (`FrameOrderGate`) sau bộ ghép và chỉ đưa frame cho decoder theo `frameNo` tăng dần:
+  - frame hoàn tất đúng thứ tự → nhả ngay (không thêm trễ);
+  - frame hoàn tất khi frame đứng trước chưa xong → giữ tối đa **50 ms** (`holdBoundMs`, ≈ 1 RTT; tối đa 32 frame đang giữ);
+  - keyframe hoàn tất → nhảy tới nó ngay, bỏ mọi frame đứng trước (IDR không phụ thuộc frame cũ);
+  - hết hạn mà vẫn thiếu → bỏ frame thiếu, nhả các frame đang giữ theo thứ tự và gửi `keyframe.request` (giới hạn tần suất như khi mất gói);
+  - nếu frame bị bỏ là keyframe (đã thấy mảnh của nó) → loại mọi P-frame cho tới keyframe kế tiếp;
+  - frame có `frameNo` nhỏ hơn mốc đã nhả (đến muộn, trùng) bị bỏ. Chi phí theo số frame đang giữ, không theo khoảng nhảy `frameNo`.
 - Khoảng trống: frame < frame mới nhất mà chưa nhận mảnh nào.
 
 ## NACK (gói ptype 0x40)

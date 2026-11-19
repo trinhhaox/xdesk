@@ -79,7 +79,7 @@ import Testing
         let f2 = try packets(2, length: 3000)
         _ = try r.ingest(f2[0], nowMs: 10)
         #expect(r.gaps == [0, 1])
-        #expect(r.pending == [PendingFrame(frameNo: 2, missing: [1, 2], firstSeenMs: 10)])
+        #expect(r.pending == [PendingFrame(frameNo: 2, missing: [1, 2], firstSeenMs: 10, isKeyframe: false)])
         r.abandon(0)
         r.abandon(1)
         #expect(r.watermark == 2 && r.abandonedCount == 2)
@@ -103,6 +103,15 @@ import Testing
         _ = try r.ingest(try #require(try packets(far, length: 3000).first), nowMs: 1)
         #expect(r.watermark == far - Reassembler.window + 1)
         #expect(r.pending.map(\.frameNo) == [far])
+    }
+
+    @Test func abandonBeforeDropsEverythingBelow() throws {
+        var r = Reassembler()
+        _ = try r.ingest(try #require(try packets(1, length: 3000).first), nowMs: 0)
+        r.abandon(before: .max - 10)
+        #expect(r.watermark == .max - 10 && r.pending.isEmpty)
+        r.abandon(before: 5)
+        #expect(r.watermark == UInt32.max - 10)
     }
 
     @Test func pendingByteCapEvictsOldest() throws {

@@ -9,7 +9,7 @@ class AssembledFrame(
 )
 
 /** Frame đang ghép dở: các mảnh còn thiếu để gửi NACK. */
-data class PendingFrame(val frameNo: Long, val missing: List<Int>, val firstSeenMs: Long)
+data class PendingFrame(val frameNo: Long, val missing: List<Int>, val firstSeenMs: Long, val isKeyframe: Boolean)
 
 /**
  * Ghép mảnh theo `frameNo`; chịu mất gói, đảo thứ tự, trùng lặp. Thời gian do người gọi truyền (`nowMs`).
@@ -50,7 +50,7 @@ class Reassembler(firstFrameNo: Long = 0, private val maxPendingBytes: Int = 32 
     val pending: List<PendingFrame>
         get() = partials.keys.sorted().map { frameNo ->
             val p = partials.getValue(frameNo)
-            PendingFrame(frameNo, p.parts.indices.filter { p.parts[it] == null }, p.firstSeenMs)
+            PendingFrame(frameNo, p.parts.indices.filter { p.parts[it] == null }, p.firstSeenMs, p.isKeyframe)
         }
 
     /** Nhận một gói; trả frame khi vừa đủ mảnh. Gói trùng/cũ → `null`; gói sai → [WireException]. */
@@ -99,6 +99,11 @@ class Reassembler(firstFrameNo: Long = 0, private val maxPendingBytes: Int = 32 
         partials.remove(frameNo)?.let { pendingBytes -= it.bytes }
         abandonedCount++
         markFinished(frameNo)
+    }
+
+    /** Bỏ mọi frame < [frameNo] một lần (tầng trên đã bỏ qua chúng); chi phí theo số frame đang giữ. */
+    fun abandonBefore(frameNo: Long) {
+        if (frameNo > watermark) advanceWatermark(frameNo)
     }
 
     private fun advanceWatermark(newWatermark: Long) {

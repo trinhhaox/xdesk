@@ -42,6 +42,7 @@ public actor UdpMediaChannel {
     var listener: NWListener?
     var history = MediaSendHistory()
     var reassembler = Reassembler()
+    var frameGate = FrameOrderGate()
     var nackTracker = NackTracker()
     var pollTask: Task<Void, Never>?
     var maintenanceTask: Task<Void, Never>?

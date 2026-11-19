@@ -35,7 +35,7 @@ class ReassemblerTest {
         r.ingest(packets(0)[0], 10)
         packets(2).forEach { r.ingest(it, 20) }
         assertEquals(listOf(1L), r.gaps)
-        assertEquals(listOf(PendingFrame(0, listOf(1, 2), 10)), r.pending)
+        assertEquals(listOf(PendingFrame(0, listOf(1, 2), 10, true)), r.pending)
     }
 
     @Test
@@ -94,5 +94,16 @@ class ReassemblerTest {
         val tracker = NackTracker()
         tracker.poll(r, 0)
         assertEquals(listOf(NackEntry(0, NackEntry.WHOLE_FRAME)), tracker.poll(r, 30).nacks)
+    }
+
+    @Test
+    fun abandonBeforeDropsEverythingBelow() {
+        val r = Reassembler()
+        r.ingest(packets(1)[0], 0)
+        r.abandonBefore(0xFFFF_FFFFL - 10)
+        assertEquals(0xFFFF_FFFFL - 10, r.watermark)
+        assertTrue(r.pending.isEmpty())
+        r.abandonBefore(5)
+        assertEquals(0xFFFF_FFFFL - 10, r.watermark)
     }
 }

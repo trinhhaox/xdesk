@@ -59,7 +59,8 @@ extension UdpMediaChannel {
         switch packet.header.type {
         case .video where packet.header.streamId == streamId:
             do {
-                if let frame = try reassembler.ingest(packet, nowMs: monotonicMs()) { continuation.yield(.frame(frame)) }
+                let now = monotonicMs()
+                if let frame = try reassembler.ingest(packet, nowMs: now) { publish(frameGate.push(frame, nowMs: now)) }
             } catch {
                 malformedPacketCount += 1
             }
@@ -79,12 +80,22 @@ extension UdpMediaChannel {
         }
     }
 
+    private func publish(_ out: FrameOrderGate.Output) {
+        if let skipTo = out.skipTo { reassembler.abandon(before: skipTo) }
+        for frame in out.frames { continuation.yield(.frame(frame)) }
+        if out.keyframeNeeded { continuation.yield(.keyframeNeeded) }
+    }
+
     /// Mỗi 10 ms: punch (nếu chưa nghe được host) và NACK/bỏ frame.
     func tick() async {
         let now = monotonicMs()
         if !heardFromHost, now - lastPunchMs >= Self.punchIntervalMs {
             lastPunchMs = now
             try? await transmit(MediaPunch.packet(streamId: streamId))
+        }
+        if frameGate.isHolding {
+            let keyframes = Set(reassembler.pending.filter(\.isKeyframe).map(\.frameNo))
+            publish(frameGate.poll(nowMs: now, pendingKeyframes: keyframes))
         }
         let poll = nackTracker.poll(&reassembler, nowMs: now)
         if !poll.nacks.isEmpty, let nack = try? MediaPacket.nack(streamId: streamId, entries: poll.nacks) {

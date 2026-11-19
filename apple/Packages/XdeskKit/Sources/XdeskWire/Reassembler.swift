@@ -11,6 +11,7 @@ public struct PendingFrame: Sendable, Equatable {
     public let frameNo: UInt32
     public let missing: [UInt16]
     public let firstSeenMs: Int
+    public let isKeyframe: Bool
 }
 
 /// Ghép mảnh theo `frameNo`. Chịu mất gói, đảo thứ tự và trùng lặp. Thời gian do người gọi truyền vào
@@ -54,7 +55,7 @@ public struct Reassembler: Sendable {
         partials.keys.sorted().compactMap { frameNo in
             guard let p = partials[frameNo] else { return nil }
             let missing = p.parts.indices.filter { p.parts[$0] == nil }.map { UInt16($0) }
-            return PendingFrame(frameNo: frameNo, missing: missing, firstSeenMs: p.firstSeenMs)
+            return PendingFrame(frameNo: frameNo, missing: missing, firstSeenMs: p.firstSeenMs, isKeyframe: p.isKeyframe)
         }
     }
 
@@ -101,6 +102,11 @@ public struct Reassembler: Sendable {
         if let p = partials.removeValue(forKey: frameNo) { pendingBytes -= p.bytes }
         abandonedCount += 1
         markFinished(frameNo)
+    }
+
+    /// Bỏ mọi frame < `frameNo` một lần (tầng trên đã bỏ qua chúng); chi phí theo số frame đang giữ.
+    public mutating func abandon(before frameNo: UInt32) {
+        if frameNo > watermark { advanceWatermark(to: frameNo) }
     }
 
     /// Nhảy watermark một lần, chi phí theo số frame đang giữ chứ không theo khoảng cách: một gói

@@ -9,6 +9,7 @@ import java.nio.channels.DatagramChannel
 import java.nio.channels.Selector
 import vn.xox.xdesk.crypto.CryptoErrorCode
 import vn.xox.xdesk.wire.ControlMessage
+import vn.xox.xdesk.wire.FrameOrderGate
 import vn.xox.xdesk.wire.MediaHeader
 import vn.xox.xdesk.wire.MediaPacket
 import vn.xox.xdesk.wire.MediaPacketType
@@ -34,6 +35,7 @@ class UdpMediaChannel private constructor(
     private val sendLock = Any()
     private val selector: Selector = Selector.open()
     private val reassembler = Reassembler()
+    private val frameGate = FrameOrderGate()
     private val nackTracker = NackTracker()
     private var heardFromHost = false
     private var lastPunchMs = 0L
@@ -117,7 +119,8 @@ class UdpMediaChannel private constructor(
         when {
             packet.header.type == MediaPacketType.PROBE -> Unit
             packet.header.type == MediaPacketType.VIDEO && packet.header.streamId == streamId -> try {
-                reassembler.ingest(packet, nowMs())?.let { stats.framesAssembled++; listener.onFrame(it) }
+                val now = nowMs()
+                reassembler.ingest(packet, now)?.let { stats.framesAssembled++; publish(frameGate.push(it, now)) }
             } catch (e: WireException) {
                 stats.malformedPacketCount++
             }
@@ -126,12 +129,22 @@ class UdpMediaChannel private constructor(
         }
     }
 
+    private fun publish(out: FrameOrderGate.Output) {
+        out.skipTo?.let(reassembler::abandonBefore)
+        for (frame in out.frames) listener.onFrame(frame)
+        if (out.keyframeNeeded) listener.onKeyframeNeeded()
+    }
+
     /** Mỗi 10 ms: punch (nếu chưa nghe được host), NACK và bỏ frame quá hạn. */
     private fun tick() {
         val now = nowMs()
         if (!heardFromHost && now - lastPunchMs >= PUNCH_INTERVAL_MS) {
             lastPunchMs = now
             trySend(probe)
+        }
+        if (frameGate.isHolding) {
+            val keyframes = reassembler.pending.filter { it.isKeyframe }.map { it.frameNo }.toSet()
+            publish(frameGate.poll(now, keyframes))
         }
         val poll = nackTracker.poll(reassembler, now)
         if (poll.nacks.isNotEmpty()) trySend(MediaPacket.nack(streamId, poll.nacks))
