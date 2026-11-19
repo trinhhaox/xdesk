@@ -22,6 +22,7 @@ class AppContainer(context: Context) {
     val knownHosts: KnownHostStore = FileKnownHostStore(File(context.filesDir, "known-hosts.txt"))
 
     val updates = UpdateController(context)
+    val display = DisplaySettingsStore(context)
 
     /** `null` kèm [identityError] khi Keystore mất khoá: UI cho người dùng chọn đặt lại danh tính. */
     var identity: DeviceIdentity? = null

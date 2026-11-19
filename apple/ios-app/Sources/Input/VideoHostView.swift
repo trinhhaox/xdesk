@@ -16,8 +16,20 @@ final class VideoHostView: UIView {
     private var obscuredHeight: CGFloat = 0
     private var keyboardObserver: NSObjectProtocol?
     private var hideCursorTask: Task<Void, Never>?
+    private var zoomController: VideoZoomController?
+    private let zoomState: VideoZoomState
 
-    init(videoLayer: CALayer, touchView: TouchInputView, controller: TextComposerController) {
+    /// Bản sao "Giống màn hình Mac": bật zoom/kéo và lấy kích thước Mac từ video. Tắt = về vừa khung.
+    var zoomEnabled: Bool {
+        get { zoomController?.enabled ?? false }
+        set {
+            touchView.nativeMac = newValue
+            zoomController?.enabled = newValue
+        }
+    }
+
+    init(videoLayer: CALayer, touchView: TouchInputView, controller: TextComposerController, zoomState: VideoZoomState) {
+        self.zoomState = zoomState
         self.videoLayer = videoLayer
         self.touchView = touchView
         self.controller = controller
@@ -31,6 +43,9 @@ final class VideoHostView: UIView {
         addSubview(composer)
         touchView.onCursor = { [weak self] in self?.showCursor($0) }
         touchView.onSequenceEnded = { [weak self] in self?.applyPan(duration: 0.2, options: .curveEaseInOut) }
+        touchView.onViewportChanged = { [weak self] in self?.viewportChanged() }
+        zoomController = VideoZoomController(host: self, touchView: touchView) { [weak self] in self?.viewportChanged() }
+        zoomState.reset = { [weak self] in self?.zoomController?.reset() }
     }
 
     @available(*, unavailable) required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
@@ -44,6 +59,7 @@ final class VideoHostView: UIView {
         videoLayer.frame = container.bounds
         CATransaction.commit()
         touchView.frame = bounds
+        zoomController?.reclamp()
     }
 
     override func didMoveToWindow() {
@@ -87,16 +103,29 @@ final class VideoHostView: UIView {
         let pan = currentPan()
         touchView.panY = pan
         UIView.animate(withDuration: duration, delay: 0, options: options.union(.beginFromCurrentState)) {
-            self.container.transform = CGAffineTransform(translationX: 0, y: -pan)
+            self.container.transform = self.containerTransform(pan: pan)
         }
     }
 
+    /// Zoom quanh tâm view rồi kéo (`translation`), cuối cùng đẩy lên theo bàn phím.
+    private func containerTransform(pan: CGFloat) -> CGAffineTransform {
+        let viewport = touchView.viewport
+        let zoom = CGFloat(viewport.zoom)
+        return CGAffineTransform(translationX: CGFloat(viewport.translationX), y: CGFloat(viewport.translationY) - pan).scaledBy(x: zoom, y: zoom)
+    }
+
+    private func viewportChanged() {
+        zoomState.isZoomed = !touchView.viewport.isIdentity
+        applyPan(duration: 0, options: [])
+    }
+
     private func currentPan() -> CGFloat {
-        guard obscuredHeight > 0, let rect = touchView.contentRect, let focus = touchView.focusNormalizedY else { return 0 }
-        let focusY = rect.minY + CGFloat(focus) * rect.height
-        return CGFloat(VideoPan.offset(
-            focusY: Float(focusY), viewHeight: Float(bounds.height), obscuredHeight: Float(obscuredHeight), videoBottom: Float(rect.maxY)
-        ))
+        guard obscuredHeight > 0, let rect = touchView.contentRect, let focus = touchView.focusNormalizedY,
+              let mapper = touchView.mapper() else { return 0 }
+        let viewport = touchView.viewport
+        let focusY = viewport.toView(x: 0, y: Float(rect.minY + CGFloat(focus) * rect.height), in: mapper).y
+        let videoBottom = viewport.toView(x: 0, y: Float(rect.maxY), in: mapper).y
+        return CGFloat(VideoPan.offset(focusY: focusY, viewHeight: Float(bounds.height), obscuredHeight: Float(obscuredHeight), videoBottom: videoBottom))
     }
 
     // MARK: Con trỏ cục bộ
@@ -122,6 +151,9 @@ final class VideoHostView: UIView {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         cursorLayer.position = point
+        // Con trỏ nằm trong container đã zoom: nghịch đảo để giữ cỡ cố định trên màn hình.
+        let inverse = 1 / CGFloat(touchView.viewport.zoom)
+        cursorLayer.setAffineTransform(CGAffineTransform(scaleX: inverse, y: inverse))
         cursorLayer.opacity = 1
         CATransaction.commit()
         hideCursorTask = Task { [weak self] in

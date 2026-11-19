@@ -20,7 +20,9 @@ actor HostSession {
     static let initialBitrateKbps = 10_000
 
     let connection: ControlConnection
-    private let provider: VirtualDisplayProvider
+    let provider: VirtualDisplayProvider
+    let windowFit: WindowFitter?
+    var windowFitActive = false
     let hostCaps: Capabilities
     private let report: @Sendable (HostSessionState) -> Void
     let onSecureInput: @Sendable (Bool) -> Void
@@ -42,7 +44,7 @@ actor HostSession {
     var clipboard: ClipboardSync?
 
     init(
-        connection: ControlConnection, provider: VirtualDisplayProvider, caps: Capabilities,
+        connection: ControlConnection, provider: VirtualDisplayProvider, windowFit: WindowFitter? = nil, caps: Capabilities,
         report: @escaping @Sendable (HostSessionState) -> Void,
         onSecureInput: @escaping @Sendable (Bool) -> Void = { _ in },
         onAgentAnswer: @escaping @Sendable (String, Bool) -> Void = { _, _ in },
@@ -56,6 +58,7 @@ actor HostSession {
         self.onAgentAnswer = onAgentAnswer
         self.connection = connection
         self.provider = provider
+        self.windowFit = windowFit
         self.hostCaps = caps
         self.report = report
         self.onSecureInput = onSecureInput
@@ -117,13 +120,9 @@ actor HostSession {
 
     private func startPipeline(_ config: DisplayConfig, caps: Capabilities) async throws {
         guard let channel else { throw TransportError.noPeer }
-        let width = Int(config.w), height = Int(config.h)
-        let hiDPI = config.scale >= 2
-        let acquired = await provider.acquire(VirtualDisplaySpec(
-            pixelWidth: width, pixelHeight: height, refreshRate: Double(config.fps), hiDPI: hiDPI,
-            mirrorsMac: config.screenMode == .mirror
-        ))
-        if let reason = acquired.fallbackReason { log.notice("fallback \(acquired.mode == .mirror ? "mirror" : "extend", privacy: .public): \(reason, privacy: .public)") }
+        let (acquired, width, height) = try await acquireDisplay(for: config)
+        if let reason = acquired.fallbackReason { log.notice("fallback mirror: \(reason, privacy: .public)") }
+        log.notice("màn hình \(acquired.mode == .native ? "native" : "ảo", privacy: .public) \(width)x\(height) fit=\(config.fit.rawValue, privacy: .public)")
         let settings = EncoderSettings(width: width, height: height, fps: Int(config.fps), bitrateKbps: Self.initialBitrateKbps, codec: config.codec)
         audio = await makeAudioStreamer(caps: caps, channel: channel)
         let audioSink = audio.map { streamer in { @Sendable (samples: [Int16], captureMs: Double, nowMs: Double) in streamer.ingest(samples: samples, captureMs: captureMs, nowMs: nowMs) } }
@@ -134,6 +133,7 @@ actor HostSession {
         try await pipeline.start()
         tasks.append(Task { await Self.pumpFrames(pipeline.encoder, to: channel) })
         await startInput(displayID: acquired.displayID)
+        await beginWindowFit(config, displayID: acquired.displayID)
         tasks.append(Task { [weak pipeline] in
             for await event in channel.events {
                 switch event {
@@ -179,5 +179,6 @@ actor HostSession {
         channel = nil
         await connection.close()
         await provider.release()
+        await endWindowFit()
     }
 }

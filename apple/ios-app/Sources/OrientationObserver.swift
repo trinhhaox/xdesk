@@ -10,7 +10,10 @@ struct ScreenMetrics: Equatable {
     static func current() -> ScreenMetrics? {
         let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
         guard let scene else { return nil }
-        return ScreenMetrics(size: scene.windows.first?.bounds.size ?? scene.screen.bounds.size, scale: scene.screen.scale)
+        // Vùng an toàn (video không nằm dưới tai thỏ/Dynamic Island): phải khớp kích thước SwiftUI đo ở màn stream.
+        let window = scene.windows.first
+        let size = window.map { $0.bounds.inset(by: $0.safeAreaInsets).size } ?? scene.screen.bounds.size
+        return ScreenMetrics(size: size, scale: scene.screen.scale)
     }
 }
 

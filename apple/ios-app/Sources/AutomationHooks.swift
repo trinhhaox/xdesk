@@ -9,6 +9,7 @@ import XdeskWire
 ///   --plaintext                tắt mã hoá (chỉ Debug; mặc định Debug cũng mã hoá và dùng ghép đôi thật)
 ///   --pair-token <uri|@file>   ghép đôi bằng QR (URI xdesk://pair?... hoặc đường dẫn file chứa URI)
 ///   --mode extend|mirror       chọn chế độ hiển thị trước khi kết nối
+///   --fit native|fitDevice|touch  chọn kiểu vừa khung của Bản sao trước khi kết nối
 ///   --quit-after <giây>        tự thoát (kèm bye)
 /// In `xdesk-stats ...` mỗi 2 giây ra stderr để đọc từ console.
 @MainActor
@@ -16,6 +17,7 @@ enum AutomationHooks {
     static func run(_ model: StreamViewModel) async {
         let args = CommandLine.arguments
         if let mode = value(after: "--mode", in: args).flatMap(ScreenMode.init(rawValue:)) { model.screenMode = mode }
+        if let fit = value(after: "--fit", in: args).flatMap(MirrorFit.init(rawValue:)) { model.mirrorFit = fit }
         if let backend = model.security?.identityBackend { report("xdesk-security identityBackend=\(backend) dataProtection=\(model.security?.usesDataProtectionKeychain ?? false)") }
         if let error = model.securityError { report("xdesk-security error=\(error)") }
         try? await Task.sleep(for: .seconds(1))

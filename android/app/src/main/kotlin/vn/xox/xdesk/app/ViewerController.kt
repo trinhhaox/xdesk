@@ -53,6 +53,7 @@ class ViewerController(private val container: AppContainer, private val deviceNa
     var input: StreamInputRouter? = null
         private set
 
+    val display: DisplaySettingsStore get() = container.display
     val trust: ViewerTrust? get() = container.trust()
     val identityError: String? get() = container.identityError
     val fingerprint: String? get() = container.identity?.fingerprint
@@ -85,7 +86,9 @@ class ViewerController(private val container: AppContainer, private val deviceNa
     private fun start(targets: List<ViewerTarget>, auth: ViewerAuth) {
         val trust = trust ?: return run { failure = ConnectionFailure(identityError.orEmpty(), false) }
         val (w, h, density) = screenSize()
-        val config = DisplayConfigPlanner.config(w.toDouble(), h.toDouble(), density.toDouble()) ?: return
+        val config = DisplayConfigPlanner.config(
+            w.toDouble(), h.toDouble(), density.toDouble(), mode = container.display.mode, mirrorFit = container.display.fit,
+        ) ?: return
         failure = null
         sasCode = null
         connecting = true

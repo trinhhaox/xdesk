@@ -15,9 +15,19 @@ final class StreamViewModel {
     var errorMessage: String?
     /// `true` từ lúc bấm kết nối tới khi người dùng thoát hoặc kết nối hỏng → màn hình stream thay danh sách host.
     var inStream = false
-    /// Mở rộng hay bản sao màn hình Mac; nhớ giữa các lần mở app.
-    var screenMode: ScreenMode = ScreenMode(rawValue: UserDefaults.standard.string(forKey: "xdesk.screenMode") ?? "") ?? .extend {
-        didSet { UserDefaults.standard.set(screenMode.rawValue, forKey: "xdesk.screenMode") }
+    /// Bản sao (mặc định, hay dùng để điều khiển Mac) hay mở rộng màn hình Mac; nhớ giữa các lần mở app.
+    var screenMode: ScreenMode = ScreenMode(rawValue: UserDefaults.standard.string(forKey: "xdesk.screenMode") ?? "") ?? .mirror {
+        didSet {
+            UserDefaults.standard.set(screenMode.rawValue, forKey: "xdesk.screenMode")
+            displayOptionsChanged()
+        }
+    }
+    /// Kiểu vừa khung của Bản sao (Giống màn hình Mac / Vừa với điện thoại / Tối ưu thao tác); nhớ giữa các lần mở app.
+    var mirrorFit: MirrorFit = MirrorFit(rawValue: UserDefaults.standard.string(forKey: "xdesk.mirrorFit") ?? "") ?? .fitDevice {
+        didSet {
+            UserDefaults.standard.set(mirrorFit.rawValue, forKey: "xdesk.mirrorFit")
+            displayOptionsChanged()
+        }
     }
     let session: ViewerSession
     /// Danh tính + host đã ghép của iPhone/iPad; nil khi không mở được Keychain/file (xem `securityError`).
@@ -171,11 +181,17 @@ final class StreamViewModel {
         Task { await syncDisplayConfig() }
     }
 
+    /// Đổi Bản sao/Mở rộng hoặc kiểu vừa khung giữa phiên → mở lại phiên với `display.config` mới (như khi xoay máy).
+    private func displayOptionsChanged() {
+        guard inStream, !suspended, !isRestarting, session.state == .streaming else { return }
+        Task { await syncDisplayConfig() }
+    }
+
     /// Host chưa đổi mode giữa phiên → đổi cấu hình bằng cách mở lại phiên với `display.config` mới.
     private func syncDisplayConfig() async {
         isRestarting = true
         defer { isRestarting = false }
-        while inStream, !suspended, let target, let config = plan(orientation.latest), config != currentConfig {
+        while inStream, !suspended, let target, let config = plan(orientation.latest ?? ScreenMetrics.current()), config != currentConfig {
             await session.disconnect()
             await start(target, config)
             guard session.state == .streaming else { return }
@@ -185,7 +201,8 @@ final class StreamViewModel {
     func plan(_ metrics: ScreenMetrics?) -> DisplayConfig? {
         guard let metrics else { return nil }
         return DisplayConfigPlanner.config(
-            pointsWidth: metrics.size.width, pointsHeight: metrics.size.height, scale: metrics.scale, mode: screenMode
+            pointsWidth: metrics.size.width, pointsHeight: metrics.size.height, scale: metrics.scale,
+            mode: screenMode, mirrorFit: mirrorFit
         )
     }
 }

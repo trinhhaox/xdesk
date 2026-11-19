@@ -9,10 +9,11 @@ import XdeskWire
 @MainActor
 final class TouchInputView: UIView {
     private static let tickInterval: TimeInterval = 0.05
+    private static let cursorMargin: Float = 40
 
     private let session: ViewerSession
     private let renderer: VideoLayerRenderer
-    private lazy var keyboard = HardwareKeyboardHandler { [weak self] in self?.session.sendInput($0) }
+    lazy var keyboard = HardwareKeyboardHandler { [weak self] in self?.session.sendInput($0) }
     private var engine: PointerEngine?
     private var engineStale = true
     private var lastTouch: (x: Float, y: Float)?
@@ -23,12 +24,18 @@ final class TouchInputView: UIView {
     /// Kích thước màn hình host theo điểm (`DisplayConfig` w/h ÷ scale); đổi delta chuẩn hoá thành pixel cuộn.
     var hostPoints = CGSize(width: 1, height: 1) { didSet { if oldValue != hostPoints { engineStale = true } } }
     var pointer = PointerSettings() { didSet { if oldValue != pointer { engineStale = true } } }
+    /// Bản sao "Giống màn hình Mac": kích thước Mac lấy từ video (không phải từ cấu hình) và video có thể zoom/kéo.
+    var nativeMac = false { didSet { if oldValue != nativeMac { engineStale = true } } }
+    /// Zoom/kéo hiện tại; chạm được đổi ngược về toạ độ video chưa zoom trước khi vào `VideoContentMapper`.
+    var viewport = VideoViewport.identity
     /// Video đang dịch lên bao nhiêu điểm (bàn phím mở); cộng vào y của ngón để ra toạ độ video.
     var panY: CGFloat = 0
     /// Bàn phím ảo đang giữ first responder: đừng giành lại khi chạm.
     var keyboardActive = false
     /// Vị trí con trỏ cục bộ (toạ độ view chưa dịch) ở chế độ trackpad.
     var onCursor: ((CGPoint?) -> Void)?
+    /// Viewport đổi do con trỏ trackpad chạy ra mép: view cha cập nhật transform.
+    var onViewportChanged: (() -> Void)?
     /// Vừa nhả ngón cuối: nơi người dùng chạm đã đổi, tính lại độ dịch.
     var onSequenceEnded: (() -> Void)?
 
@@ -111,10 +118,13 @@ final class TouchInputView: UIView {
         let events = current.handle(sample)
         engine = current
         session.sendInput(events)
-        if let cursor = current.cursor { onCursor?(viewPoint(cursor)) }
+        if let cursor = current.cursor {
+            revealCursor(cursor)
+            onCursor?(viewPoint(cursor))
+        }
     }
 
-    private func mapper() -> VideoContentMapper? {
+    func mapper() -> VideoContentMapper? {
         let content = renderer.videoSize ?? hostPoints
         return VideoContentMapper(
             viewWidth: Float(bounds.width), viewHeight: Float(bounds.height),
@@ -127,17 +137,38 @@ final class TouchInputView: UIView {
         let location = touch.location(in: self)
         guard let mapper = mapper() else { return nil }
         let x = Float(location.x), y = Float(location.y + panY)
-        if engine?.cursor != nil { return mapper.normalizeUnbounded(x: x, y: y) }
-        return mapper.normalize(x: x, y: y, clamping: clamping)
+        if engine?.cursor != nil {
+            let relative = viewport.toBaseIgnoringPan(x: x, y: y, in: mapper)
+            return mapper.normalizeUnbounded(x: relative.x, y: relative.y)
+        }
+        let base = viewport.toBase(x: x, y: y, in: mapper)
+        return mapper.normalize(x: base.x, y: base.y, clamping: clamping)
+    }
+
+    /// Đang zoom ở chế độ con trỏ: con trỏ chạy ra mép thì kéo video theo để luôn thấy nó.
+    private func revealCursor(_ cursor: (x: Float, y: Float)) {
+        guard !viewport.isIdentity, let mapper = mapper() else { return }
+        let base = (x: mapper.originX + cursor.x * mapper.width, y: mapper.originY + cursor.y * mapper.height)
+        let next = viewport.revealing(base: base, margin: Self.cursorMargin, in: mapper)
+        guard next != viewport else { return }
+        viewport = next
+        onViewportChanged?()
     }
 
     private func viewPoint(_ normalized: (x: Float, y: Float)) -> CGPoint? {
         mapper().map { CGPoint(x: CGFloat($0.originX + normalized.x * $0.width), y: CGFloat($0.originY + normalized.y * $0.height)) }
     }
 
+    /// Kích thước màn hình Mac theo điểm: từ cấu hình, hoặc (Giống màn hình Mac) từ video ÷ 2 vì màn hình Retina.
+    private var surfacePoints: CGSize {
+        guard nativeMac, let video = renderer.videoSize else { return hostPoints }
+        return CGSize(width: video.width / 2, height: video.height / 2)
+    }
+
     private func rebuildEngineIfNeeded() {
         guard engine == nil || engineStale else { return }
-        engine = PointerEngine(settings: pointer, surfaceWidth: Float(hostPoints.width), surfaceHeight: Float(hostPoints.height), cursor: engine?.cursor)
+        let surface = surfacePoints
+        engine = PointerEngine(settings: pointer, surfaceWidth: Float(surface.width), surfaceHeight: Float(surface.height), cursor: engine?.cursor)
         engineStale = false
     }
 
@@ -163,19 +194,4 @@ final class TouchInputView: UIView {
 
     private static var nowMs: Int64 { Int64(ProcessInfo.processInfo.systemUptime * 1000) }
     private static func ms(_ touch: UITouch) -> Int64 { Int64(touch.timestamp * 1000) }
-
-    // MARK: Bàn phím vật lý
-
-    override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
-        if !keyboard.pressesBegan(presses) { super.pressesBegan(presses, with: event) }
-    }
-
-    override func pressesEnded(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
-        if !keyboard.pressesEnded(presses) { super.pressesEnded(presses, with: event) }
-    }
-
-    override func pressesCancelled(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
-        keyboard.releaseAll()
-        super.pressesCancelled(presses, with: event)
-    }
 }

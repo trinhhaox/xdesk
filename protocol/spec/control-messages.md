@@ -9,7 +9,7 @@ là "unknown" và bỏ qua (tương thích tiến). JSON hỏng / thiếu trư�
 | `hello` | V→H | `ver` string "1.0", `caps` u32, `name` string | |
 | `welcome` | H→V | `ver`, `sessionId` string, `caps` (giao) u32 | |
 | `reject` | cả hai | `reason` string ("version"…), `detail` string? | |
-| `display.config` | V→H | `w`,`h` u32, `scale` number, `fps` u32, `codec` "h264"\|"hevc", `mode` "extend"\|"mirror"? (vắng = extend; mirror = màn hình Mac phản chiếu màn hình ảo theo kích thước viewer) | w,h 1…16384; fps 1…240; scale (0,8] |
+| `display.config` | V→H | `w`,`h` u32, `scale` number, `fps` u32, `codec` "h264"\|"hevc", `mode` "extend"\|"mirror"? (vắng = extend; mirror = màn hình Mac phản chiếu màn hình ảo theo kích thước viewer), `mirrorFit` "native"\|"fitDevice"\|"touch"? (chỉ có nghĩa khi `mode` = mirror; vắng = fitDevice; xem "Bản sao: ba kiểu vừa khung") | w,h 1…16384; fps 1…240; scale (0,8] |
 | `display.ready` | H→V | `udpPort` u16, `streamId` u16 | udpPort ≠ 0 (đường hầm USB: giữ chỗ = 1, bỏ qua vì media đi qua TCP, xem `framing.md`) |
 | `keyframe.request` | V→H | `streamId` u16 | |
 | `net.report` | V→H | `rttMs`,`lossPermille`,`jitterMs`,`recvKbps` u32 | lossPermille ≤ 1000 |
@@ -38,10 +38,32 @@ Thêm trường tuỳ chọn ở minor mới là tương thích; trường `deta
 {"caps":3,"id":1,"sessionId":"s-7f3a","t":"welcome","ver":"1.0"}
 {"detail":"major 2 not supported","id":2,"reason":"version","t":"reject"}
 {"codec":"h264","fps":60,"h":1440,"id":3,"scale":2,"t":"display.config","w":2560}
+{"codec":"h264","fps":60,"h":1440,"id":3,"mirrorFit":"native","mode":"mirror","scale":2,"t":"display.config","w":2560}
 {"id":10,"t":"ping","t0":1700000000123}
 ```
 Số thực `scale` có thể viết `2` hoặc `2.0`; bộ giải mã chấp nhận cả hai. Bộ mã hoá Swift sắp xếp khoá theo thứ tự
 byte và không escape dấu `/`. Danh sách đầy đủ + frame hex: `protocol/test-vectors/control-frames.json`.
+
+## Bản sao: ba kiểu vừa khung (`mirrorFit`)
+
+Chỉ áp dụng khi `display.config.mode` = `mirror`. Host/viewer cũ bỏ qua khoá lạ nên vẫn chạy như `fitDevice`; giá trị lạ là `malformedJSON`.
+
+| `mirrorFit` | Host làm gì | `w`,`h`,`scale` |
+|---|---|---|
+| `native` | Không đổi/mirror màn hình Mac. Capture màn hình chính ở độ phân giải thật, cạnh dài tối đa 2560 px (giữ tỉ lệ, làm tròn xuống số chẵn). Viewer tự letterbox + zoom/pan; xoay viewer không đổi gì ở Mac | Chỉ là gợi ý, host bỏ qua. Viewer luôn gửi (cạnh dài, cạnh ngắn) theo điểm × scale để xoay máy không sinh `display.config` mới |
+| `fitDevice` (mặc định) | Màn hình ảo đúng `w`×`h` px, mọi màn hình thật phản chiếu nó (desktop Mac theo kích thước/tỉ lệ viewer, theo chiều xoay). HiDPI khi `scale` ≥ 2 | Kích thước viewer theo điểm ảnh gốc |
+| `touch` | Như `fitDevice` nhưng luôn HiDPI và độ phân giải logic thấp để điều khiển macOS cỡ 22–24 pt đủ to cho ngón tay | Viewer tính: `w`,`h` = 2 × kích thước logic, `scale` = 2 |
+
+**Công thức `touch`** (viewer tính; điểm = điểm của viewer, xấp xỉ kích thước vật lý vì mọi iPhone ~ 163 ppi theo điểm):
+
+```
+short, long   = min/max(pointsWidth, pointsHeight)
+magnification = clamp( min(44/22, short/540, long/640) )     // ≥ 44 pt cho điều khiển 22 pt, nhưng cạnh ngắn logic không nhỏ hơn 540
+logical       = round(points / magnification)                      // theo từng cạnh, giữ chiều xoay
+w, h          = 2 × logical.width, 2 × logical.height ; scale = 2   // mode HiDPI: macOS thấy logical, backing 2×
+```
+
+Sàn 540 pt cạnh ngắn là giới hạn đo thực của macOS (mode HiDPI cạnh ngắn logic ≤ 520 bị `CGDisplaySetDisplayMode` từ chối, 540 được), nên trên iPhone điều khiển 22 pt chỉ lên ~16 pt (`fitDevice` khi scale 3: logic 590×1278 → ~14,7 pt, nên ở iPhone `touch` chỉ nhỉnh hơn ~9%, rõ hơn ở màn hình lớn). iPad (820×1180 pt) lên ~33 pt. Host cưỡng chế HiDPI cho `touch` và danh sách mode của màn hình ảo chính là mode logic đó (`w/2`×`h/2`).
 
 ## Âm thanh (cap 0x04 PCM, 0x08 AAC-ELD, phase 09a)
 

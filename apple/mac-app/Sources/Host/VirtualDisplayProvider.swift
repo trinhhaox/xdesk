@@ -5,6 +5,8 @@ import Foundation
 enum DisplayMode: Sendable, Equatable {
     case extend
     case mirror
+    /// Bản sao "Giống màn hình Mac": capture màn hình chính thật, không tạo/đổi/phản chiếu màn hình nào.
+    case native
 }
 
 struct VirtualDisplaySpec: Sendable, Equatable {
@@ -67,6 +69,14 @@ final class VirtualDisplayProvider {
         return acquired
     }
 
+    /// Giống màn hình Mac: dùng thẳng màn hình chính, không đụng cấu hình màn hình (không có gì để khôi phục khi kết thúc).
+    func acquireNative() -> AcquiredDisplay {
+        release()
+        let acquired = AcquiredDisplay(displayID: mainDisplayID(), mode: .native, fallbackReason: nil)
+        activeDisplay = acquired
+        return acquired
+    }
+
     /// Huỷ màn hình ảo (nếu có).
     func release() {
         handle = nil
@@ -87,12 +97,14 @@ struct CGVirtualDisplayBackend: VirtualDisplayBackend {
             withName: spec.name, pixelWidth: UInt(spec.pixelWidth), pixelHeight: UInt(spec.pixelHeight),
             refreshRate: spec.refreshRate, hiDPI: spec.hiDPI
         )
-        if spec.hiDPI { DisplayArrangement.applyRetinaMode(display.displayID, pixels: (spec.pixelWidth, spec.pixelHeight)) }
         if spec.mirrorsMac {
             try DisplayArrangement.mirrorMac(onto: display.displayID)
         } else {
             try DisplayArrangement.extendRight(newDisplay: display.displayID)
         }
+        // Sau khi sắp xếp: cấu hình mirror/extend đặt lại mode về 1× nên chọn Retina trước đó bị mất (desktop Mac hiện đủ pixel
+        // thay vì điểm = pixel / 2, chữ rất nhỏ trên viewer).
+        if spec.hiDPI { DisplayArrangement.applyRetinaMode(display.displayID, pixels: (spec.pixelWidth, spec.pixelHeight)) }
         return RealVirtualDisplay(display: display)
     }
 }

@@ -23,7 +23,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import vn.xox.xdesk.app.PointerSettingsStore
 import vn.xox.xdesk.app.Screen
 import vn.xox.xdesk.app.ViewerController
 import vn.xox.xdesk.app.discovery.HostBadge
@@ -34,6 +36,8 @@ import vn.xox.xdesk.transport.ViewerTarget
 @Composable
 fun HostListScreen(controller: ViewerController) {
     var manual by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val pointerStore = remember { PointerSettingsStore(context) }
     val trust = controller.trust
     LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
@@ -55,6 +59,7 @@ fun HostListScreen(controller: ViewerController) {
                 }
             }
         }
+        item { DisplaySettingsCard(controller.display, pointerStore) }
         item { Text("Máy Mac trên mạng", style = MaterialTheme.typography.titleMedium) }
         if (controller.hosts.isEmpty()) item { Text("Chưa thấy máy nào. Bật Xdesk trên Mac cùng mạng Wi-Fi, hoặc nhập địa chỉ bên dưới.") }
         items(controller.hosts, key = { it.id + it.host }) { host ->

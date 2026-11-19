@@ -19,6 +19,7 @@ internal object ControlMessageFields {
             is ControlMessage.DisplayConfig -> {
                 f["w"] = num(m.w); f["h"] = num(m.h); f["scale"] = JsonNumber.of(m.scale); f["fps"] = num(m.fps)
                 f["codec"] = str(m.codec.wire); m.mode?.let { f["mode"] = str(it.wire) }
+                m.mirrorFit?.let { f["mirrorFit"] = str(it.wire) }
             }
             is ControlMessage.DisplayReady -> { f["udpPort"] = num(m.udpPort); f["streamId"] = num(m.streamId) }
             is ControlMessage.KeyframeRequest -> f["streamId"] = num(m.streamId)
@@ -56,6 +57,7 @@ internal object ControlMessageFields {
             r.u32("w"), r.u32("h"), r.double("scale"), r.u32("fps"),
             r.enum("codec", VideoCodec.entries.toTypedArray()) { it.wire },
             r.optEnum("mode", ScreenMode.entries.toTypedArray()) { it.wire },
+            r.optEnum("mirrorFit", MirrorFit.entries.toTypedArray()) { it.wire },
         )
         "display.ready" -> ControlMessage.DisplayReady(r.u16("udpPort"), r.u16("streamId"))
         "keyframe.request" -> ControlMessage.KeyframeRequest(r.u16("streamId"))

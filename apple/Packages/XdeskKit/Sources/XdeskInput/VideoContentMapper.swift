@@ -1,6 +1,8 @@
 /// Đổi toạ độ trong view (gốc trên-trái, đơn vị điểm) sang 0…1 trên khung video thật.
 /// Video letterbox (aspect-fit) nên dải đen hai bên không phải là màn hình host.
 public struct VideoContentMapper: Sendable, Equatable {
+    public let viewWidth: Float
+    public let viewHeight: Float
     public let originX: Float
     public let originY: Float
     public let width: Float
@@ -10,6 +12,8 @@ public struct VideoContentMapper: Sendable, Equatable {
     public init?(viewWidth: Float, viewHeight: Float, contentWidth: Float, contentHeight: Float) {
         let sizes = [viewWidth, viewHeight, contentWidth, contentHeight]
         guard sizes.allSatisfy({ $0.isFinite && $0 > 0 }) else { return nil }
+        self.viewWidth = viewWidth
+        self.viewHeight = viewHeight
         let scale = min(viewWidth / contentWidth, viewHeight / contentHeight)
         width = contentWidth * scale
         height = contentHeight * scale

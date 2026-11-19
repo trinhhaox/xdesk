@@ -9,18 +9,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -42,14 +37,13 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import kotlinx.coroutines.delay
+import vn.xox.xdesk.app.FloatingControlStore
 import vn.xox.xdesk.app.PointerSettingsStore
 import vn.xox.xdesk.app.StreamInputRouter
 import vn.xox.xdesk.app.ViewerController
@@ -64,7 +58,7 @@ private const val CURSOR_VISIBLE_MS = 1500L
 @Composable
 fun StreamScreen(controller: ViewerController, window: Window) {
     val pointerStore = remember { PointerSettingsStore(window.context) }
-    var showBars by remember { mutableStateOf(true) }
+    val floatingStore = remember { FloatingControlStore(window.context) }
     var showPointerSettings by remember { mutableStateOf(false) }
     var viewRef by remember { mutableStateOf<StreamSurfaceView?>(null) }
     var viewHeight by remember { mutableIntStateOf(0) }
@@ -89,7 +83,6 @@ fun StreamScreen(controller: ViewerController, window: Window) {
     LaunchedEffect(controller.streaming) {
         while (controller.streaming) { controller.refreshStats(); delay(1000) }
     }
-    LaunchedEffect(showBars) { if (showBars) { delay(4000); showBars = false } }
 
     Box(Modifier.fillMaxSize().background(Color.Black).onSizeChanged { viewHeight = it.height }) {
         AndroidView(modifier = Modifier.fillMaxSize(), factory = { ctx ->
@@ -103,14 +96,7 @@ fun StreamScreen(controller: ViewerController, window: Window) {
         CursorOverlay(controller.input) { pan }
         Overlay(controller)
         controller.agentApproval?.takeIf { controller.streaming }?.let { AgentApprovalDialog(it, controller::answerAgentApproval) }
-        if (showBars || !controller.streaming) {
-            TopBar(
-                controller, pointerStore, onKeyboard = { viewRef?.showKeyboard() }, onPointerSettings = { showPointerSettings = true },
-                modifier = Modifier.align(Alignment.TopCenter),
-            )
-        } else {
-            TextButton(onClick = { showBars = true }, modifier = Modifier.align(Alignment.TopEnd).heightIn(min = 48.dp)) { Text("⋯") }
-        }
+        if (imeBottom == 0) FloatingControl(floatingStore, controller.stats, floatingActions(controller, pointerStore, onKeyboard = { viewRef?.showKeyboard() }) { showPointerSettings = true })
         controller.input?.takeIf { imeBottom > 0 }?.let {
             KeyBar(it, onHide = { viewRef?.hideKeyboard() }, modifier = Modifier.align(Alignment.BottomCenter).imePadding())
         }
@@ -156,19 +142,12 @@ private fun CursorOverlay(router: StreamInputRouter?, pan: () -> Float) {
     }
 }
 
-@Composable
-private fun TopBar(controller: ViewerController, store: PointerSettingsStore, onKeyboard: () -> Unit, onPointerSettings: () -> Unit, modifier: Modifier) {
-    val button = Modifier.heightIn(min = 48.dp)
-    Row(modifier.fillMaxWidth().background(Color(0x99000000)).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(controller.stats, color = Color.White, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-        TextButton(onClick = onKeyboard, modifier = button) { Text("Bàn phím") }
-        TextButton(onClick = store::toggleMode, modifier = button.semantics { contentDescription = "Đổi chế độ chuột, đang là ${store.settings.mode.title()}" }) {
-            Text(store.settings.mode.title())
-        }
-        TextButton(onClick = onPointerSettings, modifier = button.semantics { contentDescription = "Cài đặt chuột và con trỏ" }) { Text("Chuột") }
-        Button(onClick = controller::disconnect, modifier = button) { Text("Ngắt") }
-    }
-}
+private fun floatingActions(controller: ViewerController, store: PointerSettingsStore, onKeyboard: () -> Unit, onPointerSettings: () -> Unit) = listOf(
+    FloatingAction("Ngắt kết nối", onClick = controller::disconnect),
+    FloatingAction("Bàn phím", onClick = onKeyboard),
+    FloatingAction("Chuột: ${store.settings.mode.title()}", "Đổi chế độ chuột, đang là ${store.settings.mode.title()}", onClick = store::toggleMode),
+    FloatingAction("Cài đặt chuột", "Cài đặt chuột và con trỏ", onClick = onPointerSettings),
+)
 
 @Composable
 private fun Overlay(controller: ViewerController) {

@@ -22,6 +22,7 @@ struct MenuBarContent: View {
         }
         Toggle("Chỉ phát âm thanh trên thiết bị (tắt loa Mac)", isOn: Binding(
             get: { host.audioOptions.muteLocalOutput }, set: { host.audioOptions.setMuteLocalOutput($0) }))
+        Toggle("Tự co giãn cửa sổ ứng dụng cho vừa màn hình", isOn: Binding(get: { host.fitWindows }, set: { host.setFitWindows($0) }))
         UsbMenuSection(host: host)
         if !AccessibilityPermission.isGranted {
             Button(AccessibilityPermission.menuTitle) {

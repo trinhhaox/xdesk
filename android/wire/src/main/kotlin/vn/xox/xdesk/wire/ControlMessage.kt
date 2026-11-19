@@ -2,6 +2,8 @@ package vn.xox.xdesk.wire
 
 enum class VideoCodec(val wire: String) { H264("h264"), HEVC("hevc") }
 enum class ScreenMode(val wire: String) { EXTEND("extend"), MIRROR("mirror") }
+/** Chỉ có nghĩa khi mode = MIRROR; xem protocol/spec/control-messages.md. */
+enum class MirrorFit(val wire: String) { NATIVE("native"), FIT_DEVICE("fitDevice"), TOUCH("touch") }
 enum class ClipKind(val wire: String) { TEXT("text"), IMAGE("image") }
 enum class ControlOwner(val wire: String) { AGENT("agent"), HUMAN("human") }
 
@@ -15,11 +17,13 @@ sealed interface ControlMessage {
             const val REASON_REVOKED = "revoked"
         }
     }
-    /** `mode` vắng = extend. */
+    /** `mode` vắng = extend; `mirrorFit` vắng = fitDevice. */
     data class DisplayConfig(
         val w: Long, val h: Long, val scale: Double, val fps: Long, val codec: VideoCodec, val mode: ScreenMode? = null,
+        val mirrorFit: MirrorFit? = null,
     ) : ControlMessage {
         val screenMode: ScreenMode get() = mode ?: ScreenMode.EXTEND
+        val fit: MirrorFit get() = mirrorFit ?: MirrorFit.FIT_DEVICE
     }
     data class DisplayReady(val udpPort: Int, val streamId: Int) : ControlMessage
     data class KeyframeRequest(val streamId: Int) : ControlMessage

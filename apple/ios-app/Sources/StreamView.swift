@@ -5,7 +5,8 @@ import XdeskMedia
 import XdeskViewer
 import XdeskWire
 
-/// Toàn màn hình: video letterbox trên nền đen, ẩn status bar + home indicator, thanh nút mờ (thoát, clipboard, bàn phím, chế độ chuột, cài đặt) ở góc trên.
+/// Video letterbox trong vùng an toàn (không dưới tai thỏ/Dynamic Island) trên nền đen; mọi điều khiển gom vào một nút nổi
+/// kéo được (không che menu bar Mac).
 struct StreamView: View {
     let model: StreamViewModel
     @Environment(\.displayScale) private var displayScale
@@ -13,6 +14,8 @@ struct StreamView: View {
     @State private var pointer = PointerSettingsStore()
     @State private var showPointerSettings = false
     @State private var modeNotice: String?
+    @State private var zoom = VideoZoomState()
+    @State private var floating = FloatingControlStore()
 
     init(model: StreamViewModel) {
         self.model = model
@@ -25,12 +28,14 @@ struct StreamView: View {
                 Color.black
                 VideoSurface(
                     renderer: model.session.renderer, session: model.session, config: model.currentConfig,
-                    composer: composer, pointer: pointer.settings
+                    composer: composer, pointer: pointer.settings, zoom: zoom
                 )
                 if model.session.state != .streaming {
                     connectingOverlay
                 }
-                topBar
+                if !composer.isActive {
+                    FloatingControl(store: floating, container: proxy.size) { close in menuItems(close) }
+                }
                 if !composer.preview.isEmpty { composingPreview }
                 if let notice = modeNotice ?? model.clipboardNotice { toast(notice) }
             }
@@ -38,7 +43,7 @@ struct StreamView: View {
                 model.screenChanged(ScreenMetrics(size: size, scale: displayScale))
             }
         }
-        .ignoresSafeArea()
+        .background(Color.black.ignoresSafeArea())
         .sheet(isPresented: $showPointerSettings) { PointerSettingsSheet(store: pointer) }
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
@@ -62,22 +67,24 @@ struct StreamView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private var topBar: some View {
-        HStack(spacing: 0) {
-            Button { Task { await model.disconnect() } } label: { faintIcon("xmark.circle.fill") }
-                .accessibilityLabel("Ngắt kết nối")
-            if model.session.clipboardAvailable {
-                Button { Task { await model.sendClipboardToMac() } } label: { faintIcon("doc.on.clipboard") }
-                    .accessibilityLabel("Gửi clipboard sang Mac")
-            }
-            Button { composer.isActive.toggle() } label: { faintIcon(composer.isActive ? "keyboard.fill" : "keyboard") }
-                .accessibilityLabel(composer.isActive ? "Ẩn bàn phím" : "Mở bàn phím gõ chữ")
+    private func menuItems(_ close: @escaping () -> Void) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            item("Ngắt kết nối", "xmark.circle", close) { Task { await model.disconnect() } }
+            item(composer.isActive ? "Ẩn bàn phím" : "Bàn phím", composer.isActive ? "keyboard.fill" : "keyboard", close) { composer.isActive.toggle() }
                 .disabled(model.session.state != .streaming)
-            Button { toggleMode() } label: { faintIcon(pointer.settings.mode.symbol) }
-                .accessibilityLabel("Đổi chế độ chuột")
-                .accessibilityValue(pointer.settings.mode.title)
-            Button { showPointerSettings = true } label: { faintIcon("slider.horizontal.3") }
-                .accessibilityLabel("Cài đặt chuột và con trỏ")
+            item("Chuột: \(pointer.settings.mode.title)", pointer.settings.mode.symbol, close) { toggleMode() }
+            item("Cài đặt chuột", "slider.horizontal.3", close) { showPointerSettings = true }
+            if model.session.clipboardAvailable {
+                item("Gửi clipboard sang Mac", "doc.on.clipboard", close) { Task { await model.sendClipboardToMac() } }
+            }
+            if model.screenMode == .mirror { MirrorFitMenu(fit: mirrorFit) }
+            if zoom.isZoomed { item("Vừa khung màn hình", "arrow.down.right.and.arrow.up.left", close) { zoom.reset?() } }
+        }
+    }
+
+    private func item(_ title: String, _ symbol: String, _ close: @escaping () -> Void, action: @escaping () -> Void) -> some View {
+        Button { action(); close() } label: {
+            Label(title, systemImage: symbol).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).padding(.horizontal, 10)
         }
     }
 
@@ -100,13 +107,12 @@ struct StreamView: View {
             .padding(.horizontal, 14).padding(.vertical, 8)
             .background(.black.opacity(0.7), in: Capsule())
             .foregroundStyle(.white)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-            .padding(.bottom, 40 + composer.obscuredHeight)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             .allowsHitTesting(false)
     }
 
-    private func faintIcon(_ name: String) -> some View {
-        Image(systemName: name).font(.title).foregroundStyle(.white.opacity(0.5)).padding(16)
+    private var mirrorFit: Binding<MirrorFit> {
+        Binding(get: { model.mirrorFit }, set: { model.mirrorFit = $0 })
     }
 
     private func toggleMode() {
@@ -126,14 +132,16 @@ private struct VideoSurface: UIViewRepresentable {
     let config: DisplayConfig?
     let composer: TextComposerController
     let pointer: PointerSettings
+    let zoom: VideoZoomState
 
     func makeUIView(context: Context) -> VideoHostView {
-        VideoHostView(videoLayer: renderer.layer, touchView: TouchInputView(session: session, renderer: renderer), controller: composer)
+        VideoHostView(videoLayer: renderer.layer, touchView: TouchInputView(session: session, renderer: renderer), controller: composer, zoomState: zoom)
     }
 
     func updateUIView(_ view: VideoHostView, context: Context) {
         view.touchView.pointer = pointer
         view.syncKeyboard(active: composer.isActive)
+        view.zoomEnabled = config?.isNativeMirror ?? false
         guard let config, config.scale > 0 else { return }
         view.touchView.hostPoints = CGSize(width: Double(config.w) / config.scale, height: Double(config.h) / config.scale)
     }

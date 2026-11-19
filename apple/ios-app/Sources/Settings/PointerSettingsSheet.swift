@@ -1,7 +1,7 @@
 import SwiftUI
 import XdeskInput
 
-/// Cài đặt chuột/con trỏ mở từ thanh công cụ màn stream.
+/// Cài đặt chuột/con trỏ: mở từ danh sách máy Mac (mục Điều khiển) hoặc thanh công cụ màn stream.
 struct PointerSettingsSheet: View {
     @Bindable var store: PointerSettingsStore
     @Environment(\.dismiss) private var dismiss

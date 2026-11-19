@@ -33,6 +33,15 @@ public enum ScreenMode: String, Codable, Sendable, CaseIterable {
     case mirror
 }
 
+/// Chỉ có nghĩa khi `mode == .mirror`. `native`: host không đụng màn hình Mac, stream màn hình chính ở độ phân giải thật.
+/// `fitDevice`: desktop Mac theo kích thước/chiều xoay viewer. `touch`: như `fitDevice` nhưng độ phân giải logic thấp
+/// (viewer tính trong `w`,`h`,`scale`) để nút bấm macOS đủ to cho ngón tay.
+public enum MirrorFit: String, Codable, Sendable, CaseIterable {
+    case native
+    case fitDevice
+    case touch
+}
+
 public struct DisplayConfig: Codable, Sendable, Equatable {
     public var w: UInt32
     public var h: UInt32
@@ -41,11 +50,16 @@ public struct DisplayConfig: Codable, Sendable, Equatable {
     public var codec: VideoCodec
     /// Vắng mặt = `extend` (tương thích viewer cũ).
     public var mode: ScreenMode?
-    public init(w: UInt32, h: UInt32, scale: Double, fps: UInt32, codec: VideoCodec, mode: ScreenMode? = nil) {
-        self.w = w; self.h = h; self.scale = scale; self.fps = fps; self.codec = codec; self.mode = mode
+    /// Vắng mặt = `fitDevice` (tương thích viewer/host cũ, vốn bỏ qua khoá lạ).
+    public var mirrorFit: MirrorFit?
+    public init(w: UInt32, h: UInt32, scale: Double, fps: UInt32, codec: VideoCodec, mode: ScreenMode? = nil, mirrorFit: MirrorFit? = nil) {
+        self.w = w; self.h = h; self.scale = scale; self.fps = fps; self.codec = codec; self.mode = mode; self.mirrorFit = mirrorFit
     }
 
     public var screenMode: ScreenMode { mode ?? .extend }
+    public var fit: MirrorFit { mirrorFit ?? .fitDevice }
+    /// Chỉ `mirror + native` mới giữ nguyên màn hình Mac và stream màn hình chính.
+    public var isNativeMirror: Bool { screenMode == .mirror && fit == .native }
 }
 
 public struct DisplayReady: Codable, Sendable, Equatable {

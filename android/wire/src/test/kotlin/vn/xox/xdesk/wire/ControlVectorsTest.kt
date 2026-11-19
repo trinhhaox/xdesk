@@ -68,6 +68,8 @@ class ControlVectorsTest {
     fun newMessagesRoundTrip() {
         val cases = listOf(
             ControlMessage.DisplayConfig(1280, 720, 1.5, 60, VideoCodec.HEVC, ScreenMode.MIRROR),
+            ControlMessage.DisplayConfig(720, 1560, 2.0, 60, VideoCodec.H264, ScreenMode.MIRROR, MirrorFit.TOUCH),
+            ControlMessage.DisplayConfig(2560, 1440, 2.0, 60, VideoCodec.H264, ScreenMode.MIRROR, MirrorFit.NATIVE),
             ControlMessage.Reject(ControlMessage.Reject.REASON_REVOKED),
             ControlMessage.PairResult(true),
             ControlMessage.Rekey,
@@ -85,6 +87,8 @@ class ControlVectorsTest {
         ).message as ControlMessage.DisplayConfig
         assertEquals(ScreenMode.MIRROR, mirror.screenMode)
         assertEquals(ScreenMode.EXTEND, ControlMessage.DisplayConfig(10, 10, 1.0, 30, VideoCodec.H264).screenMode)
+        assertEquals(MirrorFit.FIT_DEVICE, mirror.fit)
+        assertEquals(null, mirror.mirrorFit)
     }
 
     @Test

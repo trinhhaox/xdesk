@@ -31,6 +31,9 @@ final class HostController {
     private static let allowTailscaleKey = "xdesk.host.allowTailscale"
 
     let audioOptions = HostAudioOptions()
+    let windowFit = WindowFitter()
+    /// "Tự co giãn cửa sổ ứng dụng cho vừa màn hình" (Bản sao fitDevice/touch): mặc định bật.
+    private(set) var fitWindows = WindowFitter.isEnabledByUser
     let usb = UsbDeviceMonitor()
     var usbMessage: String?
     private let log = Logger(subsystem: "vn.xox.xdesk", category: "host-controller")
@@ -91,6 +94,12 @@ final class HostController {
         }
     }
 
+    func setFitWindows(_ enabled: Bool) {
+        fitWindows = enabled
+        UserDefaults.standard.set(enabled, forKey: WindowFitter.enabledKey)
+        if !enabled { windowFit.restoreNow() }
+    }
+
     /// `persist: false` chỉ dành cho kiểm thử tự động (không ghi vào cài đặt người dùng).
     func setAllowTailscale(_ allowed: Bool, persist: Bool = true) {
         allowTailscale = allowed
@@ -109,6 +118,7 @@ final class HostController {
         sessions.removeAll()
         sessionStates.removeAll()
         status = .stopped
+        await windowFit.restoreAfterSettle()
     }
 
     /// Gửi yêu cầu duyệt tới mọi viewer đang xem; trả lời đầu tiên (kể cả từ Mac) thắng.
@@ -123,7 +133,7 @@ final class HostController {
     private func admit(_ connection: ControlConnection) {
         let id = UUID()
         let session = HostSession(
-            connection: connection, provider: VirtualDisplayProvider(), caps: [.h264, .hevc],
+            connection: connection, provider: VirtualDisplayProvider(), windowFit: windowFit, caps: [.h264, .hevc],
             report: { [weak self] state in Task { @MainActor in self?.update(id, state) } },
             onSecureInput: { [weak self] active in Task { @MainActor in self?.secureInputActive = active } },
             onAgentAnswer: { [weak self] requestId, allow in Task { @MainActor in self?.agentAnswerSink?(requestId, allow) } },

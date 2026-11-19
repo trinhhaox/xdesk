@@ -28,6 +28,20 @@ import Testing
         #expect(String(decoding: bytes, as: UTF8.self) == "{\"id\":10,\"t\":\"ping\",\"t0\":123}")
     }
 
+    @Test func mirrorFitRoundTripsAndDefaultsToFitDevice() throws {
+        for fit in MirrorFit.allCases {
+            let config = DisplayConfig(w: 720, h: 1560, scale: 2, fps: 60, codec: .h264, mode: .mirror, mirrorFit: fit)
+            #expect(try roundTrip(.displayConfig(config)).message == .displayConfig(config))
+        }
+        let legacy = "{\"codec\":\"h264\",\"fps\":60,\"h\":100,\"id\":1,\"mode\":\"mirror\",\"scale\":1,\"t\":\"display.config\",\"w\":100}"
+        guard case .displayConfig(let decoded) = try ControlMessageCodec.decode(Array(legacy.utf8)).message else { Issue.record("không phải display.config"); return }
+        #expect(decoded.mirrorFit == nil)
+        #expect(decoded.fit == .fitDevice)
+        #expect(!decoded.isNativeMirror)
+        #expect(DisplayConfig(w: 1, h: 1, scale: 1, fps: 1, codec: .h264, mode: .mirror, mirrorFit: .native).isNativeMirror)
+        #expect(!DisplayConfig(w: 1, h: 1, scale: 1, fps: 1, codec: .h264, mode: .extend, mirrorFit: .native).isNativeMirror)
+    }
+
     @Test func unknownFieldsAreIgnored() throws {
         let json = "{\"extra\":[1,2],\"id\":3,\"t\":\"clip.pull\",\"kind\":\"text\",\"z\":null}"
         #expect(try ControlMessageCodec.decode(Array(json.utf8)).message == .clipPull(ClipPull(kind: .text)))

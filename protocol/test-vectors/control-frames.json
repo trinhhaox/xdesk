@@ -88,6 +88,11 @@
       "name" : "display-config-bad-codec"
     },
     {
+      "error" : "malformedJSON",
+      "json" : "{\"codec\":\"h264\",\"fps\":60,\"h\":100,\"id\":1,\"mirrorFit\":\"zoom\",\"mode\":\"mirror\",\"scale\":1,\"t\":\"display.config\",\"w\":100}",
+      "name" : "display-config-bad-mirror-fit"
+    },
+    {
       "error" : "invalidField",
       "json" : "{\"id\":1,\"streamId\":1,\"t\":\"display.ready\",\"udpPort\":0}",
       "name" : "display-ready-port-zero"
@@ -130,6 +135,27 @@
       "id" : 3,
       "json" : "{\"codec\":\"h264\",\"fps\":60,\"h\":1440,\"id\":3,\"scale\":2,\"t\":\"display.config\",\"w\":2560}",
       "name" : "display-config",
+      "type" : "display.config"
+    },
+    {
+      "frameHex" : "00000077027b22636f646563223a2268323634222c22667073223a36302c2268223a313434302c226964223a332c226d6972726f72466974223a226e6174697665222c226d6f6465223a226d6972726f72222c227363616c65223a322c2274223a22646973706c61792e636f6e666967222c2277223a323536307d",
+      "id" : 3,
+      "json" : "{\"codec\":\"h264\",\"fps\":60,\"h\":1440,\"id\":3,\"mirrorFit\":\"native\",\"mode\":\"mirror\",\"scale\":2,\"t\":\"display.config\",\"w\":2560}",
+      "name" : "display-config-mirror-native",
+      "type" : "display.config"
+    },
+    {
+      "frameHex" : "0000007a027b22636f646563223a2268323634222c22667073223a36302c2268223a323535362c226964223a332c226d6972726f72466974223a22666974446576696365222c226d6f6465223a226d6972726f72222c227363616c65223a332c2274223a22646973706c61792e636f6e666967222c2277223a313137397d",
+      "id" : 3,
+      "json" : "{\"codec\":\"h264\",\"fps\":60,\"h\":2556,\"id\":3,\"mirrorFit\":\"fitDevice\",\"mode\":\"mirror\",\"scale\":3,\"t\":\"display.config\",\"w\":1179}",
+      "name" : "display-config-mirror-fit-device",
+      "type" : "display.config"
+    },
+    {
+      "frameHex" : "00000076027b22636f646563223a2268657663222c22667073223a36302c2268223a323334322c226964223a332c226d6972726f72466974223a22746f756368222c226d6f6465223a226d6972726f72222c227363616c65223a322c2274223a22646973706c61792e636f6e666967222c2277223a313038307d",
+      "id" : 3,
+      "json" : "{\"codec\":\"hevc\",\"fps\":60,\"h\":2342,\"id\":3,\"mirrorFit\":\"touch\",\"mode\":\"mirror\",\"scale\":2,\"t\":\"display.config\",\"w\":1080}",
+      "name" : "display-config-mirror-touch",
       "type" : "display.config"
     },
     {

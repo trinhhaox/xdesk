@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import XdeskCrypto
+import XdeskInput
 import XdeskTransport
 import XdeskViewer
 import XdeskWire
@@ -14,6 +15,8 @@ struct HostListView: View {
     @State private var changedKey: KeyChange?
     @State private var showScanner = false
     @State private var showSettings = false
+    @State private var showPointer = false
+    @State private var pointer = PointerSettingsStore()
 
     private struct KeyChange: Identifiable {
         let host: DiscoveredHost
@@ -25,7 +28,8 @@ struct HostListView: View {
         NavigationStack {
             Form {
                 if model.localNetworkDenied { localNetworkGuidance }
-                modePicker
+                displaySections
+                controlSection
                 Section("Máy Mac trên mạng") {
                     if model.hosts.isEmpty {
                         Text("Đang tìm… (trên Mac cần bật \"Bắt đầu chia sẻ\")").foregroundStyle(.secondary)
@@ -71,6 +75,7 @@ struct HostListView: View {
             }
             .sheet(isPresented: $showScanner) { PairWithMacView(model: model) }
             .sheet(isPresented: $showSettings) { SecuritySettingsView(model: model) }
+            .sheet(isPresented: $showPointer) { PointerSettingsSheet(store: pointer) }
             .confirmationDialog("Chưa ghép đôi với máy này", isPresented: Binding(get: { choosing != nil }, set: { if !$0 { choosing = nil } }),
                                 titleVisibility: .visible, presenting: choosing) { target in
                 Button("Quét mã QR trên Mac") { showScanner = true }
@@ -104,12 +109,30 @@ struct HostListView: View {
         .onDisappear { model.stopBrowsing() }
     }
 
+    @ViewBuilder private var displaySections: some View {
+        modePicker
+        if model.screenMode == .mirror { mirrorFitPicker }
+    }
+
+    private var controlSection: some View {
+        Section("Điều khiển") {
+            Button { showPointer = true } label: {
+                LabeledContent("Chuột và con trỏ", value: pointer.settings.mode.title).foregroundStyle(.primary)
+            }
+        }
+    }
+
+    private var mirrorFitPicker: some View {
+        @Bindable var model = model
+        return MirrorFitPicker(fit: $model.mirrorFit, pointer: pointer)
+    }
+
     private var modePicker: some View {
         @Bindable var model = model
         return Section {
             Picker("Chế độ", selection: $model.screenMode) {
-                Text("Mở rộng").tag(ScreenMode.extend)
                 Text("Bản sao").tag(ScreenMode.mirror)
+                Text("Mở rộng").tag(ScreenMode.extend)
             }
             .pickerStyle(.segmented)
         } header: {
@@ -117,7 +140,7 @@ struct HostListView: View {
         } footer: {
             Text(model.screenMode == .extend
                  ? "Điện thoại là màn hình thứ hai bên phải Mac. Kéo cửa sổ sang để dùng."
-                 : "Điện thoại hiện đúng màn hình Mac. Màn hình Mac tự đổi theo kích thước và chiều xoay của điện thoại.")
+                 : "Điện thoại hiện đúng màn hình Mac. Chọn bên dưới Mac giữ nguyên hay đổi theo điện thoại.")
         }
     }
 

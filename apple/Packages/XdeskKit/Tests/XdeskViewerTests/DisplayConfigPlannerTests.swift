@@ -49,4 +49,27 @@ import XdeskWire
         let bytes = try ControlMessageCodec.encode(ControlEnvelope(id: 1, message: .displayConfig(config)))
         #expect(try ControlMessageCodec.decode(bytes).message == .displayConfig(config))
     }
+
+    @Test func fitDeviceIsOmittedAndExtendIgnoresFit() throws {
+        let fit = try #require(DisplayConfigPlanner.config(pointsWidth: 393, pointsHeight: 852, scale: 3, mode: .mirror, mirrorFit: .fitDevice))
+        #expect(fit.mirrorFit == nil && (fit.w, fit.h, fit.scale) == (1180, 2556, 3))
+        let extend = try #require(DisplayConfigPlanner.config(pointsWidth: 393, pointsHeight: 852, scale: 3, mode: .extend, mirrorFit: .touch))
+        #expect(extend.mirrorFit == nil && (extend.w, extend.h) == (1180, 2556))
+    }
+
+    @Test func nativeConfigIsOrientationIndependent() throws {
+        let portrait = try #require(DisplayConfigPlanner.config(pointsWidth: 393, pointsHeight: 852, scale: 3, mode: .mirror, mirrorFit: .native))
+        let landscape = try #require(DisplayConfigPlanner.config(pointsWidth: 852, pointsHeight: 393, scale: 3, mode: .mirror, mirrorFit: .native))
+        #expect(portrait == landscape)
+        #expect(portrait.isNativeMirror && (portrait.w, portrait.h) == (2556, 1180))
+    }
+
+    @Test func touchConfigIsHiDPIAtLogicalSizeAndFollowsOrientation() throws {
+        let portrait = try #require(DisplayConfigPlanner.config(pointsWidth: 393, pointsHeight: 852, scale: 3, mode: .mirror, mirrorFit: .touch))
+        #expect((portrait.w, portrait.h, portrait.scale, portrait.fit) == (1080, 2342, 2, .touch))
+        let landscape = try #require(DisplayConfigPlanner.config(pointsWidth: 852, pointsHeight: 393, scale: 3, mode: .mirror, mirrorFit: .touch))
+        #expect((landscape.w, landscape.h) == (2342, 1080))
+        let bytes = try ControlMessageCodec.encode(ControlEnvelope(id: 1, message: .displayConfig(portrait)))
+        #expect(try ControlMessageCodec.decode(bytes).message == .displayConfig(portrait))
+    }
 }
