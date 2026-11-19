@@ -10,7 +10,7 @@ struct XdeskApp: App {
     private let updater: UpdaterController
 
     var body: some Scene {
-        MenuBarExtra("Xdesk", systemImage: "display.2") {
+        MenuBarExtra("Xdesk", systemImage: updater.pendingVersion == nil ? "display.2" : "arrow.down.circle.fill") {
             MenuBarContent(host: host, viewer: viewer, pairing: pairing, agent: agent, updater: updater)
         }
         Window("Xdesk — Kết nối tới máy khác", id: ViewerBrowserWindow.id) {
@@ -19,6 +19,10 @@ struct XdeskApp: App {
         .windowResizability(.contentSize)
         Window("Xdesk — Cài đặt agent AI", id: AgentSettingsWindow.id) {
             AgentSettingsView(settings: agent.settings)
+        }
+        .windowResizability(.contentSize)
+        Window("Xdesk — Cập nhật", id: UpdateSettingsWindow.id) {
+            UpdateSettingsView(updater: updater)
         }
         .windowResizability(.contentSize)
     }
@@ -43,3 +47,4 @@ struct XdeskApp: App {
 
 enum ViewerBrowserWindow { static let id = "viewer-browser" }
 enum AgentSettingsWindow { static let id = "agent-settings" }
+enum UpdateSettingsWindow { static let id = "update-settings" }

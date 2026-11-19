@@ -48,8 +48,15 @@ struct MenuBarContent: View {
         Divider()
         AgentMenuSection(agent: agent)
         Divider()
+        if let version = updater.pendingVersion {
+            Button("Có bản mới \(version) — cập nhật…") { updater.checkForUpdates() }
+        }
         Button("Kiểm tra cập nhật…") { updater.checkForUpdates() }
             .disabled(!updater.canCheckForUpdates)
+        Button("Cài đặt cập nhật…") {
+            NSApp.activate(ignoringOtherApps: true)
+            openWindow(id: UpdateSettingsWindow.id)
+        }
         Button("Thoát Xdesk") { NSApplication.shared.terminate(nil) }
             .keyboardShortcut("q")
     }
