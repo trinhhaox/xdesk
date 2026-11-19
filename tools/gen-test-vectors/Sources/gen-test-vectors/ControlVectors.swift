@@ -20,6 +20,10 @@ func controlVectors() -> JSONObject {
         ("bye-no-reason", 12, .bye(Bye())),
         ("input-text-vietnamese", 13, .inputText(InputText(text: "Xin chào, Việt Nam"))),
         ("unknown-type", 14, .unknown(type: "future.thing")),
+        ("agent-approve-request", 15, .agentApprove(.request(
+            requestId: "req-7f3a", agentName: "Claude", summary: "Mở TextEdit và gõ lời chào", expiresAt: 1_700_000_060_000))),
+        ("agent-approve-response-allow", 15, .agentApprove(.response(requestId: "req-7f3a", allow: true))),
+        ("agent-approve-response-deny", 16, .agentApprove(.response(requestId: "req-9c01", allow: false))),
     ]
     let frames: [(String, ControlFrameKind, [UInt8])] = [
         ("handshake-3-bytes", .handshake, [0xAA, 0xBB, 0xCC]),
@@ -78,6 +82,7 @@ private func invalidMessages() -> [JSONObject] {
         ("display-config-bad-codec", "{\"codec\":\"vp9\",\"fps\":60,\"h\":100,\"id\":1,\"scale\":1,\"t\":\"display.config\",\"w\":100}", "malformedJSON"),
         ("display-ready-port-zero", "{\"id\":1,\"streamId\":1,\"t\":\"display.ready\",\"udpPort\":0}", "invalidField"),
         ("net-report-loss-over-1000", "{\"id\":1,\"jitterMs\":0,\"lossPermille\":1001,\"recvKbps\":0,\"rttMs\":0,\"t\":\"net.report\"}", "invalidField"),
+        ("agent-approve-empty-request-id", "{\"id\":1,\"requestId\":\"\",\"t\":\"agent.approve\"}", "invalidField"),
     ]
     return cases.map { name, json, error in
         expectError(name, error) { _ = try ControlMessageCodec.decode(Array(json.utf8)) }
