@@ -30,6 +30,9 @@ class VideoDecoder(
     private var codec: MediaCodec? = null
     private var waitingForKeyframe = true
 
+    /** Chỉ chẩn đoán: ghi lại mọi access unit đưa vào codec. Gán trước [start]; decoder đóng nó khi [stop]. */
+    @Volatile var recorder: FrameRecorder? = null
+
     /** Số frame đã đưa vào codec nhưng chưa xuất; ≤ 1 nghĩa là decoder không giữ frame. */
     val framesHeld: Int get() = meter.held
 
@@ -90,6 +93,7 @@ class VideoDecoder(
             codec = null
             codecName = null
             pending.clear(); freeInputs.clear(); pendingCount.set(0); meter.reset()
+            recorder?.close(); recorder = null
         }
     }
 
@@ -133,7 +137,9 @@ class VideoDecoder(
             buffer.clear()
             buffer.put(frame.data)
             val ptsUs = frame.ptsMs * 1000
-            meter.onInput(ptsUs, System.nanoTime())
+            val nowNs = System.nanoTime()
+            meter.onInput(ptsUs, nowNs)
+            recorder?.record(frame, nowNs)
             active.queueInputBuffer(index, 0, frame.data.size, ptsUs, if (frame.isKeyframe) MediaCodec.BUFFER_FLAG_KEY_FRAME else 0)
         }
     }
@@ -152,7 +158,7 @@ class VideoDecoder(
         override fun onOutputBufferAvailable(codec: MediaCodec, index: Int, info: MediaCodec.BufferInfo) {
             try { codec.releaseOutputBuffer(index, true) } catch (e: IllegalStateException) { return }
             meter.onOutput(info.presentationTimeUs, System.nanoTime())?.let {
-                log("lag codec=${codecName} samples=${it.samples} p50=${"%.1f".format(it.p50Ms)}ms p95=${"%.1f".format(it.p95Ms)}ms max=${"%.1f".format(it.maxMs)}ms held=${"%.1f".format(it.avgFramesHeld)}/${it.maxFramesHeld}")
+                log("lag codec=${codecName} samples=${it.samples} p50=${"%.1f".format(it.p50Ms)}ms p95=${"%.1f".format(it.p95Ms)}ms max=${"%.1f".format(it.maxMs)}ms inflight=${"%.1f".format(it.avgInFlight)}/${it.maxInFlight} stuck=${it.stuckEvents}x avg=${"%.1f".format(it.avgStuckFrames)} max=${it.maxStuckFrames} lag=${"%.0f".format(it.maxStuckLagMs)}ms skipped=${it.skipped}(stuck ${it.skippedWhileStuck}) unknown=${it.unknownOutputs}")
             }
         }
 

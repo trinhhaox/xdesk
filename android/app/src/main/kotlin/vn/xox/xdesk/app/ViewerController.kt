@@ -123,7 +123,9 @@ class ViewerController(private val container: AppContainer, private val deviceNa
     private fun startDecoderIfReady() {
         val target = surface ?: return
         val config = currentConfig ?: return
-        if (streaming) decoder.start(target, config.w.toInt(), config.h.toInt())
+        if (!streaming) return
+        decoder.recorder = container.streamRecorder()
+        decoder.start(target, config.w.toInt(), config.h.toInt())
     }
 
     fun disconnect() {

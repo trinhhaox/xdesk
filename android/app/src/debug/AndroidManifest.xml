@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
     <application>
         <activity android:name=".DecoderBenchActivity" android:exported="true" />
+        <!-- Chỉ debug: đo trên máy thật khi khoá màn hình, app tự bật màn hình và hiện trên màn khoá (không mở khoá máy). -->
+        <activity android:name=".MainActivity" android:showWhenLocked="true" android:turnScreenOn="true" tools:node="merge" />
     </application>
 </manifest>
