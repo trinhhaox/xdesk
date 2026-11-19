@@ -34,5 +34,5 @@ Xdesk biến iPhone, iPad, Android hoặc một máy Mac khác thành màn hình
 | Bundle id iOS | `vn.xox.xdesk.ios` |
 | Android applicationId | `vn.xox.xdesk` |
 | Dịch vụ Bonjour | `_xdesk._tcp` |
-| Appcast (dự kiến, chưa dùng) | `https://xdesk.xox.vn/appcast.xml` |
+| Appcast | `https://raw.githubusercontent.com/trinhhaox/xdesk-releases/main/appcast.xml` |
 | Development Team | `4DU4BTV46U` |
