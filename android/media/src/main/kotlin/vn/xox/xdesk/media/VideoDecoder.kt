@@ -7,6 +7,8 @@ import android.os.HandlerThread
 import android.os.Process
 import android.util.Log
 import android.view.Surface
+import java.util.concurrent.FutureTask
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import vn.xox.xdesk.wire.AssembledFrame
 
@@ -20,6 +22,7 @@ class VideoDecoder(
     private val onError: (String) -> Unit,
     private val log: (String) -> Unit = { Log.i(TAG, it) },
     lagWindow: Int = 120,
+    private val onVideoSize: (Int, Int) -> Unit = { _, _ -> },
 ) {
     private val thread = HandlerThread("xdesk-decode", Process.THREAD_PRIORITY_URGENT_DISPLAY).also { it.start() }
     private val handler = Handler(thread.looper)
@@ -28,6 +31,7 @@ class VideoDecoder(
     private val freeInputs = ArrayDeque<Int>()
     private val meter = FrameLagMeter(lagWindow)
     private var codec: MediaCodec? = null
+    private var activeKey: DecoderKey? = null
     private var waitingForKeyframe = true
 
     /** Chỉ chẩn đoán: ghi lại mọi access unit đưa vào codec. Gán trước [start]; decoder đóng nó khi [stop]. */
@@ -40,25 +44,37 @@ class VideoDecoder(
     @Volatile var codecName: String? = null
         private set
 
-    /** Chọn decoder, cấu hình và start. Trả `false` (và gọi [onError]) nếu máy không có decoder H.264 hoặc cấu hình lỗi. */
+    /**
+     * Chọn decoder, cấu hình và start. Chạy trên thread decode, tuần tự với [stop]: codec cũ luôn được huỷ xong trước khi dựng codec mới
+     * (Surface chỉ nối được một codec), yêu cầu trùng cấu hình đang chạy thì bỏ qua, Surface đã chết thì không configure.
+     * Trả `false` (và gọi [onError]) nếu máy không có decoder H.264 hoặc cấu hình lỗi; `true` kể cả khi bỏ qua vì đã chạy đúng cấu hình.
+     */
     fun start(surface: Surface, width: Int, height: Int, extraFormat: Map<String, Int> = emptyMap(), forceCodec: String? = null): Boolean {
+        val task = FutureTask { startOnThread(surface, width, height, extraFormat, forceCodec) }
+        if (!handler.post(task)) return false
+        return try { task.get(START_TIMEOUT_S, TimeUnit.SECONDS) } catch (e: Exception) { fail("Khởi động decoder thất bại: ${DecoderLifecycle.describe(e)}") }
+    }
+
+    private fun startOnThread(surface: Surface, width: Int, height: Int, extraFormat: Map<String, Int>, forceCodec: String?): Boolean {
+        val key = DecoderKey(surface, width, height, extraFormat)
+        when (DecoderLifecycle.plan(activeKey, key, surface.isValid)) {
+            StartPlan.SKIP_NO_SURFACE -> { log("bỏ qua start: Surface đã chết"); return false }
+            StartPlan.SKIP_UNCHANGED -> return true
+            StartPlan.RESTART -> teardown()
+            StartPlan.START -> Unit
+        }
         val candidates = AndroidCodecList.decoders()
         val choice = (forceCodec?.let { name -> candidates.firstOrNull { it.name == name } } ?: CodecSelector.select(candidates)) ?: return fail("Máy không có decoder H.264")
         val quirk = DecoderQuirks.forCodec(choice.name)
-        val format = MediaFormat.createVideoFormat(AndroidCodecList.MIME_AVC, width, height).apply {
-            setInteger(MediaFormat.KEY_LOW_LATENCY, 1) // gửi cả khi không quảng bá FEATURE_LowLatency: codec không biết thì bỏ qua
-            setInteger(MediaFormat.KEY_PRIORITY, 0)
-            setInteger(MediaFormat.KEY_OPERATING_RATE, Short.MAX_VALUE.toInt())
-            quirk?.maxInputSizeBytes?.let { setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, it) }
-            quirk?.lowLatencyKeys?.forEach { (key, value) -> setInteger(key, value) }
-            extraFormat.forEach { (key, value) -> setInteger(key, value) }
-        }
+        val format = DecoderFormat.build(width, height, quirk, extraFormat)
+        var created: MediaCodec? = null
         return try {
-            val created = MediaCodec.createByCodecName(choice.name)
+            created = MediaCodec.createByCodecName(choice.name)
             created.setCallback(callback, handler)
             created.configure(format, surface, null, 0)
             created.start()
             codec = created
+            activeKey = key
             CodecDiagnostics.listDecoders(log)
             CodecDiagnostics.vendorParameters(created, log)
             codecName = choice.name
@@ -66,12 +82,21 @@ class VideoDecoder(
             log("decoder=${choice.name} hw=${choice.isHardwareAccelerated} lowLatency=${choice.supportsLowLatency} holdsFrames=${quirk?.mayHoldFrames == true}")
             true
         } catch (e: MediaCodec.CodecException) {
-            fail("Không khởi động được decoder ${choice.name}: ${e.diagnosticInfo}")
+            releaseQuietly(created)
+            fail("Không khởi động được decoder ${choice.name}: ${DecoderLifecycle.describe(e, codecDetail(e))}")
         } catch (e: IllegalStateException) {
-            fail("Decoder ${choice.name} ở trạng thái sai: ${e.message}")
+            releaseQuietly(created)
+            fail("Decoder ${choice.name} ở trạng thái sai: ${DecoderLifecycle.describe(e)}")
         } catch (e: IllegalArgumentException) {
-            fail("Cấu hình decoder ${choice.name} bị từ chối: ${e.message}")
+            releaseQuietly(created)
+            fail("Cấu hình decoder ${choice.name} bị từ chối: ${DecoderLifecycle.describe(e)}")
         }
+    }
+
+    private fun codecDetail(e: MediaCodec.CodecException): String = "diagnosticInfo=${e.diagnosticInfo}, errorCode=${e.errorCode}, recoverable=${e.isRecoverable}"
+
+    private fun releaseQuietly(c: MediaCodec?) {
+        try { c?.release() } catch (e: RuntimeException) { log("release lỗi: ${DecoderLifecycle.describe(e)}") }
     }
 
     /** Đưa một frame đã ghép vào hàng đợi; hàng đợi quá đầy → bỏ hết tới keyframe kế và xin keyframe mới. */
@@ -84,17 +109,21 @@ class VideoDecoder(
         handler.post { enqueue(frame) }
     }
 
+    /** Huỷ codec trên thread decode; mọi lỗi của codec đã huỷ bị bỏ qua (xem [callback]). */
     fun stop() {
-        handler.post {
-            codec?.let {
-                try { it.stop() } catch (e: IllegalStateException) { /* đã dừng */ }
-                it.release()
-            }
-            codec = null
-            codecName = null
-            pending.clear(); freeInputs.clear(); pendingCount.set(0); meter.reset()
-            recorder?.close(); recorder = null
+        handler.post { teardown() }
+    }
+
+    private fun teardown() {
+        codec?.let {
+            try { it.stop() } catch (e: IllegalStateException) { /* đã dừng */ }
+            releaseQuietly(it)
         }
+        codec = null
+        activeKey = null
+        codecName = null
+        pending.clear(); freeInputs.clear(); pendingCount.set(0); meter.reset()
+        recorder?.close(); recorder = null
     }
 
     fun release() {
@@ -163,14 +192,20 @@ class VideoDecoder(
         }
 
         override fun onError(codec: MediaCodec, e: MediaCodec.CodecException) {
-            this@VideoDecoder.onError("Decoder lỗi: ${e.diagnosticInfo}")
+            if (codec !== this@VideoDecoder.codec) return // codec đã bị huỷ (ngắt kết nối/đổi cấu hình): lỗi muộn không đáng báo
+            this@VideoDecoder.onError("Decoder lỗi: ${DecoderLifecycle.describe(e, codecDetail(e))}")
         }
 
-        override fun onOutputFormatChanged(codec: MediaCodec, format: MediaFormat) = Unit
+        override fun onOutputFormatChanged(codec: MediaCodec, format: MediaFormat) {
+            val width = DecoderFormat.visibleSize(format, MediaFormat.KEY_WIDTH, "crop-left", "crop-right")
+            val height = DecoderFormat.visibleSize(format, MediaFormat.KEY_HEIGHT, "crop-top", "crop-bottom")
+            if (width > 0 && height > 0) onVideoSize(width, height)
+        }
     }
 
     companion object {
         private const val TAG = "XdeskDecoder"
         const val MAX_PENDING = 8
+        private const val START_TIMEOUT_S = 5L
     }
 }
