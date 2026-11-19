@@ -1,32 +1,45 @@
 import SwiftUI
 import UIKit
+import XdeskInput
 import XdeskMedia
 import XdeskViewer
 import XdeskWire
 
-/// Toàn màn hình: video letterbox trên nền đen, ẩn status bar + home indicator, nút thoát mờ + nút bàn phím ở góc trên.
+/// Toàn màn hình: video letterbox trên nền đen, ẩn status bar + home indicator, thanh nút mờ (thoát, clipboard, bàn phím, chế độ chuột, cài đặt) ở góc trên.
 struct StreamView: View {
     let model: StreamViewModel
     @Environment(\.displayScale) private var displayScale
-    @State private var composing = false
-    @State private var composer: TextComposerController?
+    @State private var composer: TextComposerController
+    @State private var pointer = PointerSettingsStore()
+    @State private var showPointerSettings = false
+    @State private var modeNotice: String?
+
+    init(model: StreamViewModel) {
+        self.model = model
+        _composer = State(initialValue: TextComposerController(session: model.session))
+    }
 
     var body: some View {
         GeometryReader { proxy in
             ZStack(alignment: .topLeading) {
                 Color.black
-                VideoSurface(renderer: model.session.renderer, session: model.session, config: model.currentConfig)
+                VideoSurface(
+                    renderer: model.session.renderer, session: model.session, config: model.currentConfig,
+                    composer: composer, pointer: pointer.settings
+                )
                 if model.session.state != .streaming {
                     connectingOverlay
                 }
                 topBar
-                if let notice = model.clipboardNotice { clipboardToast(notice) }
+                if !composer.preview.isEmpty { composingPreview }
+                if let notice = modeNotice ?? model.clipboardNotice { toast(notice) }
             }
             .onChange(of: proxy.size, initial: true) { _, size in
                 model.screenChanged(ScreenMetrics(size: size, scale: displayScale))
             }
         }
         .ignoresSafeArea()
+        .sheet(isPresented: $showPointerSettings) { PointerSettingsSheet(store: pointer) }
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
         .alert("Agent AI xin quyền điều khiển", isPresented: approvalPresented, presenting: model.session.pendingAgentApproval) { _ in
@@ -57,25 +70,38 @@ struct StreamView: View {
                 Button { Task { await model.sendClipboardToMac() } } label: { faintIcon("doc.on.clipboard") }
                     .accessibilityLabel("Gửi clipboard sang Mac")
             }
-            if composing, let composer {
-                TextComposerBar(controller: composer) { composing = false }
-                    .padding(.trailing, 16)
-            } else {
-                Button { openComposer() } label: { faintIcon("keyboard") }
-                    .accessibilityLabel("Mở bàn phím gõ chữ")
-                    .disabled(model.session.state != .streaming)
-            }
+            Button { composer.isActive.toggle() } label: { faintIcon(composer.isActive ? "keyboard.fill" : "keyboard") }
+                .accessibilityLabel(composer.isActive ? "Ẩn bàn phím" : "Mở bàn phím gõ chữ")
+                .disabled(model.session.state != .streaming)
+            Button { toggleMode() } label: { faintIcon(pointer.settings.mode.symbol) }
+                .accessibilityLabel("Đổi chế độ chuột")
+                .accessibilityValue(pointer.settings.mode.title)
+            Button { showPointerSettings = true } label: { faintIcon("slider.horizontal.3") }
+                .accessibilityLabel("Cài đặt chuột và con trỏ")
         }
     }
 
-    private func clipboardToast(_ text: String) -> some View {
+    /// Chữ Telex đang soạn: chỉ xem trước nhỏ ngay trên bàn phím, chữ chốt mới gửi sang Mac.
+    private var composingPreview: some View {
+        Text(composer.preview)
+            .font(.callout)
+            .padding(.horizontal, 12).padding(.vertical, 6)
+            .background(.black.opacity(0.75), in: Capsule())
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            .padding(.bottom, composer.obscuredHeight + 8)
+            .allowsHitTesting(false)
+            .accessibilityLabel("Đang soạn: \(composer.preview)")
+    }
+
+    private func toast(_ text: String) -> some View {
         Text(text)
             .font(.callout)
             .padding(.horizontal, 14).padding(.vertical, 8)
             .background(.black.opacity(0.7), in: Capsule())
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-            .padding(.bottom, 40)
+            .padding(.bottom, 40 + composer.obscuredHeight)
             .allowsHitTesting(false)
     }
 
@@ -83,9 +109,13 @@ struct StreamView: View {
         Image(systemName: name).font(.title).foregroundStyle(.white.opacity(0.5)).padding(16)
     }
 
-    private func openComposer() {
-        composer = TextComposerController(session: model.session)
-        composing = true
+    private func toggleMode() {
+        pointer.toggleMode()
+        modeNotice = "Chế độ chuột: \(pointer.settings.mode.title)"
+        Task {
+            try? await Task.sleep(for: .seconds(1.5))
+            modeNotice = nil
+        }
     }
 }
 
@@ -94,38 +124,17 @@ private struct VideoSurface: UIViewRepresentable {
     let renderer: VideoLayerRenderer
     let session: ViewerSession
     let config: DisplayConfig?
+    let composer: TextComposerController
+    let pointer: PointerSettings
 
     func makeUIView(context: Context) -> VideoHostView {
-        VideoHostView(videoLayer: renderer.layer, touchView: TouchInputView(session: session, renderer: renderer))
+        VideoHostView(videoLayer: renderer.layer, touchView: TouchInputView(session: session, renderer: renderer), controller: composer)
     }
 
     func updateUIView(_ view: VideoHostView, context: Context) {
+        view.touchView.pointer = pointer
+        view.syncKeyboard(active: composer.isActive)
         guard let config, config.scale > 0 else { return }
         view.touchView.hostPoints = CGSize(width: Double(config.w) / config.scale, height: Double(config.h) / config.scale)
-    }
-}
-
-private final class VideoHostView: UIView {
-    private let videoLayer: CALayer
-    let touchView: TouchInputView
-
-    init(videoLayer: CALayer, touchView: TouchInputView) {
-        self.videoLayer = videoLayer
-        self.touchView = touchView
-        super.init(frame: .zero)
-        backgroundColor = .black
-        layer.addSublayer(videoLayer)
-        addSubview(touchView)
-    }
-
-    @available(*, unavailable) required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        videoLayer.frame = bounds
-        CATransaction.commit()
-        touchView.frame = bounds
     }
 }

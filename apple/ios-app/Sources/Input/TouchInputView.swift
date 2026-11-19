@@ -4,8 +4,8 @@ import XdeskMedia
 import XdeskViewer
 import XdeskWire
 
-/// Lớp trong suốt phủ lên video: chạm → `GestureInterpreter` → input gửi host. Chạm vào dải đen letterbox bị bỏ qua.
-/// Đồng thời là first responder nhận phím vật lý.
+/// Lớp trong suốt phủ lên video: chạm → `PointerEngine` (trực tiếp hoặc trackpad) → input gửi host. Ở chế độ trực tiếp, chạm vào
+/// dải đen letterbox bị bỏ qua. Đồng thời là first responder nhận phím vật lý (trừ lúc ô gõ ảo đang giữ bàn phím).
 @MainActor
 final class TouchInputView: UIView {
     private static let tickInterval: TimeInterval = 0.05
@@ -13,13 +13,32 @@ final class TouchInputView: UIView {
     private let session: ViewerSession
     private let renderer: VideoLayerRenderer
     private lazy var keyboard = HardwareKeyboardHandler { [weak self] in self?.session.sendInput($0) }
-    private var interpreter: GestureInterpreter?
+    private var engine: PointerEngine?
+    private var engineStale = true
+    private var lastTouch: (x: Float, y: Float)?
     private var touchIds: [ObjectIdentifier: Int] = [:]
     private var nextTouchId = 0
     private var tickTimer: Timer?
 
     /// Kích thước màn hình host theo điểm (`DisplayConfig` w/h ÷ scale); đổi delta chuẩn hoá thành pixel cuộn.
-    var hostPoints = CGSize(width: 1, height: 1)
+    var hostPoints = CGSize(width: 1, height: 1) { didSet { if oldValue != hostPoints { engineStale = true } } }
+    var pointer = PointerSettings() { didSet { if oldValue != pointer { engineStale = true } } }
+    /// Video đang dịch lên bao nhiêu điểm (bàn phím mở); cộng vào y của ngón để ra toạ độ video.
+    var panY: CGFloat = 0
+    /// Bàn phím ảo đang giữ first responder: đừng giành lại khi chạm.
+    var keyboardActive = false
+    /// Vị trí con trỏ cục bộ (toạ độ view chưa dịch) ở chế độ trackpad.
+    var onCursor: ((CGPoint?) -> Void)?
+    /// Vừa nhả ngón cuối: nơi người dùng chạm đã đổi, tính lại độ dịch.
+    var onSequenceEnded: (() -> Void)?
+
+    /// Khung video thật trong view (chưa dịch); nil khi chưa biết kích thước.
+    var contentRect: CGRect? {
+        mapper().map { CGRect(x: CGFloat($0.originX), y: CGFloat($0.originY), width: CGFloat($0.width), height: CGFloat($0.height)) }
+    }
+
+    /// Chiều dọc (0…1 trên video) của vùng người dùng vừa thao tác: con trỏ (trackpad) hoặc điểm chạm cuối (trực tiếp).
+    var focusNormalizedY: Float? { engine?.cursor?.y ?? lastTouch?.y }
 
     init(session: ViewerSession, renderer: VideoLayerRenderer) {
         self.session = session
@@ -43,7 +62,7 @@ final class TouchInputView: UIView {
         if window == nil {
             cancelAllTouches()
             keyboard.releaseAll()
-        } else {
+        } else if !keyboardActive {
             becomeFirstResponder()
         }
     }
@@ -51,10 +70,11 @@ final class TouchInputView: UIView {
     // MARK: Chạm
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        if !isFirstResponder { becomeFirstResponder() }
-        if touchIds.isEmpty { interpreter = makeInterpreter() }
+        if !isFirstResponder, !keyboardActive { becomeFirstResponder() }
+        if touchIds.isEmpty { rebuildEngineIfNeeded() }
         for touch in touches {
             guard let point = normalized(touch, clamping: false) else { continue }
+            lastTouch = point
             touchIds[ObjectIdentifier(touch)] = nextTouchId
             feed(TouchSample(id: nextTouchId, x: point.x, y: point.y, phase: .began, timeMs: Self.ms(touch)))
             nextTouchId += 1
@@ -70,39 +90,55 @@ final class TouchInputView: UIView {
         for touch in touches {
             let key = ObjectIdentifier(touch)
             guard let id = touchIds[key], let point = normalized(touch, clamping: true) else { continue }
+            if phase == .ended { lastTouch = point }
             feed(TouchSample(id: id, x: point.x, y: point.y, phase: phase, timeMs: Self.ms(touch)))
             if phase != .moved { touchIds[key] = nil }
         }
         updateTimer()
+        if touchIds.isEmpty { onSequenceEnded?() }
     }
 
     private func cancelAllTouches() {
-        guard var current = interpreter else { return }
+        guard var current = engine else { return }
         session.sendInput(touchIds.values.flatMap { current.handle(TouchSample(id: $0, x: 0, y: 0, phase: .cancelled, timeMs: Self.nowMs)) })
-        interpreter = current
+        engine = current
         touchIds.removeAll()
         updateTimer()
     }
 
     private func feed(_ sample: TouchSample) {
-        guard var current = interpreter else { return }
+        guard var current = engine else { return }
         let events = current.handle(sample)
-        interpreter = current
+        engine = current
         session.sendInput(events)
+        if let cursor = current.cursor { onCursor?(viewPoint(cursor)) }
     }
 
-    private func normalized(_ touch: UITouch, clamping: Bool) -> (x: Float, y: Float)? {
-        let location = touch.location(in: self)
+    private func mapper() -> VideoContentMapper? {
         let content = renderer.videoSize ?? hostPoints
-        guard let mapper = VideoContentMapper(
+        return VideoContentMapper(
             viewWidth: Float(bounds.width), viewHeight: Float(bounds.height),
             contentWidth: Float(content.width), contentHeight: Float(content.height)
-        ) else { return nil }
-        return mapper.normalize(x: Float(location.x), y: Float(location.y), clamping: clamping)
+        )
     }
 
-    private func makeInterpreter() -> GestureInterpreter {
-        GestureInterpreter(config: GestureConfig(surfaceWidth: Float(hostPoints.width), surfaceHeight: Float(hostPoints.height)))
+    /// Trackpad chỉ cần độ dời nên không ép vào khung video; trực tiếp bỏ qua chạm ngoài khung.
+    private func normalized(_ touch: UITouch, clamping: Bool) -> (x: Float, y: Float)? {
+        let location = touch.location(in: self)
+        guard let mapper = mapper() else { return nil }
+        let x = Float(location.x), y = Float(location.y + panY)
+        if engine?.cursor != nil { return mapper.normalizeUnbounded(x: x, y: y) }
+        return mapper.normalize(x: x, y: y, clamping: clamping)
+    }
+
+    private func viewPoint(_ normalized: (x: Float, y: Float)) -> CGPoint? {
+        mapper().map { CGPoint(x: CGFloat($0.originX + normalized.x * $0.width), y: CGFloat($0.originY + normalized.y * $0.height)) }
+    }
+
+    private func rebuildEngineIfNeeded() {
+        guard engine == nil || engineStale else { return }
+        engine = PointerEngine(settings: pointer, surfaceWidth: Float(hostPoints.width), surfaceHeight: Float(hostPoints.height), cursor: engine?.cursor)
+        engineStale = false
     }
 
     // MARK: Tick 50 ms (giữ lâu → click phải)
@@ -119,9 +155,9 @@ final class TouchInputView: UIView {
     }
 
     private func tick() {
-        guard var current = interpreter else { return }
+        guard var current = engine else { return }
         let events = current.tick(nowMs: Self.nowMs)
-        interpreter = current
+        engine = current
         session.sendInput(events)
     }
 

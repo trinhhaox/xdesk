@@ -19,6 +19,10 @@ data class GestureConfig(
     val twoFingerTapMs: Long = 300,
     /** Di chuyển dưới ngưỡng này (điểm host) vẫn tính là chạm. */
     val slop: Float = 8f,
+    /** Giữ một ngón đủ [longPressMs] = click phải (cài đặt "nhấn giữ để chuột phải"). */
+    val longPressRightClick: Boolean = true,
+    /** Cuộn tự nhiên: nội dung đi theo ngón tay; tắt thì đảo chiều. */
+    val naturalScroll: Boolean = true,
 )
 
 /**
@@ -26,7 +30,7 @@ data class GestureConfig(
  * 1 ngón kéo = giữ chuột trái và kéo, 2 ngón kéo = cuộn theo pixel. Không phụ thuộc Android để test được.
  * Đầu ra có `seq` = 0 (do InputSequencer cấp). Không thread-safe: dùng trên một thread (main).
  */
-class GestureInterpreter(private val config: GestureConfig) {
+class GestureInterpreter(private val config: GestureConfig) : PointerGestures {
     private sealed interface Mode {
         object Idle : Mode
         class Pending(val id: Int) : Mode
@@ -47,7 +51,7 @@ class GestureInterpreter(private val config: GestureConfig) {
     private var lastCentroid = Point(0f, 0f)
     private var twoFingerTap: Pair<Long, Point>? = null
 
-    fun handle(s: TouchSample): List<InputEvent> = when (s.phase) {
+    override fun handle(s: TouchSample): List<InputEvent> = when (s.phase) {
         TouchPhase.BEGAN -> began(s.id, Point(s.x, s.y), s.timeMs)
         TouchPhase.MOVED -> moved(s.id, Point(s.x, s.y))
         TouchPhase.ENDED -> ended(s.id, Point(s.x, s.y), s.timeMs)
@@ -55,8 +59,8 @@ class GestureInterpreter(private val config: GestureConfig) {
     }
 
     /** Gọi định kỳ (~50 ms) để phát click phải khi giữ đủ lâu. */
-    fun tick(nowMs: Long): List<InputEvent> {
-        if (mode !is Mode.Pending || nowMs - startMs < config.longPressMs) return emptyList()
+    override fun tick(nowMs: Long): List<InputEvent> {
+        if (!config.longPressRightClick || mode !is Mode.Pending || nowMs - startMs < config.longPressMs) return emptyList()
         mode = Mode.Consumed
         return listOf(InputEvents.move(start.x, start.y)) + click(InputButton.RIGHT, start, 1)
     }
@@ -100,8 +104,9 @@ class GestureInterpreter(private val config: GestureConfig) {
         val previous = lastCentroid
         lastCentroid = now
         twoFingerTap?.let { if (distance(now, it.second) > config.slop) twoFingerTap = null }
-        val dx = (now.x - previous.x) * config.surfaceWidth
-        val dy = (now.y - previous.y) * config.surfaceHeight
+        val sign = if (config.naturalScroll) 1f else -1f
+        val dx = sign * (now.x - previous.x) * config.surfaceWidth
+        val dy = sign * (now.y - previous.y) * config.surfaceHeight
         return if (dx == 0f && dy == 0f) emptyList() else listOf(InputEvents.scroll(dx, dy))
     }
 

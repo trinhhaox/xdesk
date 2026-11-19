@@ -24,18 +24,24 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
+import vn.xox.xdesk.app.PointerSettingsStore
 import vn.xox.xdesk.app.Screen
 import vn.xox.xdesk.app.ViewerController
 import vn.xox.xdesk.app.update.UpdateController
 import vn.xox.xdesk.transport.KnownHost
 
-/** Bảo mật: dấu vân tay của thiết bị này, host đã ghép (quên từng host) và đặt lại danh tính. */
+/** Cài đặt và bảo mật: chuột/con trỏ, dấu vân tay của thiết bị này, host đã ghép (quên từng host) và đặt lại danh tính. */
 @Composable
 fun SecuritySettingsScreen(controller: ViewerController, updates: UpdateController) {
+    val context = LocalContext.current
+    val pointerStore = remember { PointerSettingsStore(context) }
     var confirmReset by remember { mutableStateOf(false) }
     var forgetting by remember { mutableStateOf<KnownHost?>(null) }
     LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { Text("Bảo mật", style = MaterialTheme.typography.headlineMedium) }
+        item { Text("Cài đặt", style = MaterialTheme.typography.headlineMedium) }
+        item { PointerSettingsCard(pointerStore) }
+        item { Text("Bảo mật", style = MaterialTheme.typography.titleLarge) }
         item {
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {

@@ -39,4 +39,17 @@ public enum HidKeyMap {
 
     /// Chiều ngược lại cho viewer Mac (NSEvent.keyCode → HID usage).
     public static func hidUsage(forMacKeyCode code: UInt16) -> UInt16? { reverse[code] }
+
+    /// HID usage của một ký tự gõ được bằng một phím ANSI không cần Shift (a–z, 0–9, dấu cách); nil nếu không có.
+    /// Dùng khi có bổ trợ dính (⌘ + "c" → ⌘C) vì lúc đó chữ phải đi như phím, không phải văn bản.
+    public static func hidUsage(forCharacter character: Character) -> UInt16? {
+        guard character.unicodeScalars.count == 1, let scalar = character.unicodeScalars.first, scalar.isASCII else { return nil }
+        switch scalar.value {
+        case 0x61...0x7A: return 0x04 + UInt16(scalar.value - 0x61)
+        case 0x31...0x39: return 0x1E + UInt16(scalar.value - 0x31)
+        case 0x30: return 0x27
+        case 0x20: return 0x2C
+        default: return nil
+        }
+    }
 }

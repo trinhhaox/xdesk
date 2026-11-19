@@ -27,6 +27,10 @@ public struct GestureConfig: Sendable, Equatable {
     public var twoFingerTapMs: Int64 = 300
     /// Di chuyển dưới ngưỡng này (điểm) vẫn tính là chạm.
     public var slop: Float = 8
+    /// Giữ một ngón đủ `longPressMs` = click phải (cài đặt "nhấn giữ để chuột phải").
+    public var longPressRightClick = true
+    /// Cuộn tự nhiên: nội dung đi theo ngón tay; tắt thì đảo chiều.
+    public var naturalScroll = true
 
     public init(surfaceWidth: Float, surfaceHeight: Float) {
         self.surfaceWidth = surfaceWidth
@@ -72,7 +76,7 @@ public struct GestureInterpreter: Sendable {
 
     /// Gọi định kỳ (~50 ms) để phát click phải khi giữ đủ lâu.
     public mutating func tick(nowMs: Int64) -> [InputEvent] {
-        guard case .pending = mode, nowMs - startMs >= config.longPressMs else { return [] }
+        guard config.longPressRightClick, case .pending = mode, nowMs - startMs >= config.longPressMs else { return [] }
         mode = .consumed
         return [.move(x: startPoint.x, y: startPoint.y)] + click(InputButton.right, at: startPoint, count: 1)
     }
@@ -113,7 +117,8 @@ public struct GestureInterpreter: Sendable {
             let now = centroid()
             defer { lastCentroid = now }
             if let tap = twoFingerTap, distance(now, tap.start) > config.slop { twoFingerTap = nil }
-            let dx = (now.x - lastCentroid.x) * config.surfaceWidth, dy = (now.y - lastCentroid.y) * config.surfaceHeight
+            let sign: Float = config.naturalScroll ? 1 : -1
+            let dx = sign * (now.x - lastCentroid.x) * config.surfaceWidth, dy = sign * (now.y - lastCentroid.y) * config.surfaceHeight
             return dx == 0 && dy == 0 ? [] : [.scroll(dx: dx, dy: dy)]
         default:
             return []

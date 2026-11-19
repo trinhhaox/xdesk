@@ -25,4 +25,9 @@ public struct VideoContentMapper: Sendable, Equatable {
         guard (0...1).contains(nx), (0...1).contains(ny) else { return nil }
         return (nx, ny)
     }
+
+    /// Không ép vào khung: ngón trượt qua dải đen vẫn cho delta đúng (dùng cho trackpad, chỉ cần độ dời).
+    public func normalizeUnbounded(x: Float, y: Float) -> (x: Float, y: Float) {
+        ((x - originX) / width, (y - originY) / height)
+    }
 }

@@ -7,7 +7,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.exclude
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -45,7 +50,11 @@ class MainActivity : ComponentActivity() {
         updates.isSessionActive = { controller.streaming || controller.connecting }
         if (savedInstanceState == null) updates.checkOnStart()
         // targetSdk 35+ ép edge-to-edge: chừa vùng an toàn (tai thỏ, thanh hệ thống) cho các màn danh sách; màn stream tự lo immersive.
-        setContent { MaterialTheme { Surface(Modifier.safeDrawingPadding()) { Root() } } }
+        // Màn stream không chừa chỗ cho bàn phím: tự dịch video lên để SurfaceView giữ nguyên kích thước (đổi kích thước sẽ mở lại phiên).
+        setContent {
+            val insets = if (controller.screen == Screen.STREAM) Modifier.windowInsetsPadding(WindowInsets.safeDrawing.exclude(WindowInsets.ime)) else Modifier.safeDrawingPadding()
+            MaterialTheme { Surface(insets) { Root() } }
+        }
     }
 
     override fun onStart() {

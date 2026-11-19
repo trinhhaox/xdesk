@@ -43,6 +43,15 @@ object HidKeys {
         else -> null
     }
 
+    /** HID usage của ký tự gõ được bằng một phím không cần Shift (a–z, 0–9, dấu cách); dùng khi có bổ trợ dính (⌘ + "c" → ⌘C). */
+    fun fromChar(c: Char): Int? = when (c) {
+        in 'a'..'z' -> 0x04 + (c - 'a')
+        in '1'..'9' -> 0x1E + (c - '1')
+        '0' -> 0x27
+        ' ' -> SPACE
+        else -> null
+    }
+
     /** Bit `mods` của host từ trạng thái meta của Android (Alt → Option, Meta → Command). */
     fun modifiers(metaState: Int): Int {
         var mods = 0

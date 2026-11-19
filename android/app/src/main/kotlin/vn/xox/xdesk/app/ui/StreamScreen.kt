@@ -2,14 +2,22 @@ package vn.xox.xdesk.app.ui
 
 import android.view.SurfaceHolder
 import android.view.Window
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -18,28 +26,60 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import kotlinx.coroutines.delay
+import vn.xox.xdesk.app.PointerSettingsStore
+import vn.xox.xdesk.app.StreamInputRouter
 import vn.xox.xdesk.app.ViewerController
+import vn.xox.xdesk.app.input.VideoPan
 
-/** Toàn màn hình (immersive) trên một SurfaceView; xoay máy được Activity giữ nguyên (configChanges) và controller mở lại phiên với kích thước mới. */
+private const val CURSOR_VISIBLE_MS = 1500L
+
+/**
+ * Toàn màn hình (immersive) trên một SurfaceView; xoay máy được Activity giữ nguyên (configChanges) và controller mở lại phiên với kích thước mới.
+ * Khi bàn phím mở, video dịch lên (không thu nhỏ) để vùng vừa chạm nằm trên bàn phím; thanh phím phụ bám trên bàn phím theo animation IME.
+ */
 @Composable
 fun StreamScreen(controller: ViewerController, window: Window) {
+    val pointerStore = remember { PointerSettingsStore(window.context) }
     var showBars by remember { mutableStateOf(true) }
-    var showKeys by remember { mutableStateOf(false) }
+    var showPointerSettings by remember { mutableStateOf(false) }
     var viewRef by remember { mutableStateOf<StreamSurfaceView?>(null) }
+    var viewHeight by remember { mutableIntStateOf(0) }
+    val density = LocalDensity.current
+    val imeBottom = WindowInsets.ime.getBottom(density)
+    val keyBarPx = with(density) { KeyBarHeight.toPx() }
+    val obscured = if (imeBottom > 0) imeBottom + keyBarPx else 0f
+    val focus = controller.input?.focusY
+    val targetPan = if (focus == null || viewHeight == 0) 0f else VideoPan.offset(focus * viewHeight, viewHeight.toFloat(), obscured, viewHeight.toFloat())
+    val pan by animateFloatAsState(targetPan, tween(120), label = "keyboard-pan")
 
+    SideEffect {
+        controller.input?.applySettings(pointerStore.settings)
+        viewRef?.translationY = -pan
+    }
     DisposableEffect(Unit) {
         val insets = WindowCompat.getInsetsController(window, window.decorView)
         insets.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
@@ -51,7 +91,7 @@ fun StreamScreen(controller: ViewerController, window: Window) {
     }
     LaunchedEffect(showBars) { if (showBars) { delay(4000); showBars = false } }
 
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
+    Box(Modifier.fillMaxSize().background(Color.Black).onSizeChanged { viewHeight = it.height }) {
         AndroidView(modifier = Modifier.fillMaxSize(), factory = { ctx ->
             StreamSurfaceView(ctx).also { view ->
                 view.router = controller.input
@@ -60,14 +100,27 @@ fun StreamScreen(controller: ViewerController, window: Window) {
             }
         }, update = { it.router = controller.input })
 
+        CursorOverlay(controller.input) { pan }
         Overlay(controller)
         controller.agentApproval?.takeIf { controller.streaming }?.let { AgentApprovalDialog(it, controller::answerAgentApproval) }
         if (showBars || !controller.streaming) {
-            TopBar(controller, onKeyboard = { viewRef?.showKeyboard() }, onKeys = { showKeys = !showKeys }, modifier = Modifier.align(Alignment.TopCenter))
+            TopBar(
+                controller, pointerStore, onKeyboard = { viewRef?.showKeyboard() }, onPointerSettings = { showPointerSettings = true },
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
         } else {
-            TextButton(onClick = { showBars = true }, modifier = Modifier.align(Alignment.TopEnd)) { Text("⋯") }
+            TextButton(onClick = { showBars = true }, modifier = Modifier.align(Alignment.TopEnd).heightIn(min = 48.dp)) { Text("⋯") }
         }
-        controller.input?.let { if (showKeys) KeyBar(it, Modifier.align(Alignment.BottomCenter).fillMaxWidth()) }
+        controller.input?.takeIf { imeBottom > 0 }?.let {
+            KeyBar(it, onHide = { viewRef?.hideKeyboard() }, modifier = Modifier.align(Alignment.BottomCenter).imePadding())
+        }
+    }
+    if (showPointerSettings) {
+        AlertDialog(
+            onDismissRequest = { showPointerSettings = false },
+            text = { PointerSettingsCard(pointerStore) },
+            confirmButton = { TextButton(onClick = { showPointerSettings = false }) { Text("Xong") } },
+        )
     }
 }
 
@@ -78,13 +131,42 @@ private fun surfaceChanged(controller: ViewerController, holder: SurfaceHolder?,
     }
 }
 
+/** Con trỏ cục bộ của chế độ trackpad: hiện khi đang trượt và 1,5 s sau đó; vẽ ngay không chờ video có con trỏ Mac. */
 @Composable
-private fun TopBar(controller: ViewerController, onKeyboard: () -> Unit, onKeys: () -> Unit, modifier: Modifier) {
+private fun CursorOverlay(router: StreamInputRouter?, pan: () -> Float) {
+    val cursor = router?.cursor ?: return
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(router.cursorStamp) { visible = true; delay(CURSOR_VISIBLE_MS); visible = false }
+    if (!visible) return
+    Canvas(Modifier.fillMaxSize().graphicsLayer { translationY = -pan() }) {
+        val tip = Offset(cursor.first * size.width, cursor.second * size.height)
+        val unit = density
+        val arrow = Path().apply {
+            moveTo(tip.x, tip.y)
+            lineTo(tip.x, tip.y + 17 * unit)
+            lineTo(tip.x + 4.2f * unit, tip.y + 13.2f * unit)
+            lineTo(tip.x + 7 * unit, tip.y + 19.5f * unit)
+            lineTo(tip.x + 9.8f * unit, tip.y + 18.3f * unit)
+            lineTo(tip.x + 7 * unit, tip.y + 12.2f * unit)
+            lineTo(tip.x + 12 * unit, tip.y + 12.2f * unit)
+            close()
+        }
+        drawPath(arrow, Color.White)
+        drawPath(arrow, Color.Black, style = Stroke(1.2f * unit))
+    }
+}
+
+@Composable
+private fun TopBar(controller: ViewerController, store: PointerSettingsStore, onKeyboard: () -> Unit, onPointerSettings: () -> Unit, modifier: Modifier) {
+    val button = Modifier.heightIn(min = 48.dp)
     Row(modifier.fillMaxWidth().background(Color(0x99000000)).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(controller.stats, color = Color.White, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-        TextButton(onClick = onKeyboard) { Text("Bàn phím") }
-        TextButton(onClick = onKeys) { Text("Phím") }
-        Button(onClick = controller::disconnect) { Text("Ngắt") }
+        TextButton(onClick = onKeyboard, modifier = button) { Text("Bàn phím") }
+        TextButton(onClick = store::toggleMode, modifier = button.semantics { contentDescription = "Đổi chế độ chuột, đang là ${store.settings.mode.title()}" }) {
+            Text(store.settings.mode.title())
+        }
+        TextButton(onClick = onPointerSettings, modifier = button.semantics { contentDescription = "Cài đặt chuột và con trỏ" }) { Text("Chuột") }
+        Button(onClick = controller::disconnect, modifier = button) { Text("Ngắt") }
     }
 }
 
