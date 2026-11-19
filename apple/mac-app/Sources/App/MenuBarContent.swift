@@ -19,6 +19,9 @@ struct MenuBarContent: View {
         } else if host.allowTailscale {
             Text("Chưa thấy Tailscale trên máy này")
         }
+        Toggle("Chỉ phát âm thanh trên thiết bị (tắt loa Mac)", isOn: Binding(
+            get: { host.audioOptions.muteLocalOutput }, set: { host.audioOptions.setMuteLocalOutput($0) }))
+        UsbMenuSection(host: host)
         if !AccessibilityPermission.isGranted {
             Button(AccessibilityPermission.menuTitle) {
                 AccessibilityPermission.requestPrompt()

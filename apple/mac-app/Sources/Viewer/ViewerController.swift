@@ -100,12 +100,17 @@ final class ViewerController {
         await run(title: title) { await $0.pair(with: uri, config: $1) }
     }
 
+    /// Đường hầm USB (iPhone/iPad là TCP-server): Mac-viewer chỉ dùng để kiểm thử loopback.
+    func connectTunnel(_ tunnel: ControlConnection, title: String) async {
+        await run(title: title) { await $0.connect(tunnel: tunnel, config: $1) }
+    }
+
     private func run(title: String, _ start: (ViewerSession, DisplayConfig) async -> Void) async {
         guard session == nil else { return }
         errorMessage = nil
         let session = ViewerSession(
             security: AppSecurity.current, deviceName: HostIdentity.displayName, trust: security.viewerTrust,
-            clipboard: ClipboardConfig(pasteboard: clipboardPasteboard, autoWatch: true))
+            clipboard: ClipboardConfig(pasteboard: clipboardPasteboard, autoWatch: true), audio: AudioConfig())
         self.session = session
         await start(session, displayConfig())
         await security.refresh()

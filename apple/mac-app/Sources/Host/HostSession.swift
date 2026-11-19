@@ -24,15 +24,18 @@ actor HostSession {
     let hostCaps: Capabilities
     private let report: @Sendable (HostSessionState) -> Void
     let onSecureInput: @Sendable (Bool) -> Void
-    private let onAgentAnswer: @Sendable (_ requestId: String, _ allow: Bool) -> Void
+    let onAgentAnswer: @Sendable (_ requestId: String, _ allow: Bool) -> Void
     let log = Logger(subsystem: "vn.xox.xdesk", category: "host-session")
     private(set) var channel: UdpMediaChannel?
-    private var pipeline: HostPipeline?
+    var pipeline: HostPipeline?
+    var audio: HostAudioStreamer?
+    var mutedLocalOutput = false
+    let audioSettings: HostAudioSettings
     var input: HostInputService?
     var viewerReady = false
     /// Quyền của thiết bị đã ghép (plaintext Debug: mặc định). `view` tắt → từ chối phiên; `input` tắt → bỏ input.
     private(set) var permissions = DevicePermissions.default
-    private var bitrate = BitrateController(initialKbps: HostSession.initialBitrateKbps)
+    var bitrate = BitrateController(initialKbps: HostSession.initialBitrateKbps)
     private var tasks: [Task<Void, Never>] = []
     let pasteboard: (any PasteboardAccess)?
     let permissionLookup: @Sendable ([UInt8]) async -> DevicePermissions?
@@ -44,8 +47,10 @@ actor HostSession {
         onSecureInput: @escaping @Sendable (Bool) -> Void = { _ in },
         onAgentAnswer: @escaping @Sendable (String, Bool) -> Void = { _, _ in },
         pasteboard: (any PasteboardAccess)? = nil,
+        audioSettings: HostAudioSettings = HostAudioSettings(),
         permissionLookup: @escaping @Sendable ([UInt8]) async -> DevicePermissions? = { _ in nil }
     ) {
+        self.audioSettings = audioSettings
         self.pasteboard = pasteboard
         self.permissionLookup = permissionLookup
         self.onAgentAnswer = onAgentAnswer
@@ -61,11 +66,11 @@ actor HostSession {
         var reason = "viewer ngắt kết nối"
         do {
             permissions = await connection.peer?.permissions ?? .default
-            let result = try await connection.performHostHandshake(caps: negotiableCaps, sessionId: UUID().uuidString) { [self] _, display in
-                try await prepare(display)
+            let result = try await connection.performHostHandshake(caps: negotiableCaps, sessionId: UUID().uuidString) { [self] hello, display in
+                try await prepare(hello, display)
             }
             if result.caps.contains(.clipboard) { await startClipboard() }
-            try await startPipeline(result.display)
+            try await startPipeline(result.display, caps: result.caps)
             try await controlLoop()
         } catch {
             reason = error.localizedDescription
@@ -88,9 +93,17 @@ actor HostSession {
 
     // MARK: Chuẩn bị (trong handshake)
 
-    private func prepare(_ display: DisplayConfig) async throws -> DisplayReady {
+    private func prepare(_ hello: Hello, _ display: DisplayConfig) async throws -> DisplayReady {
         permissions = await connection.peer?.permissions ?? .default
         guard permissions.view else { throw TransportError.rejected(reason: "permission", detail: "thiết bị này không có quyền xem") }
+        if connection.isUsbTunnel {
+            guard Capabilities(rawValue: hello.caps).contains(.mediaOverTcp) else {
+                throw TransportError.rejected(reason: "transport", detail: "đường hầm USB cần MediaOverTcp")
+            }
+            channel = await UdpMediaChannel.overTcp(streamId: Self.streamId, isViewer: false) { [connection] in try await connection.sendMediaOverTcp($0) }
+            // Không có UDP: udpPort chỉ là chỗ giữ chỗ (≠ 0 theo spec) và bị viewer bỏ qua khi đã thương lượng MediaOverTcp.
+            return DisplayReady(udpPort: 1, streamId: Self.streamId)
+        }
         let channel = try await UdpMediaChannel.listen(
             streamId: Self.streamId, allowedPeerHost: connection.remoteHost, keys: await connection.udpKeys)
         self.channel = channel
@@ -102,7 +115,7 @@ actor HostSession {
         return DisplayReady(udpPort: await channel.localPort, streamId: Self.streamId)
     }
 
-    private func startPipeline(_ config: DisplayConfig) async throws {
+    private func startPipeline(_ config: DisplayConfig, caps: Capabilities) async throws {
         guard let channel else { throw TransportError.noPeer }
         let width = Int(config.w), height = Int(config.h)
         let hiDPI = config.scale >= 2
@@ -112,7 +125,9 @@ actor HostSession {
         ))
         if let reason = acquired.fallbackReason { log.notice("fallback \(acquired.mode == .mirror ? "mirror" : "extend", privacy: .public): \(reason, privacy: .public)") }
         let settings = EncoderSettings(width: width, height: height, fps: Int(config.fps), bitrateKbps: Self.initialBitrateKbps, codec: config.codec)
-        let pipeline = try HostPipeline(displayID: acquired.displayID, settings: settings) { [connection] error in
+        audio = await makeAudioStreamer(caps: caps, channel: channel)
+        let audioSink = audio.map { streamer in { @Sendable (samples: [Int16], captureMs: Double, nowMs: Double) in streamer.ingest(samples: samples, captureMs: captureMs, nowMs: nowMs) } }
+        let pipeline = try HostPipeline(displayID: acquired.displayID, settings: settings, audioSink: audioSink) { [connection] error in
             Task { _ = try? await connection.send(.bye(Bye(reason: error?.localizedDescription ?? "capture stopped"))); await connection.close() }
         }
         self.pipeline = pipeline
@@ -124,6 +139,7 @@ actor HostSession {
                 switch event {
                 case .peerConnected:
                     viewerReady = true
+                    audio?.setActive(true)
                     pipeline?.beginStreaming()
                 case .packet(let packet): await handleInputPacket(packet)
                 case .linkLost: await connection.close()
@@ -146,38 +162,6 @@ actor HostSession {
         }
     }
 
-    // MARK: Vòng điều khiển
-
-    private func controlLoop() async throws {
-        while let inbound = try await connection.nextInbound() {
-            if case .bulk(let chunk) = inbound { await clipboard?.handleBulk(chunk); continue }
-            guard case .message(let envelope) = inbound else { continue }
-            switch envelope.message {
-            case .clipOffer, .clipPull, .clipData: await clipboard?.handle(envelope.message)
-            case .keyframeRequest: pipeline?.requestKeyframe()
-            case .netReport(let r): try await applyNetReport(r)
-            case .ping(let ping):
-                let t1 = ClockSync.wallClockMs()
-                let pong = ClockSync.makePong(for: ping, receivedAtMs: t1, sentAtMs: ClockSync.wallClockMs())
-                _ = try await connection.send(.pong(pong), id: envelope.id)
-            case .inputText(let t): await handleInputText(t.text)
-            case .rekeyResync(let resync): await channel?.handleResync(resync)
-            case .agentApprove(let answer) where !answer.isRequest:
-                // Chỉ thiết bị có quyền điều khiển mới được duyệt quyền cho agent.
-                if permissions.input { onAgentAnswer(answer.requestId, answer.allow ?? false) }
-            case .bye: return
-            default: break
-            }
-        }
-    }
-
-    private func applyNetReport(_ r: NetReport) async throws {
-        let now = Int(ProcessInfo.processInfo.systemUptime * 1000)
-        guard let kbps = bitrate.update(lossPermille: Int(r.lossPermille), rttMs: Int(r.rttMs), nowMs: now) else { return }
-        try pipeline?.encoder.setBitrate(kbps: kbps)
-        _ = try await connection.send(.bitrateSet(BitrateSet(kbps: UInt32(kbps))))
-    }
-
     // MARK: Dọn dẹp
 
     private func teardown() async {
@@ -188,6 +172,7 @@ actor HostSession {
         viewerReady = false
         await input?.shutdown()
         input = nil
+        stopAudio()
         await pipeline?.stop()
         pipeline = nil
         await channel?.close()

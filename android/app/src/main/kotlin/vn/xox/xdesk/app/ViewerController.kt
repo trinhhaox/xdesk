@@ -33,6 +33,7 @@ class ViewerController(private val container: AppContainer, private val deviceNa
     private val main = Handler(Looper.getMainLooper())
     private val background = Executors.newSingleThreadExecutor { Thread(it, "xdesk-connect") }
     private val decoder = VideoDecoder(onNeedKeyframe = { session?.requestKeyframe() }, onError = { post { failure = ConnectionFailure(it, false) } })
+    private val audio = AppAudio()
     private var session: ViewerSession? = null
     private var surface: Surface? = null
     private var lastTarget: ViewerTarget? = null
@@ -92,7 +93,8 @@ class ViewerController(private val container: AppContainer, private val deviceNa
         lastTarget = targets.firstOrNull()
         currentConfig = config
         val next = ViewerSession(trust, deviceName, { decoder.submit(it) }, { post { onState(it) } },
-            { Thread(it, "xdesk-udp").also { t -> t.priority = Thread.MAX_PRIORITY } }, onAgentApproval = { post { agentApproval = it } })
+            { Thread(it, "xdesk-udp").also { t -> t.priority = Thread.MAX_PRIORITY } }, onAgentApproval = { post { agentApproval = it } },
+            audioSink = audio.sink)
         session = next
         input = StreamInputRouter(next).also { it.configure(config.w / config.scale.toFloat(), config.h / config.scale.toFloat()) }
         background.execute { next.connect(targets, config, auth) }
@@ -147,7 +149,8 @@ class ViewerController(private val container: AppContainer, private val deviceNa
 
     fun refreshStats() {
         val s = session ?: return
-        stats = "${decoder.codecName ?: "-"} · ${s.fps} fps · ${s.recvKbps} kbps · RTT ${s.rttMs ?: "-"} ms"
+        val sound = audio.player.stats.takeIf { it.packets > 0 }?.let { " · tiếng ${it.codec} ${it.estimatedLatencyMs(s.rttMs ?: 0)} ms" }.orEmpty()
+        stats = "${decoder.codecName ?: "-"} · ${s.fps} fps · ${s.recvKbps} kbps · RTT ${s.rttMs ?: "-"} ms$sound"
     }
 
     fun resetIdentity() {

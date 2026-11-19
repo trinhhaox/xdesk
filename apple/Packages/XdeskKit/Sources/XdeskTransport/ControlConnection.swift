@@ -26,6 +26,8 @@ public actor ControlConnection {
     enum Mode { case plaintext, awaitingKeys, secured }
 
     public nonisolated let remoteEndpoint: NWEndpoint
+    /// Kết nối đi qua đường hầm USB (usbmuxd): vai TCP đảo, media chỉ đi qua MediaOverTcp (kind 0x04).
+    public nonisolated let isUsbTunnel: Bool
     let connection: NWConnection
     let queue = DispatchQueue(label: "xdesk.control.connection")
     var decoder = ControlFrameDecoder()
@@ -40,7 +42,8 @@ public actor ControlConnection {
     public internal(set) var peer: AuthenticatedPeer?
     public internal(set) var udpKeys: UdpKeys?
 
-    init(connection: NWConnection, encrypted: Bool = false, onClose: (@Sendable () -> Void)? = nil) {
+    init(connection: NWConnection, encrypted: Bool = false, isUsbTunnel: Bool = false, onClose: (@Sendable () -> Void)? = nil) {
+        self.isUsbTunnel = isUsbTunnel
         self.connection = connection
         self.remoteEndpoint = connection.endpoint
         self.onClose = onClose

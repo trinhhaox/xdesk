@@ -8,6 +8,7 @@ extension UdpMediaChannel {
     /// Đưa vào gói nhận được qua đường khác (MediaOverTcp).
     public func ingest(_ packet: MediaPacket) async {
         heardFromHost = true
+        lastValidMs = monotonicMs()
         await handle(packet)
     }
 

@@ -8,6 +8,7 @@ import vn.xox.xdesk.wire.Capabilities
 import vn.xox.xdesk.wire.ControlMessage
 import vn.xox.xdesk.wire.InputEvent
 import vn.xox.xdesk.wire.MediaPacket
+import vn.xox.xdesk.wire.MediaPacketType
 
 /**
  * Phía viewer của một kết nối: handshake → UDP → ghép frame (giao cho [frameSink]), ping/pong (ClockSync),
@@ -23,6 +24,7 @@ class ViewerSession(
     private val threadFactory: (Runnable) -> Thread = { Thread(it, "xdesk-udp") },
     private val nowMs: () -> Long = System::currentTimeMillis,
     onAgentApproval: (AgentApprovalRequest?) -> Unit = {},
+    private val audioSink: AudioSink? = null,
 ) {
     private val connector = ViewerConnector(trust, deviceName, nowMs)
     private val lock = Any()
@@ -34,6 +36,7 @@ class ViewerSession(
     private val metrics = SessionMetrics()
     private val approvals = AgentApprovalGate(nowMs, { delayMs, task -> io?.schedule(task, delayMs, TimeUnit.MILLISECONDS) }, onAgentApproval)
     private var lastKeyframeRequestMs = 0L
+    private var audioActive = false
 
     @Volatile var state: ViewerState = ViewerState.Idle
         private set
@@ -110,7 +113,8 @@ class ViewerSession(
         connection = conn
         connectedTarget = host.target
         connectedHostId = host.hostId
-        val result = ViewerHandshake.run(conn, deviceName, Capabilities.H264, config)
+        val result = ViewerHandshake.run(conn, deviceName, offeredCaps(), config)
+        startAudio(result.caps)
         val keys = conn.udpKeys ?: transportError(TransportErrorCode.PROTOCOL_VIOLATION, "thiếu khoá UDP")
         streamId = result.ready.streamId
         val executor = Executors.newSingleThreadScheduledExecutor { Thread(it, "xdesk-io") }
@@ -127,6 +131,27 @@ class ViewerSession(
         executor.scheduleWithFixedDelay({ guardedIo { inputPump?.maintain(nowMs()) } }, 50, InputPump.MAINTENANCE_INTERVAL_MS, TimeUnit.MILLISECONDS)
         executor.scheduleWithFixedDelay({ guardedIo { reportNow() } }, 500, 500, TimeUnit.MILLISECONDS)
         executor.execute { pingLoop(100) }
+    }
+
+    /** Khả năng viewer đưa ra: audio chỉ khi app có [audioSink]; host chỉ giữ lại nếu thiết bị này được cấp quyền âm thanh. */
+    private fun offeredCaps(): Long =
+        if (audioSink == null) Capabilities.H264 else Capabilities.H264 or Capabilities.AUDIO_PCM or Capabilities.AUDIO_AAC_ELD
+
+    private fun startAudio(negotiated: Long) {
+        val sink = audioSink ?: return
+        if (negotiated and (Capabilities.AUDIO_PCM or Capabilities.AUDIO_AAC_ELD) == 0L) return
+        try {
+            sink.start()
+            audioActive = true
+        } catch (e: RuntimeException) {
+            audioActive = false // không bật được loa: chỉ mất tiếng, hình vẫn chạy
+        }
+    }
+
+    private fun stopAudio() {
+        if (!audioActive) return
+        audioActive = false
+        audioSink?.stop()
     }
 
     private fun pingLoop(intervalMs: Long) {
@@ -167,6 +192,7 @@ class ViewerSession(
 
     private fun teardown() {
         approvals.clear()
+        stopAudio()
         io?.shutdownNow()
         io = null
         channel?.close()
@@ -189,7 +215,9 @@ class ViewerSession(
         }
 
         override fun onKeyframeNeeded() = runIo { requestKeyframeNow() }
-        override fun onPacket(packet: MediaPacket) { runIo { inputPump?.handleAck(packet) } }
+        override fun onPacket(packet: MediaPacket) {
+            if (packet.header.type == MediaPacketType.AUDIO) audioSink?.onPacket(packet) else runIo { inputPump?.handleAck(packet) }
+        }
         override fun onLinkLost() = fail(TransportErrorCode.LINK_LOST.message, TransportErrorCode.LINK_LOST)
     }
 

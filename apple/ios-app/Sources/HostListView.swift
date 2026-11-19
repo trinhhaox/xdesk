@@ -58,6 +58,9 @@ struct HostListView: View {
                 } footer: {
                     Text("Qua Tailscale: nhập IP 100.x.y.z hoặc tên máy (MagicDNS) của Mac, rồi \"Lưu máy này\". Trên Mac phải bật \"Cho phép kết nối qua Tailscale\".")
                 }
+                Section("Cáp USB") {
+                    Text("Cắm cáp vào Mac rồi chọn \"Phát qua USB\" trong menu Xdesk trên Mac. Cần đã ghép đôi với Mac này qua Wi-Fi trước.").font(.footnote).foregroundStyle(.secondary)
+                }
                 if let message = model.errorMessage ?? model.manualHostError { Section { Text(message).foregroundStyle(.red) } }
             }
             .navigationTitle("Xdesk")

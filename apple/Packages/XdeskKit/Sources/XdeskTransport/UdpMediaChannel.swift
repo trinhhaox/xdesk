@@ -62,7 +62,7 @@ public actor UdpMediaChannel {
     var tcpSink: (@Sendable (MediaPacket) async throws -> Void)?
     var outgoingFilter: (@Sendable (MediaPacket) -> Bool)?
 
-    private init(streamId: UInt16, allowedPeerHost: String?, keys: UdpKeys?) {
+    init(streamId: UInt16, allowedPeerHost: String?, keys: UdpKeys?) {
         (events, continuation) = AsyncStream.makeStream(of: Event.self)
         self.streamId = streamId
         self.packetizer = Packetizer(streamId: streamId)
@@ -107,6 +107,11 @@ public actor UdpMediaChannel {
         try await startAndAwaitReady(conn, queue: queue)
         peer = conn
         beginReceiving(on: conn)
+        startPolling()
+        startMaintenance()
+    }
+
+    func startPolling() {
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
@@ -114,7 +119,6 @@ public actor UdpMediaChannel {
                 try? await Task.sleep(for: .milliseconds(Self.pollIntervalMs))
             }
         }
-        startMaintenance()
     }
 
     /// Plaintext: peer mới thay peer cũ (cùng IP). Mã hoá: chỉ nhận làm ứng viên, thành peer khi giải mã được gói đầu (`promote`).

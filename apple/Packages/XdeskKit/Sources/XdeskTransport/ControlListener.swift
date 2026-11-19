@@ -23,14 +23,14 @@ public actor ControlListener {
     /// Kết nối đã vào, đã xác thực (mã hoá) hoặc mới TCP-ready (plaintext), chưa hello/welcome.
     public nonisolated let connections: AsyncStream<ControlConnection>
     private let continuation: AsyncStream<ControlConnection>.Continuation
-    private let security: TransportSecurity
+    let security: TransportSecurity
     private let advertiser: BonjourAdvertiser?
-    private let authenticator: HostAuthenticator?
+    let authenticator: HostAuthenticator?
     private let maxViewers: Int
     private let maxPending: Int
     private let maxPendingPerSource: Int
     private let queue = DispatchQueue(label: "xdesk.control.listener")
-    private var listener: NWListener?
+    var listener: NWListener?
     private var entries: [UUID: Entry] = [:]
     private var allowTailscale: Bool
     private let isTailscale: @Sendable (NWEndpoint) -> Bool
@@ -137,8 +137,8 @@ public actor ControlListener {
 
     // MARK: Mã hoá
 
-    private func admitSecure(_ nwConnection: NWConnection, _ authenticator: HostAuthenticator) async {
-        let source = Self.source(of: nwConnection)
+    func admitSecure(_ nwConnection: NWConnection, _ authenticator: HostAuthenticator, usbHello: [UInt8]? = nil) async {
+        let source = usbHello == nil ? Self.source(of: nwConnection) : "usb"
         guard entries.values.filter({ !$0.authenticated && $0.source == source }).count < maxPendingPerSource else {
             nwConnection.cancel()
             return
@@ -147,12 +147,13 @@ public actor ControlListener {
             await oldest.connection.close()
         }
         let id = UUID()
-        let conn = ControlConnection(connection: nwConnection, encrypted: true, onClose: { [weak self] in
-            Task { await self?.released(id) }
-        })
+        let onClose: @Sendable () -> Void = { [weak self] in Task { await self?.released(id) } }
+        let conn = usbHello == nil
+            ? ControlConnection(connection: nwConnection, encrypted: true, onClose: onClose)
+            : ControlConnection.adoptUsbTunnel(nwConnection, onClose: onClose)
         entries[id] = Entry(connection: conn, source: source, startedAt: .now, authenticated: false)
         do {
-            try await conn.start()
+            if let usbHello { try await conn.sendUsbHello(hostPublicKey: usbHello) } else { try await conn.start() }
             let peer = try await authenticator.accept(conn)
             try await promote(id, conn, peer, authenticator)
         } catch {

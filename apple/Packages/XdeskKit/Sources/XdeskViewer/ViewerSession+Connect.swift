@@ -73,14 +73,14 @@ extension ViewerSession {
         }
     }
 
-    private func remember(_ outcome: InitiatorOutcome, target: ViewerTarget, trust: ViewerTrust) async {
+    func remember(_ outcome: InitiatorOutcome, target: ViewerTarget?, trust: ViewerTrust) async {
         do {
             if outcome.method != .reconnect {
                 try await trust.knownHosts.add(name: outcome.hostName, publicKey: outcome.hostKey, role: .host)
             }
             let id = DeviceFingerprint.make(publicKey: outcome.hostKey)
             try await trust.knownHosts.markSeen(id: id)
-            if case .manual(let host, let port) = target { try await trust.knownHosts.setLastAddress(id: id, "\(host):\(port)") }
+            if case .manual(let host, let port)? = target { try await trust.knownHosts.setLastAddress(id: id, "\(host):\(port)") }
         } catch {
             log.error("không lưu được host đã biết: \(error.localizedDescription, privacy: .public)")
         }

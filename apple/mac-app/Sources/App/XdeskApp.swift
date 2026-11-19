@@ -31,6 +31,7 @@ struct XdeskApp: App {
         (self.security, self.host, self.viewer, self.pairing, self.agent) = (security, host, viewer, pairing, agent)
         // Bật chia sẻ ngay khi mở app để điện thoại tìm thấy Mac mà không cần vào menu.
         Task { @MainActor in await host.start() }
+        host.usb.start()
         Task { @MainActor in await agent.restoreIfEnabled() }
         #if DEBUG
         Task { @MainActor in await AutomationHooks.run(host: host, viewer: viewer, security: security, pairing: pairing, agent: agent) }

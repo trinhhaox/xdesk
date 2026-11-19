@@ -30,9 +30,9 @@ public final class ViewerSession {
     public private(set) var recvKbps = 0
     public private(set) var rttMs: Int64?
     /// Đích đã kết nối thành công (QR có thể thử nhiều địa chỉ); phiên mở lại dùng đích này.
-    public private(set) var connectedTarget: ViewerTarget?
+    public internal(set) var connectedTarget: ViewerTarget?
     /// `ip:cổng` thực của host nhập tay vừa kết nối (tên MagicDNS đã phân giải); nil với host Bonjour.
-    public private(set) var connectedRemoteAddress: String?
+    public internal(set) var connectedRemoteAddress: String?
     /// Chênh đồng hồ host − viewer (ms); dùng cho overlay đo độ trễ.
     public private(set) var clockOffsetMs: Double?
     /// Host đã ghép vừa từ chối IK ở lần `connect` gần nhất (id = fingerprint); UI đề nghị ghép đôi lại.
@@ -43,6 +43,10 @@ public final class ViewerSession {
     public internal(set) var pendingAgentApproval: AgentApprovalRequest?
     /// Host đã cấp quyền clipboard cho thiết bị này và phiên đang đồng bộ (iOS dùng để hiện nút "Gửi clipboard sang Mac").
     public internal(set) var clipboardAvailable = false
+    /// Số liệu phát audio (nil khi phiên không có audio); cập nhật mỗi 500 ms.
+    public internal(set) var audioStats: AudioPlaybackStats?
+    /// Ước lượng trễ audio đầu-cuối (ms): host giữ + rtt/2 + jitter buffer + thiết bị phát.
+    public var audioLatencyEstimateMs: Int? { audioStats?.estimatedLatencyMs(rttMs: Int(rttMs ?? 0)) }
     public let renderer = VideoLayerRenderer()
 
     @ObservationIgnored let log = Logger(subsystem: "vn.xox.xdesk", category: "viewer-session")
@@ -50,6 +54,8 @@ public final class ViewerSession {
     @ObservationIgnored let deviceName: String
     @ObservationIgnored let trust: ViewerTrust?
     @ObservationIgnored let clipboardConfig: ClipboardConfig?
+    @ObservationIgnored let audioConfig: AudioConfig?
+    @ObservationIgnored var audioPlayer: AudioPlayer?
     @ObservationIgnored var clipboardSync: ClipboardSync?
     @ObservationIgnored var connection: ControlConnection?
     @ObservationIgnored var channel: UdpMediaChannel?
@@ -67,8 +73,12 @@ public final class ViewerSession {
     #endif
 
     /// `trust` bắt buộc khi `security == .encrypted` (danh tính + host đã biết); plaintext (Debug) bỏ qua.
-    public init(security: TransportSecurity, deviceName: String, trust: ViewerTrust? = nil, clipboard: ClipboardConfig? = nil) {
+    public init(
+        security: TransportSecurity, deviceName: String, trust: ViewerTrust? = nil, clipboard: ClipboardConfig? = nil,
+        audio: AudioConfig? = nil
+    ) {
         self.clipboardConfig = clipboard
+        self.audioConfig = audio
         self.security = security
         self.deviceName = deviceName
         self.trust = trust
@@ -103,7 +113,7 @@ public final class ViewerSession {
         state = .idle
     }
 
-    private var isFailed: Bool { if case .failed = state { true } else { false } }
+    var isFailed: Bool { if case .failed = state { true } else { false } }
 
     // MARK: Kết nối
 
@@ -112,15 +122,18 @@ public final class ViewerSession {
         connectedTarget = target
         connection = conn
         try await authenticate(conn, target: target, auth: auth)
-        let result = try await conn.performViewerHandshake(name: deviceName, caps: offeredCaps, display: config)
+        try await finishEstablishing(conn, config: config, target: target)
+    }
+
+    /// Sau khi kênh đã xác thực: hello/welcome → kênh media (UDP, hoặc MediaOverTcp qua USB) → các vòng lặp của phiên.
+    func finishEstablishing(_ conn: ControlConnection, config: DisplayConfig, target: ViewerTarget?) async throws {
+        let result = try await conn.performViewerHandshake(name: deviceName, caps: offeredCaps(tunnel: conn.isUsbTunnel), display: config)
         await startClipboard(on: conn, negotiated: result.caps)
-        guard let host = await conn.resolvedRemoteHost else { throw TransportError.connectionFailed("không xác định được địa chỉ host") }
-        if case .manual(_, let port) = target { connectedRemoteAddress = "\(PeerAddressPolicy.normalized(host)):\(port)" }
+        startAudio(negotiated: result.caps)
         factory = SampleBufferFactory(codec: config.codec)
         streamId = result.ready.streamId
-        let channel = try await UdpMediaChannel.connect(streamId: streamId, host: host, port: result.ready.udpPort, keys: await conn.udpKeys)
+        let channel = try await openMediaChannel(conn, result: result, target: target)
         self.channel = channel
-        await wireResync(channel: channel, connection: conn)
         let (packets, outbox) = AsyncStream.makeStream(of: MediaPacket.self)
         inputOutbox = outbox
         tasks = [
@@ -131,6 +144,18 @@ public final class ViewerSession {
             Task { [weak self] in await self?.pingLoop(conn) },
             Task { [weak self] in await self?.reportLoop() },
         ]
+    }
+
+    private func openMediaChannel(_ conn: ControlConnection, result: ViewerHandshakeResult, target: ViewerTarget?) async throws -> UdpMediaChannel {
+        if conn.isUsbTunnel {
+            guard result.caps.contains(.mediaOverTcp) else { throw TransportError.protocolViolation("host không bật MediaOverTcp cho đường hầm USB") }
+            return await UdpMediaChannel.overTcp(streamId: streamId, isViewer: true) { try await conn.sendMediaOverTcp($0) }
+        }
+        guard let host = await conn.resolvedRemoteHost else { throw TransportError.connectionFailed("không xác định được địa chỉ host") }
+        if case .manual(_, let port)? = target { connectedRemoteAddress = "\(PeerAddressPolicy.normalized(host)):\(port)" }
+        let channel = try await UdpMediaChannel.connect(streamId: streamId, host: host, port: result.ready.udpPort, keys: await conn.udpKeys)
+        await wireResync(channel: channel, connection: conn)
+        return channel
     }
 
     func setState(_ newState: State) { state = newState }
@@ -156,6 +181,7 @@ public final class ViewerSession {
     func teardown() async {
         pendingAgentApproval = nil
         await stopClipboard()
+        stopAudio()
         tasks.forEach { $0.cancel() }
         tasks.removeAll()
         inputOutbox?.finish()

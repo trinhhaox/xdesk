@@ -46,6 +46,29 @@ Mọi mảnh của frame giữ nguyên `frameNo`, `ptsMs`, `fragCnt`, cờ keyfr
 Ví dụ (`maxPayload=16`, frame 40 byte `00 01 … 27`, keyframe, stream 3, frame 42, pts 5000) → 3 gói, gói đầu:
 `01 10 0003 0000002a 0000 8003 00001388 000102…0f`.
 
+## Âm thanh (ptype 0x20, phase 09a)
+
+Mac → viewer, 48 kHz stereo cố định ở v1. Mỗi gói audio **không phân mảnh** (`fragIdx=0`, `fragCnt=1`, cờ keyframe = 0) và tự đủ nghĩa: mất gói chỉ mất đúng đoạn đó, không có NACK cho audio.
+
+| Trường header | Ý nghĩa |
+|---|---|
+| `streamId` | cùng stream với video |
+| `frameNo` | số thứ tự gói audio, bắt đầu 0, tăng 1 mỗi gói (khác dãy `frameNo` của video) |
+| `ptsMs` | thời điểm bắt đầu mẫu đầu tiên của gói trên **đồng hồ video** của host (ms kể từ lúc mở pipeline), cùng đồng hồ với `ptsMs` của video |
+
+Payload: `u8 codec | u16 holdMs (big-endian) | data`.
+- `holdMs` = số ms host giữ đoạn này từ lúc ghi (mốc của ScreenCaptureKit) tới lúc gửi, kẹp 0…65535. Viewer cộng vào ước lượng trễ đầu-cuối (không cần đồng bộ đồng hồ giữa hai máy).
+- `codec 0` PCM: `data` = s16 little-endian xen kẽ L,R; độ dài chia hết cho 4 và 4…1 184 B. Host gửi 240 mẫu/kênh (5 ms, 960 B) mỗi gói → ~1,6 Mb/s kể cả header.
+- `codec 1` AAC-ELD: `data` = đúng một access unit thô (không ADTS/LATM), 512 mẫu/kênh (10,67 ms); AudioSpecificConfig cố định `F8 E6 40 00` (ELD, 48 kHz, stereo, không SBR, khung 512). ~96 kb/s. Android `MediaCodec` giải được với `csd-0` = ASC này.
+- Codec khác / `data` rỗng / sai độ dài → bỏ gói (đếm lỗi, không đóng kênh).
+- Mỗi gói tự khai `codec` nên host đổi codec giữa phiên được (xem dưới) và viewer giải cả hai không cần báo trước.
+
+Thương lượng (`caps`): `audioPCM` (bit 2) và `audioAACELD` (bit 3). Host chỉ đưa chúng vào `welcome` khi **thiết bị viewer đã được cấp quyền `audio`** (mặc định tắt: âm thanh hệ thống có thể chứa nội dung riêng tư) và quyền được kiểm lại mỗi giây → tắt giữa phiên là host ngừng gửi ngay. Giao của hai tập có ít nhất một codec mới có audio; host không gửi codec không có trong giao.
+
+Chọn codec (host, `AudioCodecPolicy`): peer qua Tailscale hoặc USB (MediaOverTcp) → AAC-ELD; ngược lại PCM, và chuyển sang AAC-ELD khi ước lượng băng thông (bitrate video mà ABR đang cho phép) **< 10 Mb/s**, quay lại PCM khi **≥ 12 Mb/s** (trễ chống dao động). Chỉ chuyển giữa các codec có trong giao.
+
+Viewer: jitter buffer mục tiêu **40 ms** (bắt đầu phát khi đủ 40 ms; thiếu → phát im lặng rồi đệm lại; dư > 100 ms → bỏ phần cũ về 40 ms; khoảng trống `frameNo` được lấp bằng im lặng). Ưu tiên trễ thấp hơn lip-sync tuyệt đối (video cũng hiển thị ngay không chờ PTS).
+
 ## Bộ ghép (receiver)
 
 - Lưu mảnh theo `frameNo`; mảnh trùng bỏ qua; `fragCnt` khác nhau cho cùng `frameNo` → `inconsistentFragmentCount`.

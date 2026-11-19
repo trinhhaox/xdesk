@@ -30,6 +30,7 @@ import XdeskViewer
 ///   --clipboard-viewer-pasteboard <tên>  viewer cùng tiến trình dùng pasteboard có tên khác (để thấy clipboard đi qua mạng)
 ///   --auto-approve-clipboard    khi tự duyệt ghép đôi, cấp luôn quyền clipboard (mặc định tắt)
 ///   --allow-tailscale           host nhận kết nối Tailscale (chỉ trong tiến trình này, không lưu cài đặt)
+///   Cờ audio/USB (--auto-approve-audio, --audio-report, --audio-narrow, --audio-mute-local, --usb-loopback, --usb-probe): xem AutomationHooks+Audio.swift
 ///   --quit-after <giây>         tự thoát
 @MainActor
 enum AutomationHooks {
@@ -43,6 +44,8 @@ enum AutomationHooks {
         if let name = value(after: "--clipboard-host-pasteboard", in: args) { host.clipboardPasteboard = SystemPasteboard(name: name) }
         if let name = value(after: "--clipboard-viewer-pasteboard", in: args) { viewer.clipboardPasteboard = SystemPasteboard(name: name) }
         if args.contains("--allow-tailscale") { host.setAllowTailscale(true, persist: false) }
+        AudioAutomation.configure(host: host, args: args)
+        Task { await AudioAutomation.run(host: host, viewer: viewer, args: args) }
         if args.contains("--auto-host") {
             await host.start()
             log.notice("auto-host status: \(String(describing: host.status), privacy: .public)")

@@ -42,6 +42,8 @@ final class SecurityCenter {
 
     let stores: DeviceSecurityStores?
     let hostAuthenticator: HostAuthenticator?
+    /// Khoá công khai của host (báo cho viewer qua `usbHello` để chọn đúng khoá IK).
+    var hostPublicKey: [UInt8]? { get async { await hostAuthenticator?.publicKey } }
     let viewerTrust: ViewerTrust?
 
     @ObservationIgnored let log = Logger(subsystem: "vn.xox.xdesk", category: "security-center")

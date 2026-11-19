@@ -16,11 +16,16 @@ struct XdeskIOSApp: App {
             }
             .onChange(of: scenePhase) { _, phase in
                 switch phase {
-                case .background: Task { await model.enterBackground() }
-                case .active: Task { await model.enterForeground() }
+                case .background:
+                    model.stopUsbListener()
+                    Task { await model.enterBackground() }
+                case .active:
+                    model.startUsbListener()
+                    Task { await model.enterForeground() }
                 default: break
                 }
             }
+            .task { model.startUsbListener() }
             #if DEBUG
             .task { await AutomationHooks.run(model) }
             #endif

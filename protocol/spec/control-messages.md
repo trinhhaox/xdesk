@@ -10,7 +10,7 @@ là "unknown" và bỏ qua (tương thích tiến). JSON hỏng / thiếu trư�
 | `welcome` | H→V | `ver`, `sessionId` string, `caps` (giao) u32 | |
 | `reject` | cả hai | `reason` string ("version"…), `detail` string? | |
 | `display.config` | V→H | `w`,`h` u32, `scale` number, `fps` u32, `codec` "h264"\|"hevc", `mode` "extend"\|"mirror"? (vắng = extend; mirror = màn hình Mac phản chiếu màn hình ảo theo kích thước viewer) | w,h 1…16384; fps 1…240; scale (0,8] |
-| `display.ready` | H→V | `udpPort` u16, `streamId` u16 | udpPort ≠ 0 |
+| `display.ready` | H→V | `udpPort` u16, `streamId` u16 | udpPort ≠ 0 (đường hầm USB: giữ chỗ = 1, bỏ qua vì media đi qua TCP, xem `framing.md`) |
 | `keyframe.request` | V→H | `streamId` u16 | |
 | `net.report` | V→H | `rttMs`,`lossPermille`,`jitterMs`,`recvKbps` u32 | lossPermille ≤ 1000 |
 | `bitrate.set` | H↔V | `kbps` u32 | |
@@ -42,6 +42,10 @@ Thêm trường tuỳ chọn ở minor mới là tương thích; trường `deta
 ```
 Số thực `scale` có thể viết `2` hoặc `2.0`; bộ giải mã chấp nhận cả hai. Bộ mã hoá Swift sắp xếp khoá theo thứ tự
 byte và không escape dấu `/`. Danh sách đầy đủ + frame hex: `protocol/test-vectors/control-frames.json`.
+
+## Âm thanh (cap 0x04 PCM, 0x08 AAC-ELD, phase 09a)
+
+Host chỉ đưa `audioPCM`/`audioAACELD` vào `welcome` khi thiết bị viewer đã được cấp quyền `audio` (mặc định tắt) — giống clipboard: quyền tắt giữa phiên thì host ngừng gửi trong ≤ 1 s. Không có message điều khiển riêng; gói audio ptype 0x20 và việc chọn codec: xem `media-packets.md`.
 
 ## Clipboard (cap 0x10, phase 09b)
 

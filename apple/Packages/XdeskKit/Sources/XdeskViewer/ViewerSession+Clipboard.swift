@@ -3,8 +3,15 @@ import XdeskTransport
 import XdeskWire
 
 extension ViewerSession {
-    /// Khả năng viewer đưa ra: `.clipboard` chỉ khi app có cấu hình clipboard; host chỉ giữ lại nếu thiết bị này được cấp quyền.
-    var offeredCaps: Capabilities { clipboardConfig == nil ? [.h264, .hevc] : [.h264, .hevc, .clipboard] }
+    /// Khả năng viewer đưa ra: `.clipboard` / audio chỉ khi app có cấu hình tương ứng; host chỉ giữ lại nếu thiết bị này được cấp quyền.
+    /// `.mediaOverTcp` chỉ khi đi qua đường hầm USB (không có UDP).
+    func offeredCaps(tunnel: Bool) -> Capabilities {
+        var caps: Capabilities = [.h264, .hevc]
+        if clipboardConfig != nil { caps.insert(.clipboard) }
+        if audioConfig != nil { caps.formUnion([.audioPCM, .audioAACELD]) }
+        if tunnel { caps.insert(.mediaOverTcp) }
+        return caps
+    }
 
     func startClipboard(on connection: ControlConnection, negotiated: Capabilities) async {
         guard negotiated.contains(.clipboard), let config = clipboardConfig else { return }

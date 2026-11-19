@@ -30,6 +30,9 @@ final class CaptureService: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
     private let fps: Int
     private let onFrame: @Sendable (CapturedFrame) -> Void
     private let onStop: @Sendable (Error?) -> Void
+    /// Có thì SCK ghi cả âm thanh hệ thống (48 kHz stereo, bỏ âm của chính Xdesk) và gọi `onAudio` trên hàng đợi riêng.
+    private let onAudio: (@Sendable (CMSampleBuffer) -> Void)?
+    private let audioQueue = DispatchQueue(label: "xdesk.capture.audio", qos: .userInteractive)
     private let sampleQueue = DispatchQueue(label: "xdesk.capture.samples", qos: .userInteractive)
     private let lock = NSLock()
     private var stream: SCStream?
@@ -37,8 +40,10 @@ final class CaptureService: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
 
     init(
         displayID: CGDirectDisplayID, width: Int, height: Int, fps: Int,
-        onFrame: @escaping @Sendable (CapturedFrame) -> Void, onStop: @escaping @Sendable (Error?) -> Void
+        onFrame: @escaping @Sendable (CapturedFrame) -> Void, onStop: @escaping @Sendable (Error?) -> Void,
+        onAudio: (@Sendable (CMSampleBuffer) -> Void)? = nil
     ) {
+        self.onAudio = onAudio
         self.displayID = displayID
         self.width = width
         self.height = height
@@ -60,11 +65,18 @@ final class CaptureService: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
         configuration.queueDepth = 3
         configuration.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(fps))
         configuration.showsCursor = true
+        if onAudio != nil {
+            configuration.capturesAudio = true
+            configuration.excludesCurrentProcessAudio = true
+            configuration.sampleRate = 48_000
+            configuration.channelCount = 2
+        }
         // Cửa sổ ghép đôi (mã QR, mã so khớp) không bao giờ được đưa vào luồng gửi cho viewer.
         let secure = SecureWindowRegistry.shared.windowIDs
         let excluded = content.windows.filter { secure.contains($0.windowID) }
         let stream = SCStream(filter: SCContentFilter(display: display, excludingWindows: excluded), configuration: configuration, delegate: self)
         try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: sampleQueue)
+        if onAudio != nil { try stream.addStreamOutput(self, type: .audio, sampleHandlerQueue: audioQueue) }
         try await stream.startCapture()
         lock.withLock { self.stream = stream }
     }
@@ -96,6 +108,10 @@ final class CaptureService: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
     // MARK: SCStreamOutput / SCStreamDelegate
 
     func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
+        if type == .audio {
+            if sampleBuffer.isValid { onAudio?(sampleBuffer) }
+            return
+        }
         guard type == .screen, sampleBuffer.isValid, let pixelBuffer = sampleBuffer.imageBuffer, Self.isCompleteFrame(sampleBuffer) else { return }
         onFrame(CapturedFrame(pixelBuffer: pixelBuffer))
     }

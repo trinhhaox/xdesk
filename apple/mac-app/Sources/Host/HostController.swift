@@ -30,8 +30,11 @@ final class HostController {
     private(set) var allowTailscale = UserDefaults.standard.bool(forKey: HostController.allowTailscaleKey)
     private static let allowTailscaleKey = "xdesk.host.allowTailscale"
 
+    let audioOptions = HostAudioOptions()
+    let usb = UsbDeviceMonitor()
+    var usbMessage: String?
     private let log = Logger(subsystem: "vn.xox.xdesk", category: "host-controller")
-    private let security: SecurityCenter
+    let security: SecurityCenter
     private var listener: ControlListener?
     /// AgentController đặt: nhận trả lời `agent.approve` từ điện thoại (requestId, allow).
     var agentAnswerSink: (@MainActor (String, Bool) -> Void)?
@@ -40,6 +43,8 @@ final class HostController {
     private var sessions: [UUID: (session: HostSession, task: Task<Void, Never>)] = [:]
 
     init(security: SecurityCenter) { self.security = security }
+
+    var currentListener: ControlListener? { listener }
 
     var isHosting: Bool {
         switch status {
@@ -122,7 +127,7 @@ final class HostController {
             report: { [weak self] state in Task { @MainActor in self?.update(id, state) } },
             onSecureInput: { [weak self] active in Task { @MainActor in self?.secureInputActive = active } },
             onAgentAnswer: { [weak self] requestId, allow in Task { @MainActor in self?.agentAnswerSink?(requestId, allow) } },
-            pasteboard: clipboardPasteboard,
+            pasteboard: clipboardPasteboard, audioSettings: audioOptions.settings,
             permissionLookup: { [weak self] key in await self?.permissions(forViewerKey: key) }
         )
         sessions[id] = (session, Task { await session.run() })

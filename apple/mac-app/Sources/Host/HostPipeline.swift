@@ -1,4 +1,5 @@
 import CoreGraphics
+import CoreMedia
 import Foundation
 import os
 import XdeskMedia
@@ -10,6 +11,7 @@ final class HostPipeline: @unchecked Sendable {
     private let displayID: CGDirectDisplayID
     private let settings: EncoderSettings
     private let onStop: @Sendable (Error?) -> Void
+    private let audioSink: (@Sendable (_ samples: [Int16], _ captureMs: Double, _ nowMs: Double) -> Void)?
     private let log = Logger(subsystem: "vn.xox.xdesk", category: "host-pipeline")
     private let lock = NSLock()
     private let origin = ProcessInfo.processInfo.systemUptime
@@ -18,7 +20,12 @@ final class HostPipeline: @unchecked Sendable {
     private var streaming = false
     private var lastPtsMs: UInt32 = 0
 
-    init(displayID: CGDirectDisplayID, settings: EncoderSettings, onStop: @escaping @Sendable (Error?) -> Void) throws {
+    /// `audioSink` có thì capture cả âm thanh: mẫu s16 xen kẽ, mốc ghi và giờ hiện tại đều theo đồng hồ video (ms từ lúc mở pipeline).
+    init(
+        displayID: CGDirectDisplayID, settings: EncoderSettings,
+        audioSink: (@Sendable ([Int16], Double, Double) -> Void)? = nil, onStop: @escaping @Sendable (Error?) -> Void
+    ) throws {
+        self.audioSink = audioSink
         self.displayID = displayID
         self.settings = settings
         self.onStop = onStop
@@ -26,9 +33,12 @@ final class HostPipeline: @unchecked Sendable {
     }
 
     func start() async throws {
+        var audioHandler: (@Sendable (CMSampleBuffer) -> Void)?
+        if audioSink != nil { audioHandler = { [self] sample in self.handleAudio(sample) } }
         let service = CaptureService(
             displayID: displayID, width: settings.width, height: settings.height, fps: settings.fps,
-            onFrame: { [self] frame in handle(frame) }, onStop: onStop
+            onFrame: { [self] frame in handle(frame) }, onStop: onStop,
+            onAudio: audioHandler
         )
         try await service.start()
         lock.withLock { capture = service }
@@ -62,6 +72,12 @@ final class HostPipeline: @unchecked Sendable {
             return streaming
         }
         if active { encode(frame) }
+    }
+
+    private func handleAudio(_ sample: CMSampleBuffer) {
+        guard let audioSink, let pcm = AudioCaptureTap.convert(sample) else { return }
+        let nowMs = (ProcessInfo.processInfo.systemUptime - origin) * 1000
+        audioSink(pcm.samples, nowMs - pcm.ageMs, nowMs)
     }
 
     private func encode(_ frame: CapturedFrame) {

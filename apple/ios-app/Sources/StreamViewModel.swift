@@ -14,7 +14,7 @@ final class StreamViewModel {
     private(set) var localNetworkDenied = false
     var errorMessage: String?
     /// `true` từ lúc bấm kết nối tới khi người dùng thoát hoặc kết nối hỏng → màn hình stream thay danh sách host.
-    private(set) var inStream = false
+    var inStream = false
     /// Mở rộng hay bản sao màn hình Mac; nhớ giữa các lần mở app.
     var screenMode: ScreenMode = ScreenMode(rawValue: UserDefaults.standard.string(forKey: "xdesk.screenMode") ?? "") ?? .extend {
         didSet { UserDefaults.standard.set(screenMode.rawValue, forKey: "xdesk.screenMode") }
@@ -47,9 +47,10 @@ final class StreamViewModel {
     }
 
     @ObservationIgnored private var browseTask: Task<Void, Never>?
+    @ObservationIgnored var usbListener: UsbListener?
     @ObservationIgnored private var target: ViewerTarget?
     /// Cấu hình màn hình đang dùng; cho lớp nhập liệu biết kích thước màn hình host theo điểm.
-    private(set) var currentConfig: DisplayConfig?
+    var currentConfig: DisplayConfig?
     @ObservationIgnored private var isRestarting = false
     @ObservationIgnored private var suspended = false
     @ObservationIgnored private lazy var orientation = OrientationObserver { [weak self] _ in self?.screenSettled() }
@@ -58,18 +59,19 @@ final class StreamViewModel {
         manualStore = Result { try ManualHostStore.openDefault() }
         // iOS chỉ đọc UIPasteboard khi người dùng bấm nút (tránh banner "đã dán từ"), không tự theo dõi.
         let clipboard = ClipboardConfig(pasteboard: SystemPasteboard(), autoWatch: false)
+        let audio = AudioConfig()
         do {
             let stores = try DeviceSecurityStores.openDefault()
             let trust = ViewerTrust(identity: stores.identity, knownHosts: stores.knownHosts)
             security = stores
             securityError = nil
             self.trust = trust
-            session = ViewerSession(security: AppSecurity.current, deviceName: UIDevice.current.name, trust: trust, clipboard: clipboard)
+            session = ViewerSession(security: AppSecurity.current, deviceName: UIDevice.current.name, trust: trust, clipboard: clipboard, audio: audio)
         } catch {
             security = nil
             trust = nil
             securityError = error.localizedDescription
-            session = ViewerSession(security: AppSecurity.current, deviceName: UIDevice.current.name, clipboard: clipboard)
+            session = ViewerSession(security: AppSecurity.current, deviceName: UIDevice.current.name, clipboard: clipboard, audio: audio)
         }
     }
 
@@ -180,7 +182,7 @@ final class StreamViewModel {
         }
     }
 
-    private func plan(_ metrics: ScreenMetrics?) -> DisplayConfig? {
+    func plan(_ metrics: ScreenMetrics?) -> DisplayConfig? {
         guard let metrics else { return nil }
         return DisplayConfigPlanner.config(
             pointsWidth: metrics.size.width, pointsHeight: metrics.size.height, scale: metrics.scale, mode: screenMode

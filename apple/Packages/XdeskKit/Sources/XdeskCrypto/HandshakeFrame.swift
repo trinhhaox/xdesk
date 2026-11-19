@@ -2,10 +2,12 @@
 /// - `begin` (0x00): `u8 wireMajor=1 | u8 pattern` — initiator gửi đầu tiên, báo pattern sẽ chạy.
 /// - `commit` (0x01): 32 B cam kết SAS, chỉ khi pattern XX, gửi ngay sau `begin`, trước message 1.
 /// - `noise` (0x02): một message Noise nguyên vẹn.
+/// - `usbHello` (0x03): chỉ qua đường hầm USB (vai TCP đảo): host gửi trước, body = 32 B khoá công khai của host để viewer chọn đúng khoá IK. Không xác thực gì.
 public enum HandshakeFrame: Sendable, Equatable {
     case begin(NoisePattern)
     case commit([UInt8])
     case noise([UInt8])
+    case usbHello([UInt8])
 
     public static let wireMajor: UInt8 = 1
 
@@ -14,6 +16,7 @@ public enum HandshakeFrame: Sendable, Equatable {
         case .begin(let pattern): [0x00, Self.wireMajor, pattern.rawValue]
         case .commit(let commitment): [0x01] + commitment
         case .noise(let message): [0x02] + message
+        case .usbHello(let hostKey): [0x03] + hostKey
         }
     }
 
@@ -31,6 +34,9 @@ public enum HandshakeFrame: Sendable, Equatable {
         case 0x02:
             guard !body.isEmpty, body.count <= NoiseHandshakeState.maxMessageLength else { throw CryptoError.invalidHandshakeFrame }
             return .noise(body)
+        case 0x03:
+            guard body.count == 32 else { throw CryptoError.invalidHandshakeFrame }
+            return .usbHello(body)
         default:
             throw CryptoError.invalidHandshakeFrame
         }

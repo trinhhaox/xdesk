@@ -40,6 +40,7 @@ Payload frame `0x01` = `u8 type | body` (`HandshakeFrame`):
 | 0x00 | begin | `u8 wireMajor=1 | u8 pattern` (1 = XX, 2 = XXpsk3, 3 = IK). Initiator gửi đầu tiên |
 | 0x01 | commit | 32 B cam kết SAS; **chỉ XX**, gửi ngay sau `begin`, trước message 1 |
 | 0x02 | noise | một message Noise (≤ 65 535 B) |
+| 0x03 | usbHello | 32 B khoá công khai của host. **Chỉ đường hầm USB** (vai TCP đảo, xem `framing.md`): host (TCP-client) gửi trước mọi thứ để viewer (TCP-server) chọn đúng khoá IK trong danh sách host đã ghép. Không xác thực gì (khoá công khai không bí mật); body ≠ 32 B → đóng |
 
 Host bác `begin` có `wireMajor` khác 1 hoặc pattern lạ, và bác mọi frame sai thứ tự/ sai type → đóng kết nối. Host **không** trả lời trước khi `begin` hợp lệ; XX không bắt đầu xử lý message 1 nếu chưa có `commit`. Timeout toàn bộ phần mật mã của bắt tay: 30 s; **mỗi message tối đa 5 s** (quá hạn → đóng). Host giới hạn bắt tay chưa xác thực: **tối đa 2 mỗi IP nguồn**, tối đa 4 đồng thời; đầy thì **đuổi kết nối chưa xác thực cũ nhất**. Kết nối chưa xác thực chỉ được gửi/nhận frame `0x01`; frame `0x02-0x04` rõ trước khi xong bắt tay → đóng.
 

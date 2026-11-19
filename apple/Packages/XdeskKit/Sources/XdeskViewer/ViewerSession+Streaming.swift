@@ -10,6 +10,7 @@ extension ViewerSession {
         do {
             while let inbound = try await conn.nextInbound() {
                 if case .bulk(let chunk) = inbound { await clipboardSync?.handleBulk(chunk); continue }
+                if case .mediaOverTcp(let packet) = inbound { await channel?.ingest(packet); continue }
                 guard case .message(let envelope) = inbound else { continue }
                 switch envelope.message {
                 case .clipOffer, .clipPull, .clipData: await clipboardSync?.handle(envelope.message)
@@ -45,7 +46,9 @@ extension ViewerSession {
             switch event {
             case .frame(let frame): render(frame)
             case .keyframeNeeded: await requestKeyframe()
-            case .packet(let packet): handleInputAck(packet)
+            case .packet(let packet):
+                handleInputAck(packet)
+                handleAudio(packet)
             case .peerConnected: break
             case .linkLost: await fail("Mất liên lạc với host (UDP)")
             }
@@ -86,6 +89,7 @@ extension ViewerSession {
         let now = Int(ProcessInfo.processInfo.systemUptime * 1000)
         guard let window = stats.closeWindow(nowMs: now), let connection else { return }
         updateRates(fps: window.fps, recvKbps: window.recvKbps)
+        refreshAudioStats()
         #if DEBUG
         windowCount += 1
         if windowCount % 4 == 0 {

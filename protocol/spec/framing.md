@@ -17,6 +17,14 @@
 
 kind khác → `unknownFrameKind`.
 
+## Đường hầm USB (usbmuxd, phase 09c)
+
+Mac nối tới iPhone/iPad qua socket Unix `/var/run/usbmuxd` (giao thức plist; `Connect{DeviceID, PortNumber}` với `PortNumber` = cổng viết big-endian rồi đọc như số little-endian) — sau `Result 0` socket là TCP thô tới app Xdesk trên thiết bị, cổng cố định **47801**.
+- **Vai socket đảo, vai Noise giữ nguyên.** Mac = TCP-client nhưng vẫn là **host/responder**; iPhone/iPad = TCP-server nhưng vẫn là **viewer/initiator**. Thứ tự byte: (1) Mac gửi frame `0x01` `usbHello{hostKey}`; (2) viewer chọn khoá IK từ host đã ghép (không có → đóng, `pairingRequired`; **không ghép đôi qua USB**, phải ghép qua Wi-Fi/QR trước) và gửi `begin(IK)`; từ đây giống hệt Wi-Fi (`crypto-handshake.md`), kể cả giới hạn chưa xác thực, quyền theo thiết bị và thu hồi.
+- Chỉ chế độ mã hoá: plaintext bị từ chối. Viewer chỉ nhận kết nối từ loopback của chính thiết bị (usbmuxd đưa vào đó) nên cổng 47801 không lộ ra Wi-Fi.
+- usbmux chỉ có TCP: viewer đưa `caps.mediaOverTcp` (bit 5); host **chỉ** đưa bit này vào `welcome` cho kết nối đường hầm. Khi đã thương lượng, **mọi** gói media (video, audio, input, ack, probe, NACK) đi qua frame `0x04` của kênh control đã mã hoá (khoá TCP, không khoá UDP riêng); `display.ready.udpPort` chỉ là chỗ giữ chỗ (host gửi 1, viewer bỏ qua), không mở UDP. TCP có thứ tự nên không phát sinh NACK; không có `linkLost` kiểu UDP (đứt cáp = TCP đóng).
+- Audio qua USB luôn AAC-ELD (đường hẹp). Android: `adb reverse` chỉ chuyển TCP; viewer Android v1 chưa có MediaOverTcp nên qua đó chỉ kênh control thông, media UDP thì không — xem `docs/audio-and-usb.md` (chưa hỗ trợ, ngoài phạm vi phase 09).
+
 Sau bắt tay, payload của `0x02/0x03/0x04` là `ciphertext | tag 16 B` (`len = 1 + plaintext + 16`, AD = `len | kind`), xem `crypto-handshake.md` §7.
 
 ## Quy tắc bộ giải mã luồng
