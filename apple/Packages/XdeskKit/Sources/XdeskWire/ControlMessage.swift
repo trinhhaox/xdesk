@@ -15,6 +15,9 @@ public enum ControlMessage: Sendable, Equatable {
     case pong(Pong)
     case bye(Bye)
     case inputText(InputText)
+    case rekey
+    case rekeyResync(RekeyResync)
+    case pairResult(PairResult)
     case unknown(type: String)
 
     /// Giá trị trường `t` trên wire.
@@ -38,6 +41,9 @@ public enum ControlMessage: Sendable, Equatable {
         case .pong(let p): ("pong", p)
         case .bye(let p): ("bye", p)
         case .inputText(let p): ("input.text", p)
+        case .rekey: ("rekey", nil)
+        case .rekeyResync(let p): ("rekey.resync", p)
+        case .pairResult(let p): ("pair.result", p)
         case .unknown(let type): (type, nil)
         }
     }

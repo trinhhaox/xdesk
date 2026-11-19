@@ -21,6 +21,9 @@ là "unknown" và bỏ qua (tương thích tiến). JSON hỏng / thiếu trư�
 | `pong` | H→V | `t0` (lặp lại), `t1` (host nhận), `t2` (host gửi) i64 | |
 | `bye` | cả hai | `reason` string? | |
 | `input.text` | V→H | `text` string (Unicode, IME/Telex) | ≤ 4096 byte UTF-8 |
+| `pair.result` | H→V | `accepted` bool | gửi một lần sau message 3 của XX/XXpsk3, trước mọi thứ khác (`crypto-handshake.md` §4) |
+| `rekey` | cả hai | (không có trường riêng) | chỉ trên kênh mã hoá; frame cuối dưới khoá TCP cũ, bên nhận đổi khoá nhận rồi bỏ message (`crypto-handshake.md` §7). `id` = 0 |
+| `rekey.resync` | cả hai | `epoch` u32, `ask` bool | `ask:false` = "epoch gửi UDP của tôi là `epoch`" → bên nhận kéo khoá nhận lên epoch đó (≤ 64 epoch); `ask:true` = "hãy báo epoch gửi của bạn" (`epoch` = epoch nhận hiện tại của người hỏi) (`crypto-handshake.md` §8) |
 
 Đồng bộ đồng hồ kiểu NTP 4 mốc: viewer ghi `t3` lúc nhận pong; `offset = ((t1-t0)+(t2-t3))/2`, `rtt = (t3-t0)-(t2-t1)`.
 

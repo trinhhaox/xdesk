@@ -17,6 +17,9 @@ public enum StreamFormat {
 public struct StreamSender: ~Copyable, Sendable {
     private var state: NoiseCipherState
 
+    // Deinit tường minh: huỷ qua hàm của XdeskCrypto, không để module khác inline việc huỷ các kiểu nội bộ (lỗi liên kết Release).
+    deinit {}
+
     public init(key: SymmetricKey) { state = NoiseCipherState(key: key) }
 
     /// Trả về `ciphertext | tag`; người gọi đóng khung `len | kind | kết quả`.
@@ -36,6 +39,9 @@ public struct StreamSender: ~Copyable, Sendable {
 
 public struct StreamReceiver: ~Copyable, Sendable {
     private var state: NoiseCipherState
+
+    // Deinit tường minh: huỷ qua hàm của XdeskCrypto, không để module khác inline việc huỷ các kiểu nội bộ (lỗi liên kết Release).
+    deinit {}
 
     public init(key: SymmetricKey) { state = NoiseCipherState(key: key) }
 

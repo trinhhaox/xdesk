@@ -8,6 +8,9 @@ public struct DatagramSender: ~Copyable, Sendable {
     public private(set) var packetsInEpoch: UInt64 = 0
     private var epochStart: ContinuousClock.Instant
 
+    // Deinit tường minh: huỷ qua hàm của XdeskCrypto, không để module khác inline việc huỷ các kiểu nội bộ (lỗi liên kết Release).
+    deinit {}
+
     public init(key: SymmetricKey, now: ContinuousClock.Instant = .now) {
         self.key = key
         epochStart = now

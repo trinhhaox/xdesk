@@ -21,8 +21,9 @@ public struct ControlFrame: Sendable, Equatable {
         self.payload = payload
     }
 
-    func validate() throws {
+    /// `extraBulkAllowance`: byte thêm được phép trên payload bulk (tag AEAD 16 B khi kênh đã mã hoá).
+    func validate(extraBulkAllowance: Int = 0) throws {
         if payload.count + 1 > Self.maxLength { throw WireError.frameTooLarge(payload.count + 1) }
-        if kind == .bulk, payload.count > Self.maxBulkPayload { throw WireError.payloadTooLarge(payload.count) }
+        if kind == .bulk, payload.count > Self.maxBulkPayload + extraBulkAllowance { throw WireError.payloadTooLarge(payload.count) }
     }
 }

@@ -77,9 +77,10 @@ import XdeskWire
         await listener.stop()
     }
 
-    @Test func encryptedModeIsUnavailableUntilNoiseLands() async {
+    @Test func encryptedListenerWithoutAuthenticatorRefusesToStart() async {
+        let listener = ControlListener(security: .encrypted)
         await #expect(throws: TransportError.encryptionUnavailable) {
-            _ = try await ControlConnection.connect(host: "127.0.0.1", port: 9, security: .encrypted)
+            _ = try await listener.start(loopbackOnly: true)
         }
     }
 

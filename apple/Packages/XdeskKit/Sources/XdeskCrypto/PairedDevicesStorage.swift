@@ -4,6 +4,8 @@ import os
 public protocol PairedDevicesStorage: Sendable {
     func read() throws -> Data?
     func write(_ data: Data) throws
+    /// Chuyển file hiện có sang bản `.tampered` (ghi đè bản cũ) để lần ghi kế tiếp không làm mất bằng chứng.
+    func quarantine() throws
 }
 
 /// File JSON trong Application Support: thư mục 0700, file 0600 ngay từ lúc tạo, ghi nguyên tử (tệp tạm cùng thư mục rồi `rename`).
@@ -20,6 +22,15 @@ public struct FilePairedDevicesStorage: PairedDevicesStorage {
     public func read() throws -> Data? {
         guard FileManager.default.fileExists(atPath: url.path) else { return nil }
         return try Data(contentsOf: url)
+    }
+
+    public var tamperedURL: URL { url.appendingPathExtension("tampered") }
+
+    public func quarantine() throws {
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        guard rename(url.path, tamperedURL.path) == 0 else {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
     }
 
     public func write(_ data: Data) throws {
@@ -41,9 +52,19 @@ public struct FilePairedDevicesStorage: PairedDevicesStorage {
 
 public final class InMemoryPairedDevicesStorage: PairedDevicesStorage {
     private let data = OSAllocatedUnfairLock<Data?>(initialState: nil)
+    private let quarantined = OSAllocatedUnfairLock<Data?>(initialState: nil)
 
     public init() {}
 
     public func read() throws -> Data? { data.withLock { $0 } }
     public func write(_ newData: Data) throws { data.withLock { $0 = newData } }
+    public func quarantine() throws {
+        let moved = data.withLock { current in
+            defer { current = nil }
+            return current
+        }
+        quarantined.withLock { $0 = moved }
+    }
+
+    public var quarantinedData: Data? { quarantined.withLock { $0 } }
 }

@@ -13,12 +13,16 @@ extension ViewerSession {
                 switch envelope.message {
                 case .pong(let pong): updateClock(ClockSample(pong: pong, receivedAtMs: ClockSync.wallClockMs()))
                 case .bye(let bye): throw TransportError.rejected(reason: "bye", detail: bye.reason)
+                case .reject(let reject) where reject.reason == Reject.reasonRevoked:
+                    await forgetRevokedHost()
+                    throw TransportError.revokedByHost
+                case .rekeyResync(let resync): await channel?.handleResync(resync)
                 default: break
                 }
             }
-            if state == .streaming { setState(.failed("Host đã ngắt kết nối")) }
+            await fail("Host đã ngắt kết nối")
         } catch {
-            if state == .streaming { setState(.failed(error.localizedDescription)) }
+            await fail(error.localizedDescription)
         }
     }
 
@@ -40,6 +44,7 @@ extension ViewerSession {
             case .keyframeNeeded: await requestKeyframe()
             case .packet(let packet): handleInputAck(packet)
             case .peerConnected: break
+            case .linkLost: await fail("Mất liên lạc với host (UDP)")
             }
         }
     }

@@ -13,6 +13,9 @@ public struct NoiseHandshakeState: ~Copyable, Sendable {
 
     private var core: NoiseHandshakeCore
 
+    // Deinit tường minh: huỷ qua hàm của XdeskCrypto, không để module khác inline việc huỷ các kiểu nội bộ (lỗi liên kết Release).
+    deinit {}
+
     public init(
         pattern: NoisePattern,
         role: NoiseRole,

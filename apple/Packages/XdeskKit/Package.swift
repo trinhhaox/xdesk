@@ -4,10 +4,10 @@ import PackageDescription
 let modules = ["XdeskWire", "XdeskCrypto", "XdeskTransport", "XdeskMedia", "XdeskViewer", "XdeskInput", "XdeskAgent"]
 /// Phụ thuộc nội bộ giữa các module (Wire là nền, không phụ thuộc ai).
 let moduleDependencies: [String: [String]] = [
-    "XdeskTransport": ["XdeskWire"],
+    "XdeskTransport": ["XdeskWire", "XdeskCrypto"],
     "XdeskMedia": ["XdeskWire"],
     "XdeskInput": ["XdeskWire"],
-    "XdeskViewer": ["XdeskWire", "XdeskTransport", "XdeskMedia", "XdeskInput"],
+    "XdeskViewer": ["XdeskWire", "XdeskCrypto", "XdeskTransport", "XdeskMedia", "XdeskInput"],
 ]
 
 let package = Package(

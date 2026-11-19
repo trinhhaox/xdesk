@@ -16,6 +16,8 @@ Vector cho từng byte: `protocol/test-vectors/noise-*.json` (cacophony, công k
 - **Fingerprint** = 8 byte đầu `SHA-256(pub)`, hex HOA, nhóm 4 ký tự nối bằng `-`: `AB12-CD34-EF56-7890`. Cũng là `id` của thiết bị đã ghép và giá trị `id` trong TXT Bonjour của host. Ví dụ pub = 32 byte 0 → `6668-7AAD-F862-BD77`.
 - `PairedDevicesStore` (JSON, `schemaVersion` 1): `{schemaVersion, devices:[{id, name, pub (base64url), role: 0 host|1 viewer, createdAt, lastSeen?, permissions:{view,input,clipboard,audio}}], mac}`.
   `mac` = base64url `HMAC-SHA256(key, "xdesk v1 paired-devices" 0x00 | JSON chuẩn của {schemaVersion, devices})` (JSON chuẩn = bộ mã hoá sortedKeys, ngày ISO-8601 giây; không có trường `mac`), `key` = 32 B ngẫu nhiên trong Keychain cùng lớp truy cập với khoá tĩnh. File sai/thiếu MAC → coi là rỗng, bật cờ `integrityFailure` (fail-closed; UI phải báo). Tra cứu thiết bị luôn theo **khoá công khai đầy đủ 32 B** (so sánh hằng thời gian); `id` 64 bit chỉ để hiển thị. Thêm khoá có `id` trùng nhưng khác khoá → lỗi `deviceIdCollision`. File ghi 0600 (thư mục 0700). Mặc định thiết bị mới: view + input bật, clipboard + audio tắt. File lạ phiên bản hoặc hỏng → báo lỗi, không tự xoá.
+  `devices[].lastAddress` (tuỳ chọn, `host:port`): viewer lưu địa chỉ gần nhất kết nối được tới host đã ghép để tự chọn IK khi người dùng nhập tay; chỉ là gợi ý, không dùng để xác thực. Mỗi thiết bị có hai danh sách riêng: `paired-devices.json` (viewer được vào máy này, role viewer) và `known-hosts.json` (host máy này đã ghép, role host), mỗi danh sách một khoá MAC trong Keychain.
+  Khi MAC sai: file được chuyển thành `paired-devices.json.tampered` **trước lần ghi kế tiếp** (không mất bằng chứng); cờ `integrityNoticePending` giữ tới khi UI xác nhận.
 
 ## 3. Chọn pattern
 
@@ -39,7 +41,7 @@ Payload frame `0x01` = `u8 type | body` (`HandshakeFrame`):
 | 0x01 | commit | 32 B cam kết SAS; **chỉ XX**, gửi ngay sau `begin`, trước message 1 |
 | 0x02 | noise | một message Noise (≤ 65 535 B) |
 
-Host bác `begin` có `wireMajor` khác 1 hoặc pattern lạ, và bác mọi frame sai thứ tự/ sai type → đóng kết nối. Host **không** trả lời trước khi `begin` hợp lệ; XX không bắt đầu xử lý message 1 nếu chưa có `commit`. Timeout toàn bộ bắt tay: 30 s. Host giới hạn 4 bắt tay chưa xác thực đồng thời.
+Host bác `begin` có `wireMajor` khác 1 hoặc pattern lạ, và bác mọi frame sai thứ tự/ sai type → đóng kết nối. Host **không** trả lời trước khi `begin` hợp lệ; XX không bắt đầu xử lý message 1 nếu chưa có `commit`. Timeout toàn bộ phần mật mã của bắt tay: 30 s; **mỗi message tối đa 5 s** (quá hạn → đóng). Host giới hạn bắt tay chưa xác thực: **tối đa 2 mỗi IP nguồn**, tối đa 4 đồng thời; đầy thì **đuổi kết nối chưa xác thực cũ nhất**. Kết nối chưa xác thực chỉ được gửi/nhận frame `0x01`; frame `0x02-0x04` rõ trước khi xong bắt tay → đóng.
 
 Ví dụ `begin` XXpsk3: `000102` (payload frame 0x01 → `00000004 01 000102`).
 
@@ -58,10 +60,10 @@ Message 1 của XX/XXpsk3 không được mã hoá nên payload phải rỗng; *
 
 ### Luồng và kiểm tra của host
 
-- **XXpsk3**: host đang hiển thị QR có token hiệu lực mới nhận `begin(XXpsk3)` (không có token hiệu lực → đóng). Dùng `psk = token`. Sau message 3 hợp lệ, host gọi `consume(token)`: thất bại (token đã dùng/hết hạn) → huỷ. Thành công → ghi thiết bị với quyền mặc định. Token chỉ hết hạn/đã dùng khi *thành công*; host nên vô hiệu token sau 5 lần bắt tay hỏng.
-- **XX + SAS**: xem mục 5. Sau message 3 phiên ở trạng thái *tạm* (chỉ cho phép các message control ghép đôi do `control-messages.md` định nghĩa ở phase 06b; chưa có media). Host ghi thiết bị chỉ khi người dùng bấm "Khớp".
-- **IK**: sau message 1 host biết khoá tĩnh viewer; không có trong danh sách → đóng TCP, không trả lời (không lộ gì). Có → chạy tiếp, áp dụng quyền đã lưu, cập nhật `lastSeen`.
-- Thu hồi thiết bị ở host → đóng ngay mọi phiên của `id` đó; kết nối lại bị IK từ chối.
+- **XXpsk3**: host đang hiển thị QR có token hiệu lực mới nhận `begin(XXpsk3)` (không có token hiệu lực → đóng). Dùng `psk = token`. Viewer **ghim khoá host**: khoá tĩnh nhận ở message 2 phải bằng `h` của QR trước khi gửi message 3, lệch → viewer huỷ, không gửi gì thêm. Sau message 3 hợp lệ, host gọi `consume(token)`: thất bại (token đã dùng/hết hạn) → huỷ. Rồi host **bắt buộc hỏi người dùng** ("Cho phép '<tên>' điều khiển máy này?"); chỉ khi đồng ý mới ghi thiết bị (quyền mặc định view + input, người dùng có thể chỉnh lúc duyệt) và gửi `pair.result{accepted:true}`; từ chối/quá 60 s → `pair.result{accepted:false}` rồi đóng. Token vô hiệu sau **5 lần bắt tay hỏng** và **đổi mỗi 20 s khi host đang có phiên chạy** (người xem màn hình, kể cả viewer chỉ-xem hay ghi hình, không kịp dùng); không dùng thì hết hạn sau 2 phút. Cửa sổ QR phải loại khỏi capture của chính host.
+- **XX + SAS**: xem mục 5. Sau message 3 phiên ở trạng thái *tạm*: kênh đã mã hoá nhưng host chưa nhận message nào từ viewer và chưa có media; host gửi `pair.result` (`control-messages.md`) sau khi người dùng quyết định. Host ghi thiết bị chỉ khi người dùng bấm "Khớp"; viewer thấy `pair.result{accepted:false}` hoặc đóng kết nối = bị từ chối.
+- **IK**: sau message 1 host biết khoá tĩnh viewer; không có trong danh sách (so sánh khoá đầy đủ 32 B) → đóng TCP, không trả lời (không lộ gì). Có → gửi message 2 và áp dụng quyền đã lưu. Phiên chỉ được coi là **đã xác thực** sau **frame mã hoá hợp lệ đầu tiên** của viewer (bắt buộc là `hello`): chỉ khi đó mới cập nhật `lastSeen`, báo "đã kết nối" và bật capture/encode. Message 1 có thể bị phát lại nên không đủ để chứng minh viewer đang hiện diện; kẻ phát lại không có `e` của viewer nên không gửi được frame hợp lệ và bị đóng bởi timeout `hello`.
+- Thu hồi thiết bị ở host (xoá khỏi danh sách) → đóng ngay mọi phiên của thiết bị đó (≤ 1 s, theo dõi thay đổi của danh sách chứ không chờ UI); kết nối lại bị IK từ chối.
 
 Viewer: IK tới host mà khoá đã đổi (host cài lại) sẽ bị đóng như "không nhận ra" → UI gợi ý ghép đôi lại; nếu TXT Bonjour `id` của host cùng tên mà khác fingerprint đã lưu → cảnh báo khoá khác, không kết nối.
 
@@ -108,7 +110,7 @@ Frame `0x02/0x03/0x04` mã hoá. Khung vẫn là `len | kind | payload` (`framin
 - Frame `0x01` không còn hợp lệ sau bắt tay; frame `0x01` sau đó → đóng.
 - `MediaOverTcp (0x04)` chứa nguyên gói media (header + payload) được mã hoá bằng khoá TCP, **không** dùng khoá UDP.
 - Giải mã lỗi (tag sai, thứ tự sai) → đóng kết nối ngay, vì luồng không thể đồng bộ lại.
-- **Rekey TCP** (mỗi hướng độc lập): bên gửi gửi control `{"t":"rekey"}` (định nghĩa ở phase 06b) là frame cuối dưới khoá cũ rồi đổi khoá gửi (nonce về 0); bên nhận sau khi giải mã `rekey` đổi khoá nhận. Kích hoạt mỗi ≥ 1 giờ (và không để nonce tới 2^63).
+- **Rekey TCP** (mỗi hướng độc lập): bên gửi gửi control `{"id":0,"t":"rekey"}` (`control-messages.md`) là frame cuối dưới khoá cũ rồi đổi khoá gửi (nonce về 0); bên nhận sau khi giải mã `rekey` đổi khoá nhận (message này không chuyển lên tầng trên). Kích hoạt mỗi ≥ 1 giờ hoặc sau 2^32 frame.
 
 ## 8. Gói UDP sau bắt tay
 
@@ -122,7 +124,7 @@ Frame `0x02/0x03/0x04` mã hoá. Khung vẫn là `len | kind | payload` (`framin
 - Header media (`media-packets.md`) **không mã hoá** và là AD → không sửa được; payload mã hoá. Tổng thêm `8 + 16 = 24` byte; datagram tối đa `16 + 1192 + 24 = 1232` B (vừa MTU IPv6 tối thiểu, `media-packets.md`).
 - `nonce = epoch u32 << 32 | counter u32`; counter đếm từ 0 mỗi epoch, tăng cho **mọi gói gửi**. Gói gửi lại (đáp NACK) phải **mã hoá lại** với counter mới, không gửi lại cùng byte (sẽ bị coi là replay).
 - Bên nhận kiểm theo thứ tự: độ dài ≥ 40; chọn epoch (hiện tại, ngay trước, hoặc 1…**4** epoch mới hơn, xem dưới; khác → `unknownEpoch`); **cửa sổ replay 1024** theo counter của epoch đó (bitmap; trùng → `replayed`, cũ hơn `highest − 1023` → `outsideReplayWindow`); giải mã AEAD với AD = header; **chỉ khi thành công** mới đánh dấu cửa sổ/ chuyển epoch. Gói tag sai không đốt counter.
-- Epoch mới hơn `e + k` (`1 ≤ k ≤ 4`) mở được ngay: bên nhận dẫn xuất thử `rekey^k(K_e)`, giải mã AEAD, và **chỉ khi tag đúng** mới chuyển sang epoch đó (cửa sổ replay mới) và giữ epoch ngay trước nó (`e + k − 1`, cửa sổ mới nếu `k ≥ 2`) cho gói đến muộn; epoch cũ hơn nữa bị bỏ. Vậy bên gửi im lặng rekey theo giờ hoặc mất cả epoch vẫn được bên nhận theo kịp sau tối đa 3 epoch bị bỏ qua. Nhảy `k ≥ 5` → `unknownEpoch` và không thể tự phục hồi: tầng phiên phải đồng bộ qua kênh control TCP (thông điệp resync định nghĩa ở phase 06b) hoặc đóng phiên. Chi phí DoS của gói giả epoch xa chỉ ≤ 4 HKDF + 1 AEAD, không đổi trạng thái.
+- Epoch mới hơn `e + k` (`1 ≤ k ≤ 4`) mở được ngay: bên nhận dẫn xuất thử `rekey^k(K_e)`, giải mã AEAD, và **chỉ khi tag đúng** mới chuyển sang epoch đó (cửa sổ replay mới) và giữ epoch ngay trước nó (`e + k − 1`, cửa sổ mới nếu `k ≥ 2`) cho gói đến muộn; epoch cũ hơn nữa bị bỏ. Vậy bên gửi im lặng rekey theo giờ hoặc mất cả epoch vẫn được bên nhận theo kịp sau tối đa 3 epoch bị bỏ qua. Nhảy `k ≥ 5` → `unknownEpoch`; phục hồi bằng control **`rekey.resync`** (`control-messages.md`): (a) bên gửi UDP báo `{epoch, ask:false}` mỗi khi nó rekey; (b) bên nhận thấy ≥ 3 lỗi `unknownEpoch` và 2 s không có gói hợp lệ thì gửi `{epoch: epoch nhận hiện tại, ask:true}` (tối đa 1 lần/5 s), bên kia trả `{epoch: epoch gửi hiện tại, ask:false}`. Khi nhận `ask:false` (đã xác thực qua TCP) bên nhận kéo khoá nhận lên đúng epoch đó (dẫn xuất tối đa 64 epoch, cửa sổ replay mới, bỏ epoch trước). Chi phí DoS của gói giả epoch xa chỉ ≤ 4 HKDF + 1 AEAD, không đổi trạng thái.
 - **Rekey UDP**: bên gửi tự quyết, gọi `rekey()` khi `needsRekey` (≥ 2^32 − 65 536 gói trong epoch **hoặc** epoch sống ≥ 3600 s); cứng: refuse gửi ở 2^32 gói/epoch. Bên nhận tự theo kịp khi thấy gói epoch mới xác thực được — không cần message control cho UDP.
 - Gói UDP mã hoá tối thiểu 40 B; ngắn hơn → bỏ.
 
@@ -138,7 +140,8 @@ Frame `0x02/0x03/0x04` mã hoá. Khung vẫn là `len | kind | payload` (`framin
 | Tình huống | Hành động |
 |---|---|
 | Lỗi giải mã TCP (bất kỳ) | đóng kết nối |
-| Lỗi UDP: tag sai, `unknownEpoch`, quá ngắn | bỏ gói, đếm; **> 50 lỗi trong 1 giây** → đóng phiên. Replay/ quá cũ không tính |
+| Lỗi UDP: tag sai, `unknownEpoch`, quá ngắn | bỏ gói và đếm (chỉ để đo); **không bao giờ đóng phiên vì gói chưa xác thực** (ai trên LAN cũng gửi được rác vào cổng UDP). Replay/quá cũ không tính là lỗi |
+| Không có gói UDP hợp lệ nào suốt **10 s** | báo `linkLost` → viewer báo phiên hỏng, host đóng phiên. Mỗi bên gửi `probe` giữ liên lạc 2 s/lần nên màn hình tĩnh không bị cắt nhầm |
 | Bắt tay lỗi (auth, DH, payload, commit, khoá không khớp QR) | đóng TCP; không gửi chi tiết cho đối tác |
 | Hết nonce (2^64 − 1 TCP, 2^32 mỗi epoch UDP) | đóng/ rekey; không bao giờ lặp nonce |
 
@@ -151,4 +154,4 @@ JCA cần: X25519 (`XDH`), ChaCha20-Poly1305, HMAC-SHA256, SHA-256, HKDF tự c�
 ## 12. Điểm còn mở
 
 - MTU đã giải quyết: `maxPayload` = 1192 → datagram mã hoá ≤ 1232 B (đủ IPv6 1280).
-- Tên message control (`rekey`, xác nhận SAS) chốt ở 06b trong `control-messages.md`.
+- Tên message control đã chốt ở 06b trong `control-messages.md`: `rekey`, `rekey.resync`, `pair.result`.

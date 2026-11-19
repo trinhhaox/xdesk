@@ -12,6 +12,7 @@ public struct OpenedDatagram: Sendable, Equatable {
 public struct DatagramReceiver: ~Copyable, Sendable {
     /// Số epoch tối đa bên gửi được phép bỏ qua (kể cả khi im lặng rekey theo giờ) mà bên nhận vẫn tự theo kịp.
     public static let maxEpochLookahead: UInt32 = 4
+    public static let maxResyncGap: UInt32 = 64
 
     private struct Epoch: Sendable {
         var number: UInt32
@@ -22,9 +23,23 @@ public struct DatagramReceiver: ~Copyable, Sendable {
     private var current: Epoch
     private var previous: Epoch?
 
+    // Deinit tường minh: huỷ qua hàm của XdeskCrypto, không để module khác inline việc huỷ các kiểu nội bộ (lỗi liên kết Release).
+    deinit {}
+
     public init(key: SymmetricKey) { current = Epoch(number: 0, key: key) }
 
     public var epoch: UInt32 { current.number }
+
+    /// Kéo khoá nhận lên `target` khi bên gửi đã vượt cửa sổ nhìn trước. Chỉ gọi với epoch báo qua kênh control đã xác thực;
+    /// `target` ≤ epoch hiện tại là không làm gì, chênh quá `maxResyncGap` bị từ chối (chặn CPU DoS).
+    public mutating func resync(toEpoch target: UInt32) throws {
+        guard target > current.number else { return }
+        guard target - current.number <= Self.maxResyncGap else { throw CryptoError.unknownEpoch }
+        var key = current.key
+        for _ in 0..<(target - current.number) { key = KeySchedule.next(key) }
+        previous = nil
+        current = Epoch(number: target, key: key)
+    }
 
     public mutating func open(_ datagram: [UInt8]) throws -> OpenedDatagram {
         let headerEnd = DatagramFormat.headerLength

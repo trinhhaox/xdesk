@@ -3,6 +3,7 @@ import Foundation
 import Network
 import Observation
 import os
+import XdeskCrypto
 import XdeskInput
 import XdeskMedia
 import XdeskTransport
@@ -27,13 +28,20 @@ public final class ViewerSession {
     public private(set) var fps = 0
     public private(set) var recvKbps = 0
     public private(set) var rttMs: Int64?
+    /// Đích đã kết nối thành công (QR có thể thử nhiều địa chỉ); phiên mở lại dùng đích này.
+    public private(set) var connectedTarget: ViewerTarget?
     /// Chênh đồng hồ host − viewer (ms); dùng cho overlay đo độ trễ.
     public private(set) var clockOffsetMs: Double?
+    /// Host đã ghép vừa từ chối IK ở lần `connect` gần nhất (id = fingerprint); UI đề nghị ghép đôi lại.
+    public internal(set) var refusedHostId: String?
+    /// Fingerprint host của phiên hiện tại (đặt sau khi bắt tay mã hoá thành công).
+    @ObservationIgnored var connectedHostId: String?
     public let renderer = VideoLayerRenderer()
 
     @ObservationIgnored let log = Logger(subsystem: "vn.xox.xdesk", category: "viewer-session")
     @ObservationIgnored let security: TransportSecurity
     @ObservationIgnored let deviceName: String
+    @ObservationIgnored let trust: ViewerTrust?
     @ObservationIgnored var connection: ControlConnection?
     @ObservationIgnored var channel: UdpMediaChannel?
     @ObservationIgnored var tasks: [Task<Void, Never>] = []
@@ -49,19 +57,27 @@ public final class ViewerSession {
     @ObservationIgnored var windowCount = 0
     #endif
 
-    public init(security: TransportSecurity, deviceName: String) {
+    /// `trust` bắt buộc khi `security == .encrypted` (danh tính + host đã biết); plaintext (Debug) bỏ qua.
+    public init(security: TransportSecurity, deviceName: String, trust: ViewerTrust? = nil) {
         self.security = security
         self.deviceName = deviceName
+        self.trust = trust
     }
 
     /// Giờ host ước lượng cho thời điểm hiện tại của viewer (nil khi chưa đồng bộ).
     public func hostNowMs() -> Int64? { clock.viewerToHostMs(ClockSync.wallClockMs()) }
 
-    public func connect(to target: ViewerTarget, config: DisplayConfig) async {
+    public func connect(to target: ViewerTarget, config: DisplayConfig, auth: ViewerAuth = .automatic) async {
+        await connect(candidates: [target], config: config, auth: auth)
+    }
+
+    func connect(candidates: [ViewerTarget], config: DisplayConfig, auth: ViewerAuth) async {
         guard state == .idle || isFailed else { return }
         state = .connecting
+        refusedHostId = nil
+        connectedHostId = nil
         do {
-            try await establish(target, config: config)
+            try await establish(candidates, config: config, auth: auth)
             state = .streaming
         } catch {
             log.error("connect failed: \(error.localizedDescription, privacy: .public)")
@@ -80,19 +96,18 @@ public final class ViewerSession {
 
     // MARK: Kết nối
 
-    private func establish(_ target: ViewerTarget, config: DisplayConfig) async throws {
-        let conn: ControlConnection
-        switch target {
-        case .discovered(let host): conn = try await ControlConnection.connect(to: host.endpoint, security: security)
-        case .manual(let host, let port): conn = try await ControlConnection.connect(host: host, port: port, security: security)
-        }
+    private func establish(_ candidates: [ViewerTarget], config: DisplayConfig, auth: ViewerAuth) async throws {
+        let (conn, target) = try await openConnection(candidates)
+        connectedTarget = target
         connection = conn
+        try await authenticate(conn, target: target, auth: auth)
         let result = try await conn.performViewerHandshake(name: deviceName, caps: [.h264, .hevc], display: config)
         guard let host = await conn.resolvedRemoteHost else { throw TransportError.connectionFailed("không xác định được địa chỉ host") }
         factory = SampleBufferFactory(codec: config.codec)
         streamId = result.ready.streamId
-        let channel = try await UdpMediaChannel.connect(streamId: streamId, host: host, port: result.ready.udpPort)
+        let channel = try await UdpMediaChannel.connect(streamId: streamId, host: host, port: result.ready.udpPort, keys: await conn.udpKeys)
         self.channel = channel
+        await wireResync(channel: channel, connection: conn)
         let (packets, outbox) = AsyncStream.makeStream(of: MediaPacket.self)
         inputOutbox = outbox
         tasks = [
@@ -118,7 +133,14 @@ public final class ViewerSession {
         self.recvKbps = recvKbps
     }
 
-    private func teardown() async {
+    /// Phiên hỏng giữa chừng (host đóng, thu hồi, mất UDP): báo `failed` rồi dừng mọi vòng lặp; UI gọi `disconnect()` để về `idle`.
+    func fail(_ message: String) async {
+        guard state == .streaming else { return }
+        setState(.failed(message))
+        await teardown()
+    }
+
+    func teardown() async {
         tasks.forEach { $0.cancel() }
         tasks.removeAll()
         inputOutbox?.finish()

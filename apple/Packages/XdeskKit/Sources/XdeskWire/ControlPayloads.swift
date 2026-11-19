@@ -20,6 +20,8 @@ public struct Welcome: Codable, Sendable, Equatable {
 
 public struct Reject: Codable, Sendable, Equatable {
     public static let reasonVersion = "version"
+    /// Host thu hồi thiết bị đang kết nối; gửi trên kênh đã mã hoá ngay trước khi đóng.
+    public static let reasonRevoked = "revoked"
     public var reason: String
     public var detail: String?
     public init(reason: String, detail: String? = nil) { self.reason = reason; self.detail = detail }
@@ -110,4 +112,18 @@ public struct InputText: Codable, Sendable, Equatable {
     public static let maxBytes = 4096
     public var text: String
     public init(text: String) { self.text = text }
+}
+
+/// Đồng bộ epoch khoá UDP khi hai bên lệch quá cửa sổ nhìn trước (xem `crypto-handshake.md` §8).
+/// `epoch` = epoch gửi UDP hiện tại của người gửi message; `ask` = true: "hãy báo epoch gửi của bạn".
+public struct RekeyResync: Codable, Sendable, Equatable {
+    public var epoch: UInt32
+    public var ask: Bool
+    public init(epoch: UInt32, ask: Bool) { self.epoch = epoch; self.ask = ask }
+}
+
+/// Kết quả ghép đôi (host → viewer) sau message 3 của XX/XXpsk3: host đã duyệt hay từ chối.
+public struct PairResult: Codable, Sendable, Equatable {
+    public var accepted: Bool
+    public init(accepted: Bool) { self.accepted = accepted }
 }

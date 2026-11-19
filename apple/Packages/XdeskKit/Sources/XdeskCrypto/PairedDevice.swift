@@ -27,6 +27,8 @@ public struct PairedDevice: Codable, Sendable, Equatable {
     public let createdAt: Date
     public var lastSeen: Date?
     public var permissions: DevicePermissions
+    /// Địa chỉ `host:port` gần nhất kết nối được (viewer lưu cho host đã biết); chỉ để gợi ý, không dùng để xác thực.
+    public var lastAddress: String?
 
     public init(
         name: String, publicKey: [UInt8], role: DeviceRole, createdAt: Date,
@@ -41,7 +43,7 @@ public struct PairedDevice: Codable, Sendable, Equatable {
         self.permissions = permissions
     }
 
-    private enum CodingKeys: String, CodingKey { case id, name, pub, role, createdAt, lastSeen, permissions }
+    private enum CodingKeys: String, CodingKey { case id, name, pub, role, createdAt, lastSeen, permissions, lastAddress }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -58,6 +60,7 @@ public struct PairedDevice: Codable, Sendable, Equatable {
         createdAt = try c.decode(Date.self, forKey: .createdAt)
         lastSeen = try c.decodeIfPresent(Date.self, forKey: .lastSeen)
         permissions = try c.decode(DevicePermissions.self, forKey: .permissions)
+        lastAddress = try c.decodeIfPresent(String.self, forKey: .lastAddress)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -69,5 +72,6 @@ public struct PairedDevice: Codable, Sendable, Equatable {
         try c.encode(createdAt, forKey: .createdAt)
         try c.encodeIfPresent(lastSeen, forKey: .lastSeen)
         try c.encode(permissions, forKey: .permissions)
+        try c.encodeIfPresent(lastAddress, forKey: .lastAddress)
     }
 }

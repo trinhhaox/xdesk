@@ -1,5 +1,7 @@
+import CryptoKit
 import Foundation
 import Network
+import XdeskCrypto
 import XdeskWire
 
 /// Thứ nhận được trên kênh điều khiển (sau giải khung).
@@ -11,22 +13,38 @@ public enum ControlInbound: Sendable, Equatable {
     case handshake([UInt8])
 }
 
+/// Khoá UDP của phiên (dẫn xuất từ Noise), đưa cho `UdpMediaChannel`.
+public struct UdpKeys: Sendable, Redacted {
+    public let send: SymmetricKey
+    public let receive: SymmetricKey
+}
+
 /// Kết nối điều khiển TCP: framing của XdeskWire, mỗi frame một message. Lỗi giải khung/JSON → đóng kết nối.
 /// Chỉ MỘT task được gọi `nextInbound()` tại một thời điểm.
+/// Chế độ mã hoá: chỉ nhận frame bắt tay (0x01) tới khi `installSession`, sau đó mọi frame 0x02-0x04 qua `ControlCipher`.
 public actor ControlConnection {
-    public nonisolated let remoteEndpoint: NWEndpoint
-    private let connection: NWConnection
-    private let queue = DispatchQueue(label: "xdesk.control.connection")
-    private var decoder = ControlFrameDecoder()
-    private var nextMessageId: UInt32 = 1
-    private var closed = false
-    private var onClose: (@Sendable () -> Void)?
-    var watchdogFired = false
+    enum Mode { case plaintext, awaitingKeys, secured }
 
-    init(connection: NWConnection, onClose: (@Sendable () -> Void)? = nil) {
+    public nonisolated let remoteEndpoint: NWEndpoint
+    let connection: NWConnection
+    let queue = DispatchQueue(label: "xdesk.control.connection")
+    var decoder = ControlFrameDecoder()
+    var nextMessageId: UInt32 = 1
+    var closed = false
+    var onClose: (@Sendable () -> Void)?
+    var watchdogFired = false
+    var mode: Mode
+    var cipher: ControlCipher?
+    var rekeyInterval = ControlCipher.rekeyInterval
+    var firstFrameHooks: [@Sendable () async -> Void] = []
+    public internal(set) var peer: AuthenticatedPeer?
+    public internal(set) var udpKeys: UdpKeys?
+
+    init(connection: NWConnection, encrypted: Bool = false, onClose: (@Sendable () -> Void)? = nil) {
         self.connection = connection
         self.remoteEndpoint = connection.endpoint
         self.onClose = onClose
+        self.mode = encrypted ? .awaitingKeys : .plaintext
     }
 
     /// Kết nối tới host (viewer).
@@ -34,7 +52,7 @@ public actor ControlConnection {
         to endpoint: NWEndpoint, security: TransportSecurity, timeoutSeconds: Double = 5
     ) async throws -> ControlConnection {
         try security.requireAvailable()
-        let conn = ControlConnection(connection: NWConnection(to: endpoint, using: .tcp))
+        let conn = ControlConnection(connection: NWConnection(to: endpoint, using: .tcp), encrypted: security == .encrypted)
         try await conn.start(timeoutSeconds: timeoutSeconds)
         return conn
     }
@@ -73,78 +91,12 @@ public actor ControlConnection {
 
     public func sendFrame(_ frame: ControlFrame) async throws {
         guard !closed else { throw TransportError.connectionClosed }
-        let bytes = try ControlFrameCodec.encode(frame)
-        try await write(bytes)
+        try await write(try wireBytes(for: frame))
     }
 
     private func takeNextId() -> UInt32 {
         defer { nextMessageId &+= 1 }
         return nextMessageId
-    }
-
-    private func write(_ bytes: [UInt8]) async throws {
-        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, any Error>) in
-            connection.send(content: Data(bytes), completion: .contentProcessed { error in
-                if let error { cont.resume(throwing: TransportError.connectionFailed("\(error)")) } else { cont.resume() }
-            })
-        }
-    }
-
-    // MARK: Nhận
-
-    /// Chờ thứ kế tiếp; `nil` khi đối tác đóng sạch. Message `t` lạ được bỏ qua (tương thích tiến).
-    public func nextInbound() async throws -> ControlInbound? {
-        while true {
-            let frame: ControlFrame?
-            do {
-                frame = try await nextFrame()
-            } catch {
-                close()
-                throw error
-            }
-            guard let frame else { close(); return nil }
-            do {
-                switch frame.kind {
-                case .control:
-                    let envelope = try ControlMessageCodec.decode(frame.payload)
-                    if case .unknown = envelope.message { continue }
-                    return .message(envelope)
-                case .mediaOverTcp: return .mediaOverTcp(try MediaPacket.decode(frame.payload))
-                case .bulk: return .bulk(frame.payload)
-                case .handshake: return .handshake(frame.payload)
-                }
-            } catch {
-                close()
-                throw error
-            }
-        }
-    }
-
-    private func nextFrame() async throws -> ControlFrame? {
-        while true {
-            if let frame = try decoder.next() { return frame }
-            guard let chunk = try await readChunk() else { return nil }
-            decoder.append(chunk)
-        }
-    }
-
-    private func readChunk() async throws -> [UInt8]? {
-        while true {
-            let chunk: [UInt8]? = try await withCheckedThrowingContinuation { cont in
-                connection.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { data, _, isComplete, error in
-                    if let error {
-                        cont.resume(throwing: TransportError.connectionFailed("\(error)"))
-                    } else if let data, !data.isEmpty {
-                        cont.resume(returning: [UInt8](data))
-                    } else if isComplete {
-                        cont.resume(returning: nil)
-                    } else {
-                        cont.resume(returning: [])
-                    }
-                }
-            }
-            if chunk?.isEmpty != true { return chunk }
-        }
     }
 
     // MARK: Đóng

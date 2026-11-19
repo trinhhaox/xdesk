@@ -151,4 +151,5 @@ private struct FailingStorage: PairedDevicesStorage {
     struct Failure: Error {}
     func read() throws -> Data? { nil }
     func write(_ data: Data) throws { throw Failure() }
+    func quarantine() throws {}
 }

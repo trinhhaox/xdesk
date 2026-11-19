@@ -21,6 +21,16 @@ public actor PairedDevicesStore {
     private var byId: [String: PairedDevice]
     /// `true` nếu file có trên đĩa nhưng MAC sai/thiếu và đã bị bỏ qua; lần ghi kế tiếp sẽ thay file đó.
     public private(set) var integrityFailure = false
+    /// Sticky: file danh sách từng bị sửa/hỏng MAC trong phiên này. UI báo cho tới khi gọi `acknowledgeIntegrityNotice()`.
+    public private(set) var integrityNoticePending = false
+    private var needsQuarantine = false
+    private var observers: [UUID: AsyncStream<Change>.Continuation] = [:]
+
+    public enum Change: Sendable, Equatable {
+        case added(String)
+        case removed(String)
+        case permissionsChanged(String)
+    }
 
     /// Ném `corrupt` nếu file hỏng/trùng id và `unsupportedSchema` nếu file do bản mới hơn ghi (không bao giờ tự xoá file).
     public init(
@@ -42,6 +52,8 @@ public actor PairedDevicesStore {
               PairedDevicesIntegrity.isValid(mac, for: canonical, key: self.macKey)
         else {
             integrityFailure = true
+            integrityNoticePending = true
+            needsQuarantine = true
             return
         }
         byId = Dictionary(uniqueKeysWithValues: contents.devices.map { ($0.id, $0) })
@@ -59,6 +71,21 @@ public actor PairedDevicesStore {
 
     /// Thêm thiết bị; nếu khoá đã có thì chỉ cập nhật tên/vai trò và giữ quyền hiện tại.
     /// Trùng `id` (fingerprint) nhưng khác khoá → `deviceIdCollision`, danh sách không đổi.
+    /// Luồng thay đổi danh sách (thêm/xoá/đổi quyền) để host cắt phiên của thiết bị bị thu hồi. Mỗi lần gọi một luồng riêng.
+    public func changes() -> AsyncStream<Change> {
+        let token = UUID()
+        let (stream, continuation) = AsyncStream.makeStream(of: Change.self)
+        observers[token] = continuation
+        continuation.onTermination = { [weak self] _ in Task { await self?.removeObserver(token) } }
+        return stream
+    }
+
+    public func acknowledgeIntegrityNotice() { integrityNoticePending = false }
+
+    private func removeObserver(_ token: UUID) { observers[token] = nil }
+
+    private func notify(_ change: Change) { for continuation in observers.values { continuation.yield(change) } }
+
     @discardableResult
     public func add(name: String, publicKey: [UInt8], role: DeviceRole) throws -> PairedDevice {
         guard publicKey.count == 32 else { throw CryptoError.invalidPublicKey }
@@ -67,7 +94,9 @@ public actor PairedDevicesStore {
         var device = byId[id] ?? PairedDevice(name: name, publicKey: publicKey, role: role, createdAt: now())
         device.name = name
         device.role = role
+        let isNew = byId[id] == nil
         try commit(device)
+        if isNew { notify(.added(id)) }
         return device
     }
 
@@ -79,12 +108,20 @@ public actor PairedDevicesStore {
             byId[id] = removed
             throw error
         }
+        notify(.removed(id))
         return true
     }
 
     public func setPermissions(id: String, _ permissions: DevicePermissions) throws {
         guard var device = byId[id] else { return }
         device.permissions = permissions
+        try commit(device)
+        notify(.permissionsChanged(id))
+    }
+
+    public func setLastAddress(id: String, _ address: String) throws {
+        guard var device = byId[id], device.lastAddress != address else { return }
+        device.lastAddress = address
         try commit(device)
     }
 
@@ -107,6 +144,10 @@ public actor PairedDevicesStore {
         var contents = FileContents(schemaVersion: Self.schemaVersion, devices: devices, mac: nil)
         let canonical = try Self.encoder.encode(contents)
         contents.mac = Base64URL.encode(PairedDevicesIntegrity.mac(for: canonical, key: macKey))
+        if needsQuarantine {
+            try storage.quarantine()
+            needsQuarantine = false
+        }
         try storage.write(Self.encoder.encode(contents))
         integrityFailure = false
     }

@@ -15,7 +15,13 @@ public struct PairingToken: Sendable, Redacted {
 /// Token là psk của `XXpsk3`; host dùng `activeToken` để bắt tay rồi `consume` khi bắt tay thành công.
 /// `~Copyable`: bản sao sẽ làm "dùng một lần" chỉ đúng trên từng bản.
 public struct PairingTokenIssuer: ~Copyable, Sendable {
+    public static let maxFailures = 5
+
     private var active: PairingToken?
+    private var failures = 0
+
+    // Deinit tường minh: huỷ qua hàm của XdeskCrypto, không để module khác inline việc huỷ các kiểu nội bộ (lỗi liên kết Release).
+    deinit {}
 
     public init() {}
 
@@ -28,6 +34,7 @@ public struct PairingTokenIssuer: ~Copyable, Sendable {
         guard bytes.count == PairingToken.length else { throw CryptoError.invalidLength }
         let token = PairingToken(bytes: bytes, expiresAt: now.addingTimeInterval(PairingToken.lifetime))
         active = token
+        failures = 0
         return token
     }
 
@@ -42,4 +49,17 @@ public struct PairingTokenIssuer: ~Copyable, Sendable {
         active = nil
         return true
     }
+
+    /// Ghi một lần bắt tay hỏng; đủ `maxFailures` lần thì vô hiệu token. Trả `true` nếu token vừa bị vô hiệu.
+    @discardableResult
+    public mutating func recordFailure() -> Bool {
+        guard active != nil else { return false }
+        failures += 1
+        guard failures >= Self.maxFailures else { return false }
+        active = nil
+        return true
+    }
+
+    /// Vô hiệu token đang hiệu lực (vd. có phiên đang chạy, hoặc người dùng đóng cửa sổ QR).
+    public mutating func invalidate() { active = nil }
 }

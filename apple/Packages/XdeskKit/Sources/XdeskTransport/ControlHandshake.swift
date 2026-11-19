@@ -24,7 +24,7 @@ extension ControlConnection {
     public func performViewerHandshake(
         name: String, caps: Capabilities, display: DisplayConfig
     ) async throws -> ViewerHandshakeResult {
-        try await guarded {
+        try await withDeadline(seconds: Self.handshakeTimeoutSeconds) {
             let helloId = try await send(.hello(Hello(ver: ProtocolVersion.current.string, caps: caps.rawValue, name: name)))
             let welcome = try await expect(id: helloId) { if case .welcome(let w) = $0 { w } else { nil } }
             let configId = try await send(.displayConfig(display))
@@ -42,7 +42,7 @@ extension ControlConnection {
         sessionId: String,
         prepareDisplay: @Sendable (Hello, DisplayConfig) async throws -> DisplayReady
     ) async throws -> HostHandshakeResult {
-        try await guarded {
+        try await withDeadline(seconds: Self.handshakeTimeoutSeconds) {
             var helloId: UInt32 = 0
             let hello = try await expect { envelope in
                 if case .hello(let h) = envelope.message { helloId = envelope.id; return h }
@@ -85,26 +85,5 @@ extension ControlConnection {
 
     private func expect<T: Sendable>(id: UInt32, _ pick: (ControlMessage) -> T?) async throws -> T {
         try await expect { envelope in envelope.id == id ? pick(envelope.message) : nil }
-    }
-
-    /// Đồng hồ canh handshake: quá hạn → đóng kết nối (đánh thức lần đọc đang chờ) và báo `timedOut`.
-    private func guarded<T: Sendable>(_ body: () async throws -> T) async throws -> T {
-        let watchdog = Task { [weak self] in
-            try await Task.sleep(for: .seconds(Self.handshakeTimeoutSeconds))
-            await self?.fireWatchdog()
-        }
-        defer { watchdog.cancel() }
-        do {
-            return try await body()
-        } catch {
-            if watchdogFired { throw TransportError.timedOut }
-            close()
-            throw error
-        }
-    }
-
-    private func fireWatchdog() {
-        watchdogFired = true
-        close()
     }
 }

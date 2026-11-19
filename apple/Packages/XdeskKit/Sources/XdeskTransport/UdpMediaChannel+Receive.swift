@@ -12,11 +12,12 @@ extension UdpMediaChannel {
     }
 
     func beginReceiving(on conn: NWConnection) {
-        receiveTask = Task { [weak self] in
+        let key = ObjectIdentifier(conn)
+        receiveTasks[key] = Task { [weak self] in
             while !Task.isCancelled {
                 guard let data = await Self.receiveDatagram(conn) else { return }
                 guard let self else { return }
-                await self.handleDatagram(data)
+                await self.handleDatagram(data, from: conn)
             }
         }
     }
@@ -29,20 +30,29 @@ extension UdpMediaChannel {
         }
     }
 
-    private func handleDatagram(_ bytes: [UInt8]) async {
+    private func handleDatagram(_ bytes: [UInt8], from conn: NWConnection) async {
         guard !bytes.isEmpty else { return }
         do {
-            let packet = try MediaPacket.decode(bytes)
+            let packet = try openDatagram(bytes)
+            lastValidMs = monotonicMs()
+            recentUnknownEpoch = 0
+            linkLostReported = false
+            promote(conn)
             if isViewer { heardFromHost = true }
             await handle(packet)
+        } catch let error as DatagramRejection {
+            if error.countsAsRejected { rejectedDatagramCount += 1 }
         } catch {
             malformedPacketCount += 1
         }
     }
 
-    private func handle(_ packet: MediaPacket) async {
+    func handle(_ packet: MediaPacket) async {
         if packet.header.type == .probe {
-            if !isViewer, MediaPunch.isProbe(packet) { continuation.yield(.peerConnected) }
+            if !isViewer, MediaPunch.isProbe(packet), !peerAnnounced {
+                peerAnnounced = true
+                continuation.yield(.peerConnected)
+            }
             return
         }
         switch packet.header.type {

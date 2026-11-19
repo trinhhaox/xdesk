@@ -68,6 +68,9 @@ public enum ControlMessageCodec {
         case "pong": return .pong(try body(Pong.self))
         case "bye": return .bye(try body(Bye.self))
         case "input.text": return .inputText(try body(InputText.self))
+        case "rekey": return .rekey
+        case "rekey.resync": return .rekeyResync(try body(RekeyResync.self))
+        case "pair.result": return .pairResult(try body(PairResult.self))
         default: return .unknown(type: type)
         }
     }
