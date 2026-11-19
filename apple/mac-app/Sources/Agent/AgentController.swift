@@ -28,13 +28,16 @@ final class AgentController {
     private let defaults: UserDefaults
     private let tokenStore = McpTokenStore()
     private let listener = McpHttpListener()
-    let settings = AgentSettings()
+    let settings: AgentSettings
     let runtime: AgentRuntime
 
     init(host: HostController, defaults: UserDefaults = .standard) {
         self.host = host
         self.defaults = defaults
         isEnabled = defaults.bool(forKey: Self.enabledKey)
+        // Luật app dùng cùng kho defaults được truyền vào: test/ảnh chụp không được ghi vào cài đặt thật của người dùng.
+        let settings = AgentSettings(defaults: defaults)
+        self.settings = settings
         runtime = AgentRuntime(host: host, settings: settings)
     }
 
