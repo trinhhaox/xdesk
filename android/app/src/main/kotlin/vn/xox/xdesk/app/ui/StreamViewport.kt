@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
 import android.os.SystemClock
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.widget.FrameLayout
 import androidx.compose.runtime.getValue
@@ -25,7 +26,12 @@ import vn.xox.xdesk.app.input.VideoViewport
 class StreamViewport(context: Context) : FrameLayout(context) {
     val surfaceView = StreamSurfaceView(context)
     var router: StreamInputRouter? = null
-        set(value) { field = value; surfaceView.router = value }
+        set(value) {
+            field = value
+            surfaceView.router = value
+            // Rung nhẹ khi nhấn giữ đủ lâu: báo có thể kéo thả, hoặc nhả ra để click phải.
+            value?.onHoldArmed = { performHapticFeedback(HapticFeedbackConstants.LONG_PRESS) }
+        }
 
     /** Cỡ video (px); null = chưa biết, video lấp đầy khung. */
     var videoSize: Pair<Int, Int>? = null
@@ -104,6 +110,9 @@ class StreamViewport(context: Context) : FrameLayout(context) {
         surfaceView.translationY = viewport.translationY - panY
         invalidate()
     }
+
+    /** Bề ngang video đang hiện (dp, kể cả zoom); 0 khi chưa biết kích thước. */
+    internal fun displayedVideoWidthDp(): Float = mapper?.let { it.width * viewport.zoom / resources.displayMetrics.density } ?: 0f
 
     /** Toạ độ ngón (view) → mẫu chạm chuẩn hoá trên video; null nếu chạm bắt đầu ngoài khung video (dải đen ở chế độ trực tiếp). */
     internal fun sample(id: Int, x: Float, y: Float, phase: TouchPhase, now: Long, accepted: Set<Int>): TouchSample? {

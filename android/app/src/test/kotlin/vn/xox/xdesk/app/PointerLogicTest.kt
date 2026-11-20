@@ -1,5 +1,6 @@
 package vn.xox.xdesk.app
 
+import vn.xox.xdesk.transport.InputButton
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -61,7 +62,9 @@ class PointerLogicTest {
     fun directModeHonoursLongPressAndNaturalScrollSettings() {
         val off = createPointerGestures(PointerSettings(longPressRightClick = false), 1000f, 500f)
         off.handle(TouchSample(1, 0.5f, 0.5f, TouchPhase.BEGAN, 0))
-        assertTrue(off.tick(5000).isEmpty())
+        off.tick(5000)
+        val release = off.handle(TouchSample(1, 0.5f, 0.5f, TouchPhase.ENDED, 5050))
+        assertEquals(InputButton.LEFT, release.first().button, "tắt nhấn giữ = chuột phải: nhả ra là click trái")
 
         val reversed = GestureInterpreter(GestureConfig(1000f, 500f, naturalScroll = false))
         reversed.handle(TouchSample(1, 0.4f, 0.5f, TouchPhase.BEGAN, 0)); reversed.handle(TouchSample(2, 0.6f, 0.5f, TouchPhase.BEGAN, 1))

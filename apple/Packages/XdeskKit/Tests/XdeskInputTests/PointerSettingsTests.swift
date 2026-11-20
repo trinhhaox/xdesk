@@ -45,7 +45,9 @@ import XdeskWire
     @Test func engineLongPressSettingReachesDirectMode() {
         var engine = PointerEngine(settings: PointerSettings(longPressRightClick: false), surfaceWidth: 1000, surfaceHeight: 500)
         _ = engine.handle(TouchSample(id: 1, x: 0.5, y: 0.5, phase: .began, timeMs: 0))
-        #expect(engine.tick(nowMs: 5000).isEmpty)
+        _ = engine.tick(nowMs: 5000)
+        let release = engine.handle(TouchSample(id: 1, x: 0.5, y: 0.5, phase: .ended, timeMs: 5050))
+        #expect(release.first?.button == InputButton.left, "tắt nhấn giữ = chuột phải: nhả ra là click trái")
     }
 
     @Test func engineNaturalScrollSettingReachesDirectMode() {

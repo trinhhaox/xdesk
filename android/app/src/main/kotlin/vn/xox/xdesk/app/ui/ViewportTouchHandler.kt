@@ -122,7 +122,7 @@ internal class ViewportTouchHandler(private val view: StreamViewport) {
         val samples = indices.mapNotNull { i -> view.sample(e.getPointerId(i), e.getX(i), e.getY(i), phase, now, forwarded) }
         if (samples.isEmpty()) return
         when (phase) { TouchPhase.BEGAN -> forwarded += samples.map { it.id }; TouchPhase.ENDED -> forwarded -= samples.map { it.id }.toSet(); else -> Unit }
-        view.router?.onTouch(samples)
+        view.router?.onTouch(samples, view.displayedVideoWidthDp())
         view.afterForward()
     }
 

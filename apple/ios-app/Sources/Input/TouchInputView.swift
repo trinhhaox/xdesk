@@ -8,18 +8,18 @@ import XdeskWire
 /// dải đen letterbox bị bỏ qua. Đồng thời là first responder nhận phím vật lý (trừ lúc ô gõ ảo đang giữ bàn phím).
 @MainActor
 final class TouchInputView: UIView {
-    private static let tickInterval: TimeInterval = 0.05
+    static let tickInterval: TimeInterval = 0.05
     private static let cursorMargin: Float = 40
 
-    private let session: ViewerSession
+    let session: ViewerSession
     private let renderer: VideoLayerRenderer
     lazy var keyboard = HardwareKeyboardHandler { [weak self] in self?.session.sendInput($0) }
-    private var engine: PointerEngine?
+    var engine: PointerEngine?
     private var engineStale = true
     private var lastTouch: (x: Float, y: Float)?
-    private var touchIds: [ObjectIdentifier: Int] = [:]
+    var touchIds: [ObjectIdentifier: Int] = [:]
     private var nextTouchId = 0
-    private var tickTimer: Timer?
+    var tickTimer: Timer?
 
     /// Kích thước màn hình host theo điểm (`DisplayConfig` w/h ÷ scale); đổi delta chuẩn hoá thành pixel cuộn.
     var hostPoints = CGSize(width: 1, height: 1) { didSet { if oldValue != hostPoints { engineStale = true } } }
@@ -78,7 +78,10 @@ final class TouchInputView: UIView {
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         if !isFirstResponder, !keyboardActive { becomeFirstResponder() }
-        if touchIds.isEmpty { rebuildEngineIfNeeded() }
+        if touchIds.isEmpty {
+            rebuildEngineIfNeeded()
+            updateTouchScale()
+        }
         for touch in touches {
             guard let point = normalized(touch, clamping: false) else { continue }
             lastTouch = point
@@ -160,7 +163,7 @@ final class TouchInputView: UIView {
     }
 
     /// Kích thước màn hình Mac theo điểm: từ cấu hình, hoặc (Giống màn hình Mac) từ video ÷ 2 vì màn hình Retina.
-    private var surfacePoints: CGSize {
+    var surfacePoints: CGSize {
         guard nativeMac, let video = renderer.videoSize else { return hostPoints }
         return CGSize(width: video.width / 2, height: video.height / 2)
     }
@@ -171,27 +174,4 @@ final class TouchInputView: UIView {
         engine = PointerEngine(settings: pointer, surfaceWidth: Float(surface.width), surfaceHeight: Float(surface.height), cursor: engine?.cursor)
         engineStale = false
     }
-
-    // MARK: Tick 50 ms (giữ lâu → click phải)
-
-    private func updateTimer() {
-        if touchIds.isEmpty {
-            tickTimer?.invalidate()
-            tickTimer = nil
-        } else if tickTimer == nil {
-            tickTimer = Timer.scheduledTimer(withTimeInterval: Self.tickInterval, repeats: true) { [weak self] _ in
-                MainActor.assumeIsolated { self?.tick() }
-            }
-        }
-    }
-
-    private func tick() {
-        guard var current = engine else { return }
-        let events = current.tick(nowMs: Self.nowMs)
-        engine = current
-        session.sendInput(events)
-    }
-
-    private static var nowMs: Int64 { Int64(ProcessInfo.processInfo.systemUptime * 1000) }
-    private static func ms(_ touch: UITouch) -> Int64 { Int64(touch.timestamp * 1000) }
 }

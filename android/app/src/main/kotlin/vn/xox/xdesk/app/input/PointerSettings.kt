@@ -47,6 +47,10 @@ interface PointerGestures {
     val cursor: Pair<Float, Float>? get() = null
     fun handle(s: TouchSample): List<InputEvent>
     fun tick(nowMs: Long): List<InputEvent>
+    /** Đang giữ một ngón đủ lâu (sẵn sàng kéo thả / click phải): UI rung nhẹ khi trạng thái này bật lên. */
+    val isHolding: Boolean get() = false
+    /** Số điểm host ứng với một dp màn hình (cỡ video đang hiện, kể cả zoom) để ngưỡng chạm tính theo ngón tay. */
+    fun setHostPointsPerViewPoint(scale: Float) {}
 }
 
 /** Dựng bộ diễn giải theo cài đặt; giữ vị trí con trỏ cũ khi đổi cài đặt giữa chừng. */

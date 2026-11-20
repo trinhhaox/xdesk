@@ -32,6 +32,25 @@ public struct PointerEngine: Sendable {
         return nil
     }
 
+    /// Chế độ trực tiếp đang giữ một ngón đủ lâu (UI rung nhẹ báo có thể kéo thả).
+    public var isHolding: Bool {
+        if case .direct(let gesture) = backend { return gesture.isHolding }
+        return false
+    }
+
+    /// Còn cần gọi `tick` (cuộn quán tính vẫn chạy sau khi nhả ngón).
+    public var needsTick: Bool {
+        if case .direct(let gesture) = backend { return gesture.needsTick }
+        return false
+    }
+
+    /// Điểm host ứng với một điểm màn hình (cỡ video đang hiện, kể cả zoom) để ngưỡng chạm tính theo ngón tay.
+    public mutating func setHostPointsPerViewPoint(_ scale: Float) {
+        guard case .direct(var gesture) = backend else { return }
+        gesture.setHostPointsPerViewPoint(scale)
+        backend = .direct(gesture)
+    }
+
     public mutating func handle(_ sample: TouchSample) -> [InputEvent] {
         switch backend {
         case .direct(var gesture):

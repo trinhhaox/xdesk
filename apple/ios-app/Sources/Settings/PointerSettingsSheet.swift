@@ -55,7 +55,7 @@ struct PointerSettingsForm: View {
 
     private var modeHelp: String {
         switch store.settings.mode {
-        case .direct: "Chạm đâu click đó. Kéo một ngón để kéo thả, hai ngón để cuộn, nhấn giữ để chuột phải."
+        case .direct: "Chạm đâu click đó. Vuốt một ngón để cuộn lên xuống (hất mạnh để trang trôi nhanh), nhấn giữ rồi kéo để kéo thả, nhấn giữ rồi nhả để chuột phải."
         case .trackpad: "Trượt một ngón để di chuyển con trỏ, chạm để click. Hai ngón chạm = chuột phải, hai ngón trượt = cuộn, chạm rồi chạm-giữ-trượt = kéo."
         }
     }

@@ -1,59 +1,30 @@
 import XdeskWire
 
-public enum TouchPhase: Sendable, Equatable {
-    case began, moved, ended, cancelled
-}
-
-/// Một mẫu chạm trừu tượng: toạ độ chuẩn hoá 0…1 trên khung video, thời gian đơn điệu (ms).
-public struct TouchSample: Sendable, Equatable {
-    public var id: Int
-    public var x: Float
-    public var y: Float
-    public var phase: TouchPhase
-    public var timeMs: Int64
-
-    public init(id: Int, x: Float, y: Float, phase: TouchPhase, timeMs: Int64) {
-        self.id = id; self.x = x; self.y = y; self.phase = phase; self.timeMs = timeMs
-    }
-}
-
-public struct GestureConfig: Sendable, Equatable {
-    /// Kích thước màn hình host theo điểm; đổi delta chuẩn hoá → pixel và đo ngưỡng di chuyển.
-    public var surfaceWidth: Float
-    public var surfaceHeight: Float
-    public var longPressMs: Int64 = 500
-    public var doubleTapMs: Int64 = 300
-    /// Hai ngón chạm rồi nhả trong khoảng này (không trượt) = click phải.
-    public var twoFingerTapMs: Int64 = 300
-    /// Di chuyển dưới ngưỡng này (điểm) vẫn tính là chạm.
-    public var slop: Float = 8
-    /// Giữ một ngón đủ `longPressMs` = click phải (cài đặt "nhấn giữ để chuột phải").
-    public var longPressRightClick = true
-    /// Cuộn tự nhiên: nội dung đi theo ngón tay; tắt thì đảo chiều.
-    public var naturalScroll = true
-
-    public init(surfaceWidth: Float, surfaceHeight: Float) {
-        self.surfaceWidth = surfaceWidth
-        self.surfaceHeight = surfaceHeight
-    }
-}
-
-/// Chạm → con trỏ: chạm = click trái (liên tiếp = double/triple), giữ 500 ms hoặc chạm 2 ngón = click phải,
-/// 1 ngón kéo = giữ chuột trái và kéo, 2 ngón kéo = cuộn pixel. Không phụ thuộc UIKit để test được.
+/// Chạm trực tiếp → con trỏ:
+/// - chạm = click trái (liên tiếp = double/triple), chạm 2 ngón = click phải;
+/// - vuốt 1 ngón = cuộn (con trỏ đặt ở chỗ bắt đầu vuốt để cuộn đúng cửa sổ), khoá theo trục chính;
+/// - giữ 500 ms rồi kéo = giữ chuột trái và kéo thả; giữ rồi nhả không kéo = click phải;
+/// - 2 ngón kéo = cuộn pixel; hất rồi nhả (1 hoặc 2 ngón) thì trang trôi tiếp và chậm dần.
+/// Không phụ thuộc UIKit để test được.
 /// Đầu ra có `seq` = 0; gửi qua `InputSequencer`/`ViewerSession.sendInput`.
 public struct GestureInterpreter: Sendable {
     private enum Mode: Equatable {
         case idle
         case pending(id: Int)
+        /// Một ngón vuốt: cuộn theo ngón tay.
+        case swiping(id: Int)
+        /// Đã giữ đủ lâu: kéo = kéo thả, nhả = click phải.
+        case held(id: Int)
         case dragging(id: Int)
         case scrolling
         /// Đã dùng xong cử chỉ (long press, cuộn kết thúc); chờ nhả hết ngón.
         case consumed
     }
 
-    private struct Point { var x: Float, y: Float }
+    private typealias Point = GesturePoint
 
-    private let config: GestureConfig
+    private var config: GestureConfig
+    private var momentum = ScrollMomentum()
     private var mode = Mode.idle
     private var touches: [Int: Point] = [:]
     private var startPoint = Point(x: 0, y: 0)
@@ -61,65 +32,89 @@ public struct GestureInterpreter: Sendable {
     private var lastTap: (point: Point, endMs: Int64, count: Int)?
     private var lastCentroid = Point(x: 0, y: 0)
     private var twoFingerTap: (startMs: Int64, start: Point)?
+    /// Trục khoá khi vuốt một ngón: (1,0) ngang, (0,1) dọc, (1,1) tự do.
+    private var swipeAxis = Point(x: 1, y: 1)
 
     public init(config: GestureConfig) { self.config = config }
+
+    /// Đang giữ một ngón đủ lâu (sẵn sàng kéo thả / click phải): UI rung nhẹ khi trạng thái này bật lên.
+    public var isHolding: Bool { if case .held = mode { true } else { false } }
+    /// Còn việc cần `tick` (chờ nhấn giữ hoặc đang cuộn quán tính) dù không còn ngón nào trên màn hình.
+    public var needsTick: Bool { momentum.isActive || !touches.isEmpty }
+
+    /// Cập nhật tỉ lệ điểm host / điểm màn hình (đổi zoom, xoay máy) mà không mất trạng thái cử chỉ.
+    public mutating func setHostPointsPerViewPoint(_ scale: Float) { config.hostPointsPerViewPoint = scale }
 
     public mutating func handle(_ sample: TouchSample) -> [InputEvent] {
         let point = Point(x: sample.x, y: sample.y)
         switch sample.phase {
         case .began: return began(sample.id, point, sample.timeMs)
-        case .moved: return moved(sample.id, point)
+        case .moved: return moved(sample.id, point, sample.timeMs)
         case .ended: return ended(sample.id, point, sample.timeMs)
         case .cancelled: return cancelled(sample.id, point)
         }
     }
 
-    /// Gọi định kỳ (~50 ms) để phát click phải khi giữ đủ lâu.
+    /// Gọi định kỳ (~50 ms): giữ đủ lâu thì con trỏ nhảy tới ngón tay, sẵn sàng kéo thả hoặc click phải khi nhả.
     public mutating func tick(nowMs: Int64) -> [InputEvent] {
-        guard config.longPressRightClick, case .pending = mode, nowMs - startMs >= config.longPressMs else { return [] }
-        mode = .consumed
-        return [.move(x: startPoint.x, y: startPoint.y)] + click(InputButton.right, at: startPoint, count: 1)
+        if let glide = momentum.step(nowMs: nowMs) {
+            return glide.dx == 0 && glide.dy == 0 ? [] : [.scroll(dx: glide.dx, dy: glide.dy)]
+        }
+        guard case .pending(let id) = mode, nowMs - startMs >= config.longPressMs else { return [] }
+        mode = .held(id: id)
+        return [.move(x: startPoint.x, y: startPoint.y)]
     }
 
     // MARK: Pha
 
     private mutating func began(_ id: Int, _ point: Point, _ timeMs: Int64) -> [InputEvent] {
         touches[id] = point
+        momentum.stop()
         switch mode {
         case .idle:
             mode = .pending(id: id)
             startPoint = point
             startMs = timeMs
             return []
-        case .pending:
+        case .pending, .swiping, .held:
             return beginScroll(timeMs: timeMs)
         case .dragging(let dragId):
             mode = .scrolling
             twoFingerTap = nil
-            lastCentroid = centroid()
+            lastCentroid = GestureMath.centroid(touches.values)
             return [releaseDrag(dragId)]
         case .scrolling, .consumed:
             return []
         }
     }
 
-    private mutating func moved(_ id: Int, _ point: Point) -> [InputEvent] {
+    private mutating func moved(_ id: Int, _ point: Point, _ timeMs: Int64) -> [InputEvent] {
         guard touches[id] != nil else { return [] }
         touches[id] = point
         switch mode {
         case .pending(let pendingId) where pendingId == id:
-            guard distance(point, startPoint) > config.slop else { return [] }
+            guard GestureMath.distance(point, startPoint, in: config) > config.effectiveSlop else { return [] }
+            mode = .swiping(id: id)
+            swipeAxis = GestureMath.swipeAxis(dx: (point.x - startPoint.x) * config.surfaceWidth, dy: (point.y - startPoint.y) * config.surfaceHeight)
+            lastCentroid = startPoint
+            return [.move(x: startPoint.x, y: startPoint.y)] + scroll(to: point, timeMs: timeMs)
+        case .swiping(let swipeId) where swipeId == id:
+            return scroll(to: point, timeMs: timeMs)
+        case .held(let heldId) where heldId == id:
+            guard GestureMath.distance(point, startPoint, in: config) > config.effectiveSlop else { return [] }
             mode = .dragging(id: id)
-            return [.move(x: startPoint.x, y: startPoint.y), .button(down: true, x: startPoint.x, y: startPoint.y), .move(x: point.x, y: point.y)]
+            return [.button(down: true, x: startPoint.x, y: startPoint.y), .move(x: point.x, y: point.y)]
         case .dragging(let dragId) where dragId == id:
             return [.move(x: point.x, y: point.y)]
         case .scrolling:
-            let now = centroid()
+            let now = GestureMath.centroid(touches.values)
             defer { lastCentroid = now }
-            if let tap = twoFingerTap, distance(now, tap.start) > config.slop { twoFingerTap = nil }
+            if let tap = twoFingerTap, GestureMath.distance(now, tap.start, in: config) > config.effectiveSlop { twoFingerTap = nil }
             let sign: Float = config.naturalScroll ? 1 : -1
             let dx = sign * (now.x - lastCentroid.x) * config.surfaceWidth, dy = sign * (now.y - lastCentroid.y) * config.surfaceHeight
-            return dx == 0 && dy == 0 ? [] : [.scroll(dx: dx, dy: dy)]
+            guard dx != 0 || dy != 0 else { return [] }
+            momentum.track(dx: dx, dy: dy, timeMs: timeMs)
+            return [.scroll(dx: dx, dy: dy)]
         default:
             return []
         }
@@ -136,14 +131,23 @@ public struct GestureInterpreter: Sendable {
         case .pending(let pendingId) where pendingId == id:
             let count = nextTapCount(at: point, timeMs: timeMs)
             lastTap = (point, timeMs, count)
-            return [.move(x: point.x, y: point.y)] + click(InputButton.left, at: point, count: count)
+            return [.move(x: point.x, y: point.y)] + GestureMath.click(InputButton.left, at: point, count: count)
+        case .held(let heldId) where heldId == id:
+            let button = config.longPressRightClick ? InputButton.right : InputButton.left
+            return GestureMath.click(button, at: startPoint, count: 1)
         case .dragging(let dragId) where dragId == id:
             return [.button(down: false, x: point.x, y: point.y)]
+        case .swiping(let swipeId) where swipeId == id:
+            momentum.release(timeMs: timeMs)
+            return []
         case .scrolling:
-            guard let tap = twoFingerTap, touches.count == 2, timeMs - tap.startMs <= config.twoFingerTapMs else { return [] }
+            guard let tap = twoFingerTap, touches.count == 2, timeMs - tap.startMs <= config.twoFingerTapMs else {
+                momentum.release(timeMs: timeMs)
+                return []
+            }
             twoFingerTap = nil
-            let center = centroid()
-            return [.move(x: center.x, y: center.y)] + click(InputButton.right, at: center, count: 1)
+            let center = GestureMath.centroid(touches.values)
+            return [.move(x: center.x, y: center.y)] + GestureMath.click(InputButton.right, at: center, count: 1)
         default:
             return []
         }
@@ -162,9 +166,20 @@ public struct GestureInterpreter: Sendable {
 
     private mutating func beginScroll(timeMs: Int64) -> [InputEvent] {
         mode = .scrolling
-        lastCentroid = centroid()
+        lastCentroid = GestureMath.centroid(touches.values)
         twoFingerTap = touches.count == 2 ? (timeMs, lastCentroid) : nil
         return []
+    }
+
+    /// Một ngón vuốt: nội dung đi theo ngón tay (cuộn tự nhiên), chỉ theo trục đã khoá.
+    private mutating func scroll(to point: Point, timeMs: Int64) -> [InputEvent] {
+        defer { lastCentroid = point }
+        let sign: Float = config.naturalScroll ? 1 : -1
+        let dx = sign * (point.x - lastCentroid.x) * config.surfaceWidth * swipeAxis.x
+        let dy = sign * (point.y - lastCentroid.y) * config.surfaceHeight * swipeAxis.y
+        guard dx != 0 || dy != 0 else { return [] }
+        momentum.track(dx: dx, dy: dy, timeMs: timeMs)
+        return [.scroll(dx: dx, dy: dy)]
     }
 
     private func releaseDrag(_ id: Int) -> InputEvent {
@@ -172,23 +187,8 @@ public struct GestureInterpreter: Sendable {
         return .button(down: false, x: p.x, y: p.y)
     }
 
-    private func click(_ button: UInt8, at p: Point, count: Int) -> [InputEvent] {
-        [.button(down: true, button: button, x: p.x, y: p.y, clickCount: count), .button(down: false, button: button, x: p.x, y: p.y, clickCount: count)]
-    }
-
     private func nextTapCount(at p: Point, timeMs: Int64) -> Int {
-        guard let last = lastTap, timeMs - last.endMs <= config.doubleTapMs, distance(p, last.point) <= config.slop * 2 else { return 1 }
+        guard let last = lastTap, timeMs - last.endMs <= config.doubleTapMs, GestureMath.distance(p, last.point, in: config) <= config.effectiveSlop * 2 else { return 1 }
         return last.count + 1
-    }
-
-    private func centroid() -> Point {
-        let all = touches.values
-        let n = Float(max(1, all.count))
-        return Point(x: all.reduce(0) { $0 + $1.x } / n, y: all.reduce(0) { $0 + $1.y } / n)
-    }
-
-    private func distance(_ a: Point, _ b: Point) -> Float {
-        let dx = (a.x - b.x) * config.surfaceWidth, dy = (a.y - b.y) * config.surfaceHeight
-        return (dx * dx + dy * dy).squareRoot()
     }
 }

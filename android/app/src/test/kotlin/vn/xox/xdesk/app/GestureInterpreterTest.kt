@@ -40,23 +40,40 @@ class GestureInterpreterTest {
     }
 
     @Test
-    fun longPressBecomesRightClickOnce() {
+    fun longPressThenReleaseIsRightClick() {
         touch(1, BEGAN, 0.2f, 0.3f, 0)
         assertTrue(g.tick(499).isEmpty())
-        val events = g.tick(500)
-        assertEquals(listOf(InputKind.MOVE to 0, InputKind.DOWN to InputButton.RIGHT, InputKind.UP to InputButton.RIGHT), kinds(events))
+        assertEquals(listOf(InputKind.MOVE to 0), kinds(g.tick(500)), "giữ đủ lâu: con trỏ tới ngón tay, chưa click")
         assertTrue(g.tick(900).isEmpty())
-        assertTrue(touch(1, ENDED, 0.2f, 0.3f, 1000).isEmpty(), "nhả sau long press không click thêm")
+        val events = touch(1, ENDED, 0.2f, 0.3f, 1000)
+        assertEquals(listOf(InputKind.DOWN to InputButton.RIGHT, InputKind.UP to InputButton.RIGHT), kinds(events))
+        assertEquals(0.2f, events[0].x)
     }
 
     @Test
-    fun oneFingerDragHoldsLeftButtonAndReleases() {
+    fun oneFingerSwipeUpAndDownScrolls() {
+        touch(1, BEGAN, 0.5f, 0.5f, 0)
+        assertTrue(touch(1, MOVED, 0.5f, 0.501f, 10).isEmpty(), "dưới ngưỡng slop vẫn là chạm")
+        val start = touch(1, MOVED, 0.5f, 0.4f, 20)
+        assertEquals(listOf(InputKind.MOVE, InputKind.SCROLL), start.map { it.kind }, "con trỏ về chỗ bắt đầu vuốt rồi cuộn")
+        assertEquals(0.5f, start[0].y)
+        assertEquals(0f, start[1].dx)
+        assertEquals(-80f, start[1].dy, 0.01f) // 0.1 × 800, nội dung đi theo ngón
+        assertEquals(160f, touch(1, MOVED, 0.5f, 0.6f, 30).single().dy, 0.01f)
+        assertEquals(0f, touch(1, MOVED, 0.52f, 0.5f, 35).single().dx, "vuốt dọc khoá trục: lệch ngang không cuộn ngang")
+        assertTrue(g.tick(2000).isEmpty(), "đang vuốt thì không thành nhấn giữ")
+        assertTrue(touch(1, ENDED, 0.5f, 0.6f, 2100).isEmpty())
+    }
+
+    @Test
+    fun holdThenDragHoldsLeftButtonAndReleases() {
         touch(1, BEGAN, 0.1f, 0.1f, 0)
-        assertTrue(touch(1, MOVED, 0.101f, 0.1f, 10).isEmpty(), "dưới ngưỡng slop vẫn là chạm")
-        val start = touch(1, MOVED, 0.3f, 0.1f, 20)
-        assertEquals(listOf(InputKind.MOVE, InputKind.DOWN, InputKind.MOVE), start.map { it.kind })
-        assertEquals(listOf(InputKind.MOVE), touch(1, MOVED, 0.4f, 0.1f, 30).map { it.kind })
-        val end = touch(1, ENDED, 0.4f, 0.1f, 40)
+        g.tick(500)
+        val start = touch(1, MOVED, 0.3f, 0.1f, 520)
+        assertEquals(listOf(InputKind.DOWN, InputKind.MOVE), start.map { it.kind })
+        assertEquals(0.1f, start[0].x)
+        assertEquals(listOf(InputKind.MOVE), touch(1, MOVED, 0.4f, 0.1f, 530).map { it.kind })
+        val end = touch(1, ENDED, 0.4f, 0.1f, 540)
         assertEquals(listOf(InputKind.UP to InputButton.LEFT), kinds(end))
     }
 
@@ -81,8 +98,8 @@ class GestureInterpreterTest {
 
     @Test
     fun cancelDuringDragReleasesButtonAndUnknownTouchIsIgnored() {
-        touch(1, BEGAN, 0.1f, 0.1f, 0); touch(1, MOVED, 0.5f, 0.5f, 10)
-        assertEquals(listOf(InputKind.UP to InputButton.LEFT), kinds(touch(1, CANCELLED, 0.5f, 0.5f, 20)))
+        touch(1, BEGAN, 0.1f, 0.1f, 0); g.tick(500); touch(1, MOVED, 0.5f, 0.5f, 510)
+        assertEquals(listOf(InputKind.UP to InputButton.LEFT), kinds(touch(1, CANCELLED, 0.5f, 0.5f, 520)))
         assertTrue(touch(9, MOVED, 0.5f, 0.5f, 30).isEmpty())
         assertTrue(touch(9, ENDED, 0.5f, 0.5f, 30).isEmpty())
     }

@@ -66,17 +66,27 @@ class StreamInputRouter(private val session: ViewerSession) {
         gestures = createPointerGestures(settings, hostWidth, hostHeight, gestures?.cursor)
     }
 
-    fun onTouch(samples: List<TouchSample>) {
+    /** Nhấn giữ đủ lâu (sẵn sàng kéo thả / click phải): view rung nhẹ báo người dùng. */
+    var onHoldArmed: () -> Unit = {}
+
+    /** `displayedWidthDp`: bề ngang video đang hiện (dp, kể cả zoom) để ngưỡng chạm tính theo ngón tay; 0 = chưa biết. */
+    fun onTouch(samples: List<TouchSample>, displayedWidthDp: Float = 0f) {
         val engine = gestures ?: return
+        if (displayedWidthDp > 0f && samples.any { it.phase == TouchPhase.BEGAN }) {
+            engine.setHostPointsPerViewPoint(hostWidth / displayedWidthDp)
+        }
         session.sendInput(samples.flatMap(engine::handle))
         engine.cursor?.let { cursor = it; cursorStamp++ }
         samples.lastOrNull { it.phase == TouchPhase.BEGAN || it.phase == TouchPhase.ENDED }?.let { lastTouchY = it.y }
         if (samples.any { it.phase == TouchPhase.ENDED || it.phase == TouchPhase.CANCELLED }) focusY = engine.cursor?.second ?: lastTouchY
     }
 
-    /** Gọi ~50 ms/lần để phát click phải khi giữ lâu. */
+    /** Gọi ~50 ms/lần: nhấn giữ, cuộn quán tính sau khi nhả. */
     fun tick() {
-        gestures?.tick(SystemClock.uptimeMillis())?.takeIf { it.isNotEmpty() }?.let(session::sendInput)
+        val engine = gestures ?: return
+        val wasHolding = engine.isHolding
+        engine.tick(SystemClock.uptimeMillis()).takeIf { it.isNotEmpty() }?.let(session::sendInput)
+        if (!wasHolding && engine.isHolding) onHoldArmed()
     }
 
     fun commitText(value: String) { composingPreview = ""; apply(text.commit(value)) }

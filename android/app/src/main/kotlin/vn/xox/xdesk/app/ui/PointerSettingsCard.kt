@@ -49,7 +49,7 @@ fun PointerSettingsGroups(store: PointerSettingsStore, modifier: Modifier = Modi
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 SegmentedPicker(PointerMode.entries.map { it to it.title() }, s.mode) { mode -> store.update { it.copy(mode = mode) } }
                 Text(
-                    if (s.mode == PointerMode.DIRECT) "Chạm đâu click đó. Kéo một ngón để kéo thả, hai ngón để cuộn, nhấn giữ để chuột phải."
+                    if (s.mode == PointerMode.DIRECT) "Chạm đâu click đó. Vuốt một ngón để cuộn lên xuống (hất mạnh để trang trôi nhanh), nhấn giữ rồi kéo để kéo thả, nhấn giữ rồi nhả để chuột phải."
                     else "Trượt một ngón để di chuyển con trỏ, chạm để click. Hai ngón chạm = chuột phải, hai ngón trượt = cuộn, chạm rồi chạm-giữ-trượt = kéo.",
                     Modifier.padding(horizontal = 8.dp), fontSize = 14.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
