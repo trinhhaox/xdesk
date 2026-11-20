@@ -17,6 +17,7 @@ import vn.xox.xdesk.update.ApkIntegrity
 import vn.xox.xdesk.update.CheckOutcome
 import vn.xox.xdesk.update.LastCheckStore
 import vn.xox.xdesk.update.UpdateChecker
+import vn.xox.xdesk.update.UpdateFailure
 import vn.xox.xdesk.update.UpdateException
 import vn.xox.xdesk.update.UpdateHttp
 import vn.xox.xdesk.update.UpdateManifest
@@ -32,7 +33,8 @@ sealed interface UpdateState {
     data class Installing(val manifest: UpdateManifest) : UpdateState
     /** Chưa cấp "Cài ứng dụng không rõ nguồn" cho Xdesk. */
     data class NeedsPermission(val manifest: UpdateManifest) : UpdateState
-    data class Failed(val message: String) : UpdateState
+    /** `downloadUrl`: có khi cần gỡ app rồi cài tay bản chính thức (bản đang cài ký khác bản phát hành). */
+    data class Failed(val message: String, val downloadUrl: String? = null) : UpdateState
 }
 
 /** Điều phối kiểm tra, tải, xác minh và cài đặt. Trạng thái Compose chỉ ghi từ main thread; mạng chạy trên một thread nền. */
@@ -108,6 +110,12 @@ class UpdateController(private val context: Context, private val manifestUrl: St
         background.execute { downloadVerifyInstall(manifest) }
     }
 
+    /** Mở link tải APK chính thức bằng trình duyệt (khi phải gỡ bản đang cài rồi cài tay). */
+    fun openDownload(url: String) {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        state = UpdateState.Idle
+    }
+
     /** Mở trang "Cài ứng dụng không rõ nguồn" của chính Xdesk. */
     fun openUnknownSourcesSettings() {
         val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}"))
@@ -129,7 +137,10 @@ class UpdateController(private val context: Context, private val manifestUrl: St
             main.post { commit(manifest, apk) }
         } catch (e: UpdateException) {
             apk.delete()
-            main.post { state = UpdateState.Failed(e.message.orEmpty()) }
+            val failed = if (e.failure == UpdateFailure.SIGNATURE_MISMATCH) {
+                UpdateState.Failed(SIGNATURE_MISMATCH_HELP, manifest.apkUrl)
+            } else UpdateState.Failed(e.message.orEmpty())
+            main.post { state = failed }
         } catch (e: IOException) {
             apk.delete()
             main.post { state = UpdateState.Failed("Không ghi được tệp cập nhật") }
@@ -163,5 +174,7 @@ class UpdateController(private val context: Context, private val manifestUrl: St
     companion object {
         const val MANIFEST_URL = "https://raw.githubusercontent.com/trinhhaox/xdesk-releases/main/android-update.json"
         private const val KEY_LAST_CHECK = "last_check_ms"
+        private const val SIGNATURE_MISMATCH_HELP = "Xdesk trên máy này là bản dựng thử (ký khác bản phát hành) nên không cập nhật đè được. " +
+            "Hãy gỡ Xdesk rồi cài bản chính thức; sau đó ghép đôi lại với Mac. Từ bản chính thức trở đi, cập nhật sẽ tự chạy."
     }
 }

@@ -50,6 +50,8 @@ tools/release-android.sh            # build + ký + apksigner verify
 tools/release-android.sh --publish  # đính APK vào release v<versionName> (chạy sau release-mac.sh --publish)
 ```
 
+Bản debug (Android Studio, `installDebug`) là app riêng `vn.xox.xdesk.dev` tên "Xdesk Dev", ký khoá debug, cài song song với bản phát hành. Trước 0.1.6, bản debug dùng chung id `vn.xox.xdesk`: máy đã cài bản debug sẽ báo "Chữ ký của bản cập nhật khác chữ ký ứng dụng đang cài" và phải gỡ app rồi cài APK chính thức một lần.
+
 Lần chạy đầu tự tạo keystore. Gradle đọc `XDESK_KEYSTORE_PATH`, `XDESK_KEYSTORE_PASSWORD`, `XDESK_KEY_ALIAS` do script đặt từ Keychain; không có biến này thì bản release không được ký.
 
 ### Cập nhật trong app Android

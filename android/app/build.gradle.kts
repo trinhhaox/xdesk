@@ -28,7 +28,15 @@ android {
         }
     }
     buildTypes {
+        // Bản debug (cài bằng Android Studio/adb, ký khoá debug) là app riêng "Xdesk Dev": cài song song với bản phát hành
+        // và không bao giờ đè lên nhau. Trước đây hai bản cùng id nên bản phát hành không cập nhật đè được (chữ ký khác).
+        debug {
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev"
+            manifestPlaceholders["appLabel"] = "Xdesk Dev"
+        }
         release {
+            manifestPlaceholders["appLabel"] = "Xdesk"
             if (keystorePath != null) signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true

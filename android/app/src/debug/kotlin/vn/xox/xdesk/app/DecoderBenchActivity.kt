@@ -15,10 +15,10 @@ import vn.xox.xdesk.wire.AssembledFrame
 /**
  * Chỉ bản debug: phát một luồng H.264 ghi sẵn (khung: len u32 BE, key u8, pts u32 BE, Annex B) qua [VideoDecoder] đúng nhịp pts,
  * rồi để im [IDLE_MS] để thấy frame kẹt trong decoder. Dùng đo lag/frame-held không cần mạng:
- * `adb push bench.bin /sdcard/Android/data/vn.xox.xdesk/files/` rồi `am start -n vn.xox.xdesk/.app.DecoderBenchActivity --es file bench.bin [--es vk <khoá> --ei vv <giá trị>]`.
+ * `adb push bench.bin /sdcard/Android/data/vn.xox.xdesk.dev/files/` rồi `am start -n vn.xox.xdesk.dev/vn.xox.xdesk.app.DecoderBenchActivity --es file bench.bin [--es vk <khoá> --ei vv <giá trị>]`.
  * Phát lại luồng ghi từ phiên thật (`files/live.bin` + `live.bin.arr`, xem FrameRecorder): `--es file live.bin --es timing arrival|even|pts`
  * (arrival = đúng nhịp tới thật gồm giật mạng; even = rải đều; pts = nhịp chụp trên Mac). Tệp được tìm ở files/ nội bộ rồi tới bộ nhớ ngoài.
- * Kết quả đầy đủ ghi vào `files/bench.out` (logcat có thể tràn): `adb exec-out run-as vn.xox.xdesk cat files/bench.out`.
+ * Kết quả đầy đủ ghi vào `files/bench.out` (logcat có thể tràn): `adb exec-out run-as vn.xox.xdesk.dev cat files/bench.out`.
  */
 class DecoderBenchActivity : Activity() {
     private var decoder: VideoDecoder? = null

@@ -36,7 +36,12 @@ fun UpdatePrompt(updates: UpdateController) {
         )
         is UpdateState.Failed -> AlertDialog(
             onDismissRequest = updates::dismiss, title = { Text("Không cập nhật được") }, text = { Text(s.message) },
-            confirmButton = { TextButton(onClick = updates::dismiss) { Text("Đóng") } },
+            confirmButton = {
+                val url = s.downloadUrl
+                if (url != null) TextButton(onClick = { updates.openDownload(url) }) { Text("Tải bản chính thức") }
+                else TextButton(onClick = updates::dismiss) { Text("Đóng") }
+            },
+            dismissButton = { if (s.downloadUrl != null) TextButton(onClick = updates::dismiss) { Text("Để sau") } },
         )
         UpdateState.Idle, UpdateState.Checking, UpdateState.UpToDate -> Unit
     }
