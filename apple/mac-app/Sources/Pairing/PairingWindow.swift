@@ -40,7 +40,7 @@ final class PairingCoordinator {
     func showDevicesWindow() {
         if devicesWindow == nil {
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 560), styleMask: [.titled, .closable], backing: .buffered, defer: false)
-            window.title = "Xdesk — Thiết bị đã ghép"
+            window.title = String(localized: "Xdesk — Thiết bị đã ghép")
             window.isReleasedWhenClosed = false
             window.contentViewController = NSHostingController(rootView: PairedDevicesSettings(security: security))
             window.center()
@@ -53,7 +53,7 @@ final class PairingCoordinator {
     func showQrWindow() async {
         if qrWindow == nil {
             qrWindow = SecureWindow(
-                title: "Xdesk — Ghép đôi thiết bị mới", floating: false,
+                title: String(localized: "Xdesk — Ghép đôi thiết bị mới"), floating: false,
                 onClose: { [weak self] in self?.qrWindowClosed() }, content: PairingQrView(coordinator: self))
         }
         qrWindow?.show()
@@ -112,7 +112,7 @@ final class PairingCoordinator {
         }
         guard approvalWindow == nil else { return }
         let window = SecureWindow(
-            title: "Xdesk — Ghép đôi", floating: true,
+            title: String(localized: "Xdesk — Ghép đôi"), floating: true,
             onClose: { [weak self] in
                 self?.approvalWindow = nil
                 // Đóng bằng nút X = từ chối; không đụng tới yêu cầu mới hơn nếu yêu cầu này đã được quyết.

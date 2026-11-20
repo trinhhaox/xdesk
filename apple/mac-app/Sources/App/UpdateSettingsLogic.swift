@@ -9,12 +9,13 @@ enum UpdateReminderPolicy {
 
 enum UpdateSettingsText {
     static func versionLine(shortVersion: String?, build: String?) -> String {
-        "Phiên bản \(shortVersion ?? "?") (bản dựng \(build ?? "?"))"
+        String(localized: "Phiên bản \(shortVersion ?? "?") (bản dựng \(build ?? "?"))")
     }
 
-    static func lastCheckLine(_ date: Date?, now: Date = .now, locale: Locale = Locale(identifier: "vi_VN")) -> String {
-        guard let date else { return "Chưa kiểm tra lần nào" }
+    static func lastCheckLine(_ date: Date?, now: Date = .now, locale: Locale = .autoupdatingCurrent) -> String {
+        guard let date else { return String(localized: "Chưa kiểm tra lần nào") }
         let style = Date.FormatStyle(date: .abbreviated, time: .shortened).locale(locale)
-        return "Lần kiểm tra gần nhất: \(date > now ? now.formatted(style) : date.formatted(style))"
+        let formatted = date > now ? now.formatted(style) : date.formatted(style)
+        return String(localized: "Lần kiểm tra gần nhất: \(formatted)")
     }
 }

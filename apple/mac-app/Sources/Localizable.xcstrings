@@ -1,0 +1,2222 @@
+{
+  "sourceLanguage": "vi",
+  "strings": {
+    "%@ (tạm dừng)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ (paused)"
+          }
+        }
+      }
+    },
+    "%@ (tạm dừng: %@)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ (paused: %@)"
+          }
+        }
+      }
+    },
+    "%@ (đang hoạt động)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ (active)"
+          }
+        }
+      }
+    },
+    "%@ muốn ghép đôi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ wants to pair"
+          }
+        }
+      }
+    },
+    "%@ muốn điều khiển màn hình agent": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ wants to control the agent display"
+          }
+        }
+      }
+    },
+    "%@ · %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · %@"
+          }
+        }
+      }
+    },
+    "%@ · IP lần trước %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · Previous IP %@"
+          }
+        }
+      }
+    },
+    "%@ đang điều khiển": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ is in control"
+          }
+        }
+      }
+    },
+    "Agent AI": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI Agent"
+          }
+        }
+      }
+    },
+    "Agent AI lỗi: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI Agent error: %@"
+          }
+        }
+      }
+    },
+    "Agent AI xin quyền": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI Agent Permission Request"
+          }
+        }
+      }
+    },
+    "Agent chỉ làm việc trên màn hình ảo \"Xdesk Agent\". Bạn có thể tạm dừng bất kỳ lúc nào bằng banner hoặc ⌃⌥⌘.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The agent only works on the virtual display \"Xdesk Agent\". You can pause at any time with the banner or ⌃⌥⌘."
+          }
+        }
+      }
+    },
+    "Agent đã tạm dừng": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent paused"
+          }
+        }
+      }
+    },
+    "Bundle id, ví dụ com.apple.TextEdit": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bundle ID, for example com.apple.TextEdit"
+          }
+        }
+      }
+    },
+    "Bản sao · Cảm ứng": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mirror · Touch"
+          }
+        }
+      }
+    },
+    "Bản sao · Gốc": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mirror · Native"
+          }
+        }
+      }
+    },
+    "Bản sao · Vừa thiết bị": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mirror · Fit to Device"
+          }
+        }
+      }
+    },
+    "Bản thử nghiệm đang chạy không mã hoá nên không có ghép đôi. Hãy chạy lại không kèm --plaintext.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This test build is running without encryption, so pairing is unavailable. Run it again without --plaintext."
+          }
+        }
+      }
+    },
+    "Bắt đầu chia sẻ": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start Sharing"
+          }
+        }
+      }
+    },
+    "Cho phép": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow"
+          }
+        }
+      }
+    },
+    "Cho phép agent AI (MCP)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow AI Agent (MCP)"
+          }
+        }
+      }
+    },
+    "Cho phép kết nối qua Tailscale": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow Connections over Tailscale"
+          }
+        }
+      }
+    },
+    "Cho phép thiết bị đã ghép nhìn thấy Mac này": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lets paired devices see this Mac"
+          }
+        }
+      }
+    },
+    "Chung": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "General"
+          }
+        }
+      }
+    },
+    "Chưa bật chia sẻ màn hình. Hãy chọn \"Bắt đầu chia sẻ màn hình\" trong menu rồi mở lại cửa sổ này.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Screen sharing is off. Choose \"Start Sharing Screen\" in the menu, then reopen this window."
+          }
+        }
+      }
+    },
+    "Chưa có": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not available"
+          }
+        }
+      }
+    },
+    "Chưa có máy nào.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No Macs yet."
+          }
+        }
+      }
+    },
+    "Chưa có quyền Ghi màn hình. %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Screen Recording permission is missing. %@"
+          }
+        }
+      }
+    },
+    "Chưa có thiết bị nào đang xem.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No devices are viewing."
+          }
+        }
+      }
+    },
+    "Chưa có thiết bị nào. Chọn \"Ghép đôi thiết bị mới…\" ở thanh menu Xdesk.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No devices yet. Choose \"Pair New Device…\" from the Xdesk menu bar item."
+          }
+        }
+      }
+    },
+    "Chưa cắm iPhone/iPad. Cắm cáp và mở Xdesk trên thiết bị.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No iPhone or iPad connected. Plug in the cable and open Xdesk on the device."
+          }
+        }
+      }
+    },
+    "Chưa kiểm tra lần nào": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Never checked"
+          }
+        }
+      }
+    },
+    "Chưa kết nối lần nào": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Never connected"
+          }
+        }
+      }
+    },
+    "Chưa thấy Tailscale trên máy này": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tailscale not found on this Mac"
+          }
+        }
+      }
+    },
+    "Chỉ làm việc này nếu bạn biết máy kia vừa được cài lại. Sau đó bạn phải ghép đôi lại bằng mã 6 số.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only do this if you know the other Mac was just reinstalled. You will then need to pair again with a 6-digit code."
+          }
+        }
+      }
+    },
+    "Chỉ phát âm thanh trên thiết bị (tắt loa Mac)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Play audio only on the device (mute Mac speakers)"
+          }
+        }
+      }
+    },
+    "Chụp phím hệ thống (⌘-Tab, ⌘-Space)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Capture System Shortcuts (⌘-Tab, ⌘-Space)"
+          }
+        }
+      }
+    },
+    "Clipboard": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clipboard"
+          }
+        }
+      }
+    },
+    "Cài đặt hệ thống › Quyền riêng tư & Bảo mật › Ghi màn hình và âm thanh hệ thống › bật Xdesk": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "System Settings › Privacy & Security › Screen & System Audio Recording › turn on Xdesk"
+          }
+        }
+      }
+    },
+    "Cài đặt…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings…"
+          }
+        }
+      }
+    },
+    "Cách ghép: %@ · %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Method: %@ · %@"
+          }
+        }
+      }
+    },
+    "Cáp USB": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "USB Cable"
+          }
+        }
+      }
+    },
+    "Có bản mới %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Version %@ is available"
+          }
+        }
+      }
+    },
+    "Cấm": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Never"
+          }
+        }
+      }
+    },
+    "Cần cấp quyền": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permission Needed"
+          }
+        }
+      }
+    },
+    "Cần quyền Trợ năng để điều khiển": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Accessibility Permission Required for Control"
+          }
+        }
+      }
+    },
+    "Cập nhật": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Updates"
+          }
+        }
+      }
+    },
+    "Cập nhật %@…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update %@…"
+          }
+        }
+      }
+    },
+    "Cửa sổ": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Windows"
+          }
+        }
+      }
+    },
+    "Danh sách thiết bị từng bị sửa hoặc hỏng nên Xdesk đã bỏ đi và tạo danh sách trống. Hãy ghép đôi lại các thiết bị của bạn.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The device list was modified or corrupted, so Xdesk discarded it and created an empty list. Pair your devices again."
+          }
+        }
+      }
+    },
+    "Dấu vân tay": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fingerprint"
+          }
+        }
+      }
+    },
+    "Dấu vân tay của Mac này": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This Mac's Fingerprint"
+          }
+        }
+      }
+    },
+    "Dừng": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop"
+          }
+        }
+      }
+    },
+    "Dừng chia sẻ": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop Sharing"
+          }
+        }
+      }
+    },
+    "Dừng nhanh": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quick Stop"
+          }
+        }
+      }
+    },
+    "Dừng nhanh bằng %@. Chạm chuột/bàn phím vào màn hình agent cũng tự tạm dừng.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop quickly with %@. Touching the mouse or keyboard on the agent display also pauses automatically."
+          }
+        }
+      }
+    },
+    "Ghi màn hình": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Screen Recording"
+          }
+        }
+      }
+    },
+    "Ghép thêm thiết bị": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pair Another Device"
+          }
+        }
+      }
+    },
+    "Ghép đôi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pair"
+          }
+        }
+      }
+    },
+    "Ghép đôi bằng mã 6 số": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pair with 6-Digit Code"
+          }
+        }
+      }
+    },
+    "Ghép đôi thiết bị mới": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pair New Device"
+          }
+        }
+      }
+    },
+    "Ghép đôi thiết bị mới…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pair New Device…"
+          }
+        }
+      }
+    },
+    "Giám sát đầu vào": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Input Monitoring"
+          }
+        }
+      }
+    },
+    "Gặp lỗi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Error"
+          }
+        }
+      }
+    },
+    "Gỡ màn hình agent": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove Agent Display"
+          }
+        }
+      }
+    },
+    "Gửi ⌘-Tab và ⌘-Space sang máy được điều khiển thay vì xử lý trên Mac này. Cần quyền Trợ năng.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send ⌘-Tab and ⌘-Space to the controlled Mac instead of handling them on this Mac. Requires Accessibility permission."
+          }
+        }
+      }
+    },
+    "Hiện tại": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current"
+          }
+        }
+      }
+    },
+    "Hỏi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ask"
+          }
+        }
+      }
+    },
+    "Khoá của Mac nằm ở chùm khoá đăng nhập cũ nên kém an toàn hơn. Hãy cài bản Xdesk đã ký đầy đủ rồi ghép đôi lại.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This Mac's key is stored in the legacy login keychain, which is less secure. Install a fully signed build of Xdesk, then pair again."
+          }
+        }
+      }
+    },
+    "Khoá của máy này đã đổi: máy được cài lại hoặc có thiết bị khác đang mạo danh. Không kết nối.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This Mac's key has changed: it was reinstalled, or another device is impersonating it. Not connecting."
+          }
+        }
+      }
+    },
+    "Không khớp": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Doesn't Match"
+          }
+        }
+      }
+    },
+    "Không mở được kho khoá bảo mật": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't open the security key store"
+          }
+        }
+      }
+    },
+    "Không mở được kho khoá bảo mật: %@. Ghép đôi và kết nối mã hoá đang tắt.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't open the secure key store: %@. Pairing and encrypted connections are turned off."
+          }
+        }
+      }
+    },
+    "Không sắp xếp được màn hình ảo (CGError %@)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't arrange the virtual display (CGError %@)"
+          }
+        }
+      }
+    },
+    "Không tìm thấy màn hình %@ để capture": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't find display %@ to capture"
+          }
+        }
+      }
+    },
+    "Không tạo được ảnh mã QR.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't create the QR code image."
+          }
+        }
+      }
+    },
+    "Không đổi được cài đặt khởi động: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't change the startup setting: %@"
+          }
+        }
+      }
+    },
+    "Không đổi được token: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't rotate the token: %@"
+          }
+        }
+      }
+    },
+    "Khớp, cho phép": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Matches, Allow"
+          }
+        }
+      }
+    },
+    "Khởi động": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Startup"
+          }
+        }
+      }
+    },
+    "Khởi động lại Xdesk để áp dụng ngôn ngữ mới.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restart Xdesk to apply the new language."
+          }
+        }
+      }
+    },
+    "Kiểm tra cập nhật…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check for Updates…"
+          }
+        }
+      }
+    },
+    "Kênh kết nối": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connection Channels"
+          }
+        }
+      }
+    },
+    "Kết nối": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect"
+          }
+        }
+      }
+    },
+    "Kết nối lần cuối: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last connected: %@"
+          }
+        }
+      }
+    },
+    "Kết nối tới máy khác…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect to Another Mac…"
+          }
+        }
+      }
+    },
+    "LAN %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LAN %@"
+          }
+        }
+      }
+    },
+    "LAN: chưa có địa chỉ": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LAN: no address"
+          }
+        }
+      }
+    },
+    "Luật theo ứng dụng (app chưa có luật: hỏi)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App Rules (apps without a rule: ask)"
+          }
+        }
+      }
+    },
+    "Lưu máy này": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save This Mac"
+          }
+        }
+      }
+    },
+    "Lần kiểm tra gần nhất: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last checked: %@"
+          }
+        }
+      }
+    },
+    "Mac này": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This Mac"
+          }
+        }
+      }
+    },
+    "Máy Mac đã ghép (để xem từ máy này)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paired Macs (to View from This Mac)"
+          }
+        }
+      }
+    },
+    "Máy chủ MCP": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MCP Server"
+          }
+        }
+      }
+    },
+    "Máy tìm thấy trên mạng": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Macs Found on Network"
+          }
+        }
+      }
+    },
+    "Máy đã lưu (Tailscale / nhập tay)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved Macs (Tailscale / Manual)"
+          }
+        }
+      }
+    },
+    "Mã QR ghép đôi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pairing QR code"
+          }
+        }
+      }
+    },
+    "Mã QR đã hết hạn. Tạo mã mới rồi quét lại bằng Xdesk trên điện thoại.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The QR code has expired. Generate a new code and scan it again with Xdesk on your phone."
+          }
+        }
+      }
+    },
+    "Mã có khớp với màn hình kia không?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Does the code match the other screen?"
+          }
+        }
+      }
+    },
+    "Mã hết hạn sau %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Code expires in %@"
+          }
+        }
+      }
+    },
+    "Mạng nội bộ (LAN)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Local Network (LAN)"
+          }
+        }
+      }
+    },
+    "Mở Cài đặt": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Settings"
+          }
+        }
+      }
+    },
+    "Mở Cài đặt để cấp quyền %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Settings to grant %@ permission"
+          }
+        }
+      }
+    },
+    "Mở Xdesk khi đăng nhập": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Xdesk at Login"
+          }
+        }
+      }
+    },
+    "Mở Xdesk trên điện thoại, chọn \"Quét mã QR trên Mac\" rồi quét mã này.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Xdesk on your phone, choose \"Scan QR Code on Mac\", then scan this code."
+          }
+        }
+      }
+    },
+    "Mở lại ngay": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Relaunch Now"
+          }
+        }
+      }
+    },
+    "Mở rộng": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Extend"
+          }
+        }
+      }
+    },
+    "Mở toàn màn hình": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open in Full Screen"
+          }
+        }
+      }
+    },
+    "Ngôn ngữ": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Language"
+          }
+        }
+      }
+    },
+    "Ngắt kết nối %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disconnect %@"
+          }
+        }
+      }
+    },
+    "Ngắt mọi thiết bị đang xem": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disconnects all devices that are viewing"
+          }
+        }
+      }
+    },
+    "Nhập địa chỉ": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter Address"
+          }
+        }
+      }
+    },
+    "Phiên bản %@ (bản dựng %@)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Version %@ (build %@)"
+          }
+        }
+      }
+    },
+    "Phát qua USB": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stream over USB"
+          }
+        }
+      }
+    },
+    "Phát qua USB tới thiết bị …%@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stream over USB to device …%@"
+          }
+        }
+      }
+    },
+    "Quyền cho thiết bị này": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permissions for This Device"
+          }
+        }
+      }
+    },
+    "Quyền của Xdesk": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xdesk Permissions"
+          }
+        }
+      }
+    },
+    "Quyền điều khiển": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Control Permissions"
+          }
+        }
+      }
+    },
+    "Quét mã QR": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scan QR Code"
+          }
+        }
+      }
+    },
+    "Quên khoá cũ": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forget Old Key"
+          }
+        }
+      }
+    },
+    "Quên khoá cũ của \"%@\"?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forget the Old Key for \"%@\"?"
+          }
+        }
+      }
+    },
+    "Quên khoá cũ…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forget Old Key…"
+          }
+        }
+      }
+    },
+    "Quên máy này": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forget This Mac"
+          }
+        }
+      }
+    },
+    "Retina (HiDPI 2×, 3840×2400)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retina (HiDPI 2×, 3840×2400)"
+          }
+        }
+      }
+    },
+    "Sao chép lệnh cấu hình": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy Setup Command"
+          }
+        }
+      }
+    },
+    "So mã 6 số": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compare 6-Digit Code"
+          }
+        }
+      }
+    },
+    "Tailscale": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tailscale"
+          }
+        }
+      }
+    },
+    "Tailscale %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tailscale %@"
+          }
+        }
+      }
+    },
+    "Tailscale %@ · đang tắt trong Cài đặt": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tailscale %@ · off in Settings"
+          }
+        }
+      }
+    },
+    "Tailscale: chưa bật trên máy này": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tailscale: not running on this Mac"
+          }
+        }
+      }
+    },
+    "Tailscale: tắt": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tailscale: off"
+          }
+        }
+      }
+    },
+    "Theo hệ thống": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "System"
+          }
+        }
+      }
+    },
+    "Thiết bị": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Devices"
+          }
+        }
+      }
+    },
+    "Thiết bị chưa đặt tên": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unnamed Device"
+          }
+        }
+      }
+    },
+    "Thiết bị này vừa quét mã QR của bạn. Chỉ cho phép nếu đó là thiết bị của bạn.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This device just scanned your QR code. Only allow it if it is your device."
+          }
+        }
+      }
+    },
+    "Thiết bị sẽ bị ngắt ngay và phải ghép đôi lại để kết nối.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The device will be disconnected immediately and must pair again to connect."
+          }
+        }
+      }
+    },
+    "Thiết bị đang xem (%lld)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Devices Viewing (%lld)"
+          }
+        }
+      }
+    },
+    "Thiết bị đã ghép…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paired Devices…"
+          }
+        }
+      }
+    },
+    "Thiết bị được phép kết nối vào Mac này": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Devices Allowed to Connect to This Mac"
+          }
+        }
+      }
+    },
+    "Thiết bị …%@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device …%@"
+          }
+        }
+      }
+    },
+    "Thiếu quyền Giám sát đầu vào: chưa tự dừng khi bạn chạm màn hình agent.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Input Monitoring permission is missing: the agent won't stop automatically when you touch its screen."
+          }
+        }
+      }
+    },
+    "Thoát": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quit Xdesk"
+          }
+        }
+      }
+    },
+    "Thu hồi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revoke"
+          }
+        }
+      }
+    },
+    "Thu hồi \"%@\"?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revoke \"%@\"?"
+          }
+        }
+      }
+    },
+    "Thêm": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add"
+          }
+        }
+      }
+    },
+    "Tiếp tục": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resume"
+          }
+        }
+      }
+    },
+    "Trên Mac kia, kiểm tra cùng mã này rồi bấm \"Khớp, cho phép\". Đang chờ xác nhận…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On the other Mac, check that this code matches, then click \"Matches, Allow\". Waiting for confirmation…"
+          }
+        }
+      }
+    },
+    "Trạng thái": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Status"
+          }
+        }
+      }
+    },
+    "Trạng thái: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Status: %@"
+          }
+        }
+      }
+    },
+    "Trợ năng": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Accessibility"
+          }
+        }
+      }
+    },
+    "Tuỳ chọn": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Options"
+          }
+        }
+      }
+    },
+    "Tạm dừng": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pause"
+          }
+        }
+      }
+    },
+    "Tạo mã mới": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Generate New Code"
+          }
+        }
+      }
+    },
+    "Từ chối": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deny"
+          }
+        }
+      }
+    },
+    "Tự co giãn cửa sổ ứng dụng cho vừa màn hình": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatically resize app windows to fit the screen"
+          }
+        }
+      }
+    },
+    "Tự nhả quyền sau %lld giây im lặng": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Release control after %lld seconds of inactivity"
+          }
+        }
+      }
+    },
+    "Tự từ chối sau %lld giây.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatically denied in %lld seconds."
+          }
+        }
+      }
+    },
+    "Tự động": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic"
+          }
+        }
+      }
+    },
+    "Tự động kiểm tra cập nhật": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check for Updates Automatically"
+          }
+        }
+      }
+    },
+    "Tự động tải và cài bản mới": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download and Install Updates Automatically"
+          }
+        }
+      }
+    },
+    "USB …%@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "USB …%@"
+          }
+        }
+      }
+    },
+    "USB: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "USB: %@"
+          }
+        }
+      }
+    },
+    "USB: chưa cắm thiết bị": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "USB: no device connected"
+          }
+        }
+      }
+    },
+    "Xdesk": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xdesk"
+          }
+        }
+      }
+    },
+    "Xdesk kiểm tra mỗi 24 giờ. Khi tìm thấy bản mới lúc đang chạy nền, biểu tượng trên thanh menu đổi dấu và popover có nút để cài.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xdesk checks every 24 hours. When an update is found while running in the background, the menu bar icon changes and the popover shows an install button."
+          }
+        }
+      }
+    },
+    "Xdesk — Ghép đôi": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xdesk — Pairing"
+          }
+        }
+      }
+    },
+    "Xdesk — Ghép đôi thiết bị mới": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xdesk — Pair New Device"
+          }
+        }
+      }
+    },
+    "Xdesk — Kết nối tới máy khác": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xdesk — Connect to Another Mac"
+          }
+        }
+      }
+    },
+    "Xdesk — Thiết bị đã ghép": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xdesk — Paired Devices"
+          }
+        }
+      }
+    },
+    "Xdesk, %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xdesk, %@"
+          }
+        }
+      }
+    },
+    "Xdesk, có bản cập nhật": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xdesk, update available"
+          }
+        }
+      }
+    },
+    "Xdesk, đang chia sẻ": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xdesk, sharing"
+          }
+        }
+      }
+    },
+    "Xem": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "View"
+          }
+        }
+      }
+    },
+    "Xem màn hình": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "View Screen"
+          }
+        }
+      }
+    },
+    "Xoá": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete"
+          }
+        }
+      }
+    },
+    "Xoá máy này khỏi danh sách đã lưu (không thu hồi ghép đôi)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove this Mac from the saved list (does not revoke pairing)"
+          }
+        }
+      }
+    },
+    "app Xdesk trên thiết bị chưa mở (cổng bị từ chối)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xdesk isn't open on the device (port refused)"
+          }
+        }
+      }
+    },
+    "host:port, ví dụ 127.0.0.1:47800 hoặc 100.x.y.z (Tailscale)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "host:port, for example 127.0.0.1:47800 or 100.x.y.z (Tailscale)"
+          }
+        }
+      }
+    },
+    "hãy bật chia sẻ màn hình trước": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "turn on screen sharing first"
+          }
+        }
+      }
+    },
+    "không có": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "none"
+          }
+        }
+      }
+    },
+    "không có %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ not found"
+          }
+        }
+      }
+    },
+    "không nối được usbmuxd: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "couldn't connect to usbmuxd: %@"
+          }
+        }
+      }
+    },
+    "quá hạn nối socket": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "socket connection timed out"
+          }
+        }
+      }
+    },
+    "settings.tab.connection": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connection"
+          }
+        },
+        "vi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kết nối"
+          }
+        }
+      }
+    },
+    "thiết bị không còn cắm cáp": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "the device is no longer connected"
+          }
+        }
+      }
+    },
+    "usbmuxd gửi header sai: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "usbmuxd sent a malformed header: %@"
+          }
+        }
+      }
+    },
+    "usbmuxd gửi plist sai: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "usbmuxd sent a malformed plist: %@"
+          }
+        }
+      }
+    },
+    "usbmuxd không hiểu phiên bản giao thức": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "usbmuxd doesn't understand the protocol version"
+          }
+        }
+      }
+    },
+    "usbmuxd không trả lời": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "usbmuxd didn't respond"
+          }
+        }
+      }
+    },
+    "usbmuxd trả lỗi %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "usbmuxd returned error %@"
+          }
+        }
+      }
+    },
+    "usbmuxd từ chối: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "usbmuxd refused: %@"
+          }
+        }
+      }
+    },
+    "usbmuxd đã đóng kết nối": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "usbmuxd closed the connection"
+          }
+        }
+      }
+    },
+    "usbmuxd đóng socket": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "usbmuxd closed the socket"
+          }
+        }
+      }
+    },
+    "Áp dụng ở chế độ Bản sao khi màn hình thiết bị nhỏ hơn Mac.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Applies in Mirror mode when the device screen is smaller than the Mac's."
+          }
+        }
+      }
+    },
+    "Âm thanh": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio"
+          }
+        }
+      }
+    },
+    "Đang bật nhập liệu bảo mật: chữ gõ từ xa có thể không vào ô mật khẩu.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Secure input is on: text typed remotely may not reach password fields."
+          }
+        }
+      }
+    },
+    "Đang chia sẻ": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sharing"
+          }
+        }
+      }
+    },
+    "Đang chạy": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Running"
+          }
+        }
+      }
+    },
+    "Đang có thiết bị xem màn hình này. Để người đó không nhìn thấy mã, Xdesk chỉ hiện mã khi không ai đang xem. Hãy ngắt kết nối rồi thử lại.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A device is viewing this screen. To keep the code hidden from them, Xdesk only shows it when no one is viewing. Disconnect, then try again."
+          }
+        }
+      }
+    },
+    "Đang kết nối…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connecting…"
+          }
+        }
+      }
+    },
+    "Đang tìm… (host cần bật \"Bắt đầu chia sẻ\")": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Searching… (the host must turn on \"Start Sharing\")"
+          }
+        }
+      }
+    },
+    "Đang tắt. Bật để agent AI (Claude Code, Cursor…) điều khiển Mac qua MCP trên 127.0.0.1.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Off. Turn on to let an AI agent (Claude Code, Cursor…) control this Mac over MCP on 127.0.0.1."
+          }
+        }
+      }
+    },
+    "Điều khiển": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Control"
+          }
+        }
+      }
+    },
+    "Điều khiển (chuột, bàn phím)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Control (mouse, keyboard)"
+          }
+        }
+      }
+    },
+    "Đã bật rồi? Mở lại Xdesk để áp dụng": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Already turned on? Relaunch Xdesk to apply"
+          }
+        }
+      }
+    },
+    "Đã cấp": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Granted"
+          }
+        }
+      }
+    },
+    "Đã dừng": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stopped"
+          }
+        }
+      }
+    },
+    "Đã ghép đôi xong. Thiết bị mới có thể kết nối tới Mac này.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pairing complete. The new device can now connect to this Mac."
+          }
+        }
+      }
+    },
+    "Đã hiểu": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Got It"
+          }
+        }
+      }
+    },
+    "Đã sao chép lệnh cấu hình": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Setup command copied"
+          }
+        }
+      }
+    },
+    "Đã đổi token, hãy sao chép lệnh cấu hình mới": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Token rotated. Copy the new setup command"
+          }
+        }
+      }
+    },
+    "Để agent AI tự dừng khi bạn chạm vào màn hình của nó.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "So the AI agent stops automatically when you touch its screen."
+          }
+        }
+      }
+    },
+    "Để chia sẻ màn hình tới thiết bị khác.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To share your screen with other devices."
+          }
+        }
+      }
+    },
+    "Để sau": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not Now"
+          }
+        }
+      }
+    },
+    "Để điều khiển Mac từ thiết bị khác.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To control this Mac from another device."
+          }
+        }
+      }
+    },
+    "Để điều khiển Mac từ thiết bị khác: Cài đặt hệ thống › Quyền riêng tư & Bảo mật › Trợ năng › bật Xdesk.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To control this Mac from another device: System Settings › Privacy & Security › Accessibility › turn on Xdesk."
+          }
+        }
+      }
+    },
+    "Địa chỉ": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Address"
+          }
+        }
+      }
+    },
+    "Địa chỉ nhập trên điện thoại": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Address to Enter on Your Phone"
+          }
+        }
+      }
+    },
+    "Đổi token": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rotate Token"
+          }
+        }
+      }
+    },
+    "đang chờ người dùng duyệt (%@)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "waiting for your approval (%@)"
+          }
+        }
+      }
+    },
+    "đã huỷ": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cancelled"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

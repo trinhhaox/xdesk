@@ -13,11 +13,11 @@ final class ShortcutCaptureToggle: NSObject {
             isTargetActive: { [weak window] in NSApp.isActive && window?.isKeyWindow == true },
             forward: { [weak capture] code, down, flags in capture?.forwardSystemKey(macKeyCode: code, down: down, flags: flags) }
         )
-        checkbox = NSButton(checkboxWithTitle: "Chụp phím hệ thống (⌘-Tab, ⌘-Space)", target: nil, action: nil)
+        checkbox = NSButton(checkboxWithTitle: String(localized: "Chụp phím hệ thống (⌘-Tab, ⌘-Space)"), target: nil, action: nil)
         super.init()
         checkbox.target = self
         checkbox.action = #selector(toggled)
-        checkbox.toolTip = "Gửi ⌘-Tab và ⌘-Space sang máy được điều khiển thay vì xử lý trên Mac này. Cần quyền Trợ năng."
+        checkbox.toolTip = String(localized: "Gửi ⌘-Tab và ⌘-Space sang máy được điều khiển thay vì xử lý trên Mac này. Cần quyền Trợ năng.")
         let accessory = NSTitlebarAccessoryViewController()
         accessory.layoutAttribute = .right
         accessory.view = checkbox
@@ -39,8 +39,8 @@ final class ShortcutCaptureToggle: NSObject {
         let alert = NSAlert()
         alert.messageText = AccessibilityPermission.menuTitle
         alert.informativeText = AccessibilityPermission.guidance
-        alert.addButton(withTitle: "Mở Cài đặt")
-        alert.addButton(withTitle: "Để sau")
+        alert.addButton(withTitle: String(localized: "Mở Cài đặt"))
+        alert.addButton(withTitle: String(localized: "Để sau"))
         if alert.runModal() == .alertFirstButtonReturn { AccessibilityPermission.openSettings() }
     }
 }

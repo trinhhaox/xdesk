@@ -31,19 +31,19 @@ struct ViewerSessionInfo: Sendable, Equatable {
     static func make(name: String, config: DisplayConfig, isUsb: Bool, isTailscale: Bool) -> ViewerSessionInfo {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         return ViewerSessionInfo(
-            name: trimmed.isEmpty ? "Thiết bị chưa đặt tên" : trimmed,
+            name: trimmed.isEmpty ? String(localized: "Thiết bị chưa đặt tên") : trimmed,
             transport: isUsb ? .usb : (isTailscale ? .tailscale : .lan),
             modeLabel: modeLabel(config))
     }
 
     static func modeLabel(_ config: DisplayConfig) -> String {
         switch config.screenMode {
-        case .extend: return "Mở rộng"
+        case .extend: return String(localized: "Mở rộng")
         case .mirror:
             switch config.fit {
-            case .native: return "Bản sao · Gốc"
-            case .fitDevice: return "Bản sao · Vừa thiết bị"
-            case .touch: return "Bản sao · Cảm ứng"
+            case .native: return String(localized: "Bản sao · Gốc")
+            case .fitDevice: return String(localized: "Bản sao · Vừa thiết bị")
+            case .touch: return String(localized: "Bản sao · Cảm ứng")
             }
         }
     }

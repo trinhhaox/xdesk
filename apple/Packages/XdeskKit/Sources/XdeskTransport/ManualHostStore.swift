@@ -18,8 +18,8 @@ public enum ManualHostError: Error, Equatable, LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .invalidAddress: "Địa chỉ không hợp lệ. Nhập IP (100.x.y.z) hoặc tên máy, tuỳ chọn thêm :cổng."
-        case .limitReached: "Đã đủ \(ManualHostStore.maxHosts) máy; hãy xoá bớt trước khi thêm."
+        case .invalidAddress: String(localized: "Địa chỉ không hợp lệ. Nhập IP (100.x.y.z) hoặc tên máy, tuỳ chọn thêm :cổng.", bundle: .module)
+        case .limitReached: String(localized: "Đã đủ \(String(ManualHostStore.maxHosts)) máy; hãy xoá bớt trước khi thêm.", bundle: .module)
         }
     }
 }
@@ -49,7 +49,7 @@ public actor ManualHostStore {
                 items = file.hosts
             }
         } catch {
-            loadError = "Không đọc được danh sách máy nhập tay (\(fileURL.lastPathComponent)); đã giữ bản cũ với đuôi .bad."
+            loadError = String(localized: "Không đọc được danh sách máy nhập tay (\(fileURL.lastPathComponent)); đã giữ bản cũ với đuôi .bad.", bundle: .module)
             try? FileManager.default.moveItem(at: fileURL, to: fileURL.appendingPathExtension("bad"))
         }
     }

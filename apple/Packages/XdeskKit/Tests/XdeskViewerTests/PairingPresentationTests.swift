@@ -17,10 +17,11 @@ import XdeskCrypto
         #expect(!ViewerTrust.HostState.keyChanged(expected: known).canReconnect)
     }
 
-    @Test func badgeTitlesAreVietnamese() {
-        #expect(HostBadge.paired.title == "Đã ghép")
-        #expect(HostBadge.unpaired.title == "Chưa ghép")
-        #expect(HostBadge.keyChanged.title == "Khoá đã đổi")
+    /// Không so chuỗi cụ thể: văn bản phụ thuộc ngôn ngữ máy (vi/en).
+    @Test func badgeTitlesAreNonEmptyAndDistinct() {
+        let titles = [HostBadge.paired, .unpaired, .keyChanged].map(\.title)
+        #expect(titles.allSatisfy { !$0.isEmpty })
+        #expect(Set(titles).count == titles.count)
     }
 
     @Test func parsesValidUriWithWhitespace() throws {

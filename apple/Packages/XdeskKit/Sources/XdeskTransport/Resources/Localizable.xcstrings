@@ -1,0 +1,153 @@
+{
+  "sourceLanguage" : "vi",
+  "strings" : {
+    "Chưa có thiết bị đối tác" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No peer device" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Chưa có thiết bị đối tác" } }
+      }
+    },
+    "Chưa ghép đôi với máy này: quét mã QR hoặc so mã 6 số" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Not paired with this Mac. Scan the QR code or compare the 6-digit code." } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Chưa ghép đôi với máy này: quét mã QR hoặc so mã 6 số" } }
+      }
+    },
+    "Địa chỉ không hợp lệ. Nhập IP (100.x.y.z) hoặc tên máy, tuỳ chọn thêm :cổng." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Invalid address. Enter an IP address (100.x.y.z) or a host name, optionally followed by :port." } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Địa chỉ không hợp lệ. Nhập IP (100.x.y.z) hoặc tên máy, tuỳ chọn thêm :cổng." } }
+      }
+    },
+    "Đã đủ %@ máy; hãy xoá bớt trước khi thêm." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The limit of %@ Macs is reached. Remove one before adding another." } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Đã đủ %@ máy; hãy xoá bớt trước khi thêm." } }
+      }
+    },
+    "Đối tác vi phạm giao thức: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The peer violated the protocol: %@" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Đối tác vi phạm giao thức: %@" } }
+      }
+    },
+    "Ghép đôi bằng mã bị khoá tạm thời do thử sai quá nhiều lần" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Pairing with a code is temporarily locked after too many failed attempts." } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Ghép đôi bằng mã bị khoá tạm thời do thử sai quá nhiều lần" } }
+      }
+    },
+    "Hết thời gian chờ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Timed out" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Hết thời gian chờ" } }
+      }
+    },
+    "Host từ chối (%@)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The host Mac declined (%@)" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Host từ chối (%@)" } }
+      }
+    },
+    "Host từ chối (%@): %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The host Mac declined (%1$@): %2$@" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Host từ chối (%1$@): %2$@" } }
+      }
+    },
+    "Kênh mã hoá chưa sẵn sàng" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The encrypted channel isn't ready" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Kênh mã hoá chưa sẵn sàng" } }
+      }
+    },
+    "Kết nối đã đóng" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The connection was closed" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Kết nối đã đóng" } }
+      }
+    },
+    "Khoá của máy host không khớp (host cài lại hoặc thiết bị mạo danh): không kết nối" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The host Mac's key doesn't match (it was reinstalled, or another device is impersonating it). Not connecting." } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Khoá của máy host không khớp (host cài lại hoặc thiết bị mạo danh): không kết nối" } }
+      }
+    },
+    "Không đọc được danh sách máy nhập tay (%@); đã giữ bản cũ với đuôi .bad." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Couldn't read the list of manually added Macs (%@). The old file was kept with a .bad extension." } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Không đọc được danh sách máy nhập tay (%@); đã giữ bản cũ với đuôi .bad." } }
+      }
+    },
+    "Không kết nối được: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Couldn't connect: %@" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Không kết nối được: %@" } }
+      }
+    },
+    "Không mở được cổng nghe: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Couldn't open the listening port: %@" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Không mở được cổng nghe: %@" } }
+      }
+    },
+    "Mã so khớp không hợp lệ" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The verification code is invalid" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Mã so khớp không hợp lệ" } }
+      }
+    },
+    "Máy host không mở ghép đôi (mã QR đã dùng hoặc hết hạn)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The host Mac isn't accepting pairing (the QR code was already used or has expired)" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Máy host không mở ghép đôi (mã QR đã dùng hoặc hết hạn)" } }
+      }
+    },
+    "Máy host đã từ chối ghép đôi" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The host Mac declined pairing" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Máy host đã từ chối ghép đôi" } }
+      }
+    },
+    "Máy Mac đã thu hồi quyền của thiết bị này. Ghép đôi lại để dùng tiếp." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The Mac revoked access for this device. Pair again to continue." } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Máy Mac đã thu hồi quyền của thiết bị này. Ghép đôi lại để dùng tiếp." } }
+      }
+    },
+    "Máy Mac từ chối kết nối, có thể đã thu hồi thiết bị này. Ghép đôi lại để dùng tiếp." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The Mac refused the connection and may have revoked this device. Pair again to continue." } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Máy Mac từ chối kết nối, có thể đã thu hồi thiết bị này. Ghép đôi lại để dùng tiếp." } }
+      }
+    },
+    "Thiết bị chưa được ghép đôi với máy này" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This device isn't paired with this Mac" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Thiết bị chưa được ghép đôi với máy này" } }
+      }
+    }
+  },
+  "version" : "1.0"
+}

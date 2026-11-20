@@ -1,6 +1,8 @@
 name: Xdesk
 options:
   bundleIdPrefix: vn.xox
+  # Ngôn ngữ gốc là tiếng Việt, bản dịch tiếng Anh nằm trong Localizable.xcstrings; Sparkle tự theo ngôn ngữ app đang dùng.
+  developmentLanguage: vi
   deploymentTarget:
     macOS: "14.0"
 packages:
@@ -42,6 +44,7 @@ targets:
       path: Sources/Info.plist
       properties:
         CFBundleDisplayName: Xdesk
+        CFBundleLocalizations: [vi, en]
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         SUFeedURL: https://raw.githubusercontent.com/trinhhaox/xdesk-releases/main/appcast.xml
@@ -68,6 +71,8 @@ targets:
         ENABLE_HARDENED_RUNTIME: true
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: false
+        LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+        SWIFT_EMIT_LOC_STRINGS: YES
         SWIFT_OBJC_BRIDGING_HEADER: Sources/Host/Xdesk-Bridging-Header.h
   Xdesk-mac-tests:
     type: bundle.unit-test
@@ -88,3 +93,6 @@ schemes:
         Xdesk-mac: all
     test:
       targets: [Xdesk-mac-tests]
+      # Test so khớp chuỗi tiếng Việt nên cố định ngôn ngữ, không phụ thuộc máy chạy.
+      language: vi
+      region: VN

@@ -12,9 +12,9 @@ public struct PairedHostRow: Equatable, Sendable, Identifiable {
 
         public var text: String {
             switch self {
-            case .ready: "Sẵn sàng"
-            case .viaAddress(let address): "Qua địa chỉ \(address)"
-            case .offline: "Không thấy trên mạng"
+            case .ready: String(localized: "Sẵn sàng", bundle: .module)
+            case .viaAddress(let address): String(localized: "Qua địa chỉ \(address)", bundle: .module)
+            case .offline: String(localized: "Không thấy trên mạng", bundle: .module)
             }
         }
 

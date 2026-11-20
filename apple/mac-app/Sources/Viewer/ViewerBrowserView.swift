@@ -144,7 +144,7 @@ private struct ManualHostRow: View {
 
     private var detail: String {
         guard let last = host.lastAddress, last != host.address else { return host.address }
-        return "\(host.address) · IP lần trước \(last)"
+        return String(localized: "\(host.address) · IP lần trước \(last)")
     }
 }
 

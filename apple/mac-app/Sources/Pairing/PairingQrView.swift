@@ -26,10 +26,10 @@ struct PairingQrView: View {
         } else if let uri = coordinator.security.qrURI, let issuedAt = coordinator.qrIssuedAt {
             qr(uri.string, issuedAt: issuedAt)
         } else if coordinator.justPaired {
-            notice("Đã ghép đôi xong. Thiết bị mới có thể kết nối tới Mac này.", symbol: "checkmark.circle.fill", tint: BrandPalette.accent)
+            notice(String(localized: "Đã ghép đôi xong. Thiết bị mới có thể kết nối tới Mac này."), symbol: "checkmark.circle.fill", tint: BrandPalette.accent)
             Button("Ghép thêm thiết bị") { Task { await coordinator.refreshQr() } }
         } else {
-            notice("Mã QR đã hết hạn. Tạo mã mới rồi quét lại bằng Xdesk trên điện thoại.", symbol: "clock.badge.exclamationmark", tint: BrandPalette.warning)
+            notice(String(localized: "Mã QR đã hết hạn. Tạo mã mới rồi quét lại bằng Xdesk trên điện thoại."), symbol: "clock.badge.exclamationmark", tint: BrandPalette.warning)
             Button("Tạo mã mới") { Task { await coordinator.refreshQr() } }
                 .buttonStyle(.borderedProminent).tint(BrandPalette.primary)
         }
@@ -42,7 +42,7 @@ struct PairingQrView: View {
                     .padding(10).background(.white, in: RoundedRectangle(cornerRadius: 10))
                     .accessibilityLabel("Mã QR ghép đôi")
             } else {
-                notice("Không tạo được ảnh mã QR.", symbol: "exclamationmark.triangle", tint: BrandPalette.warning)
+                notice(String(localized: "Không tạo được ảnh mã QR."), symbol: "exclamationmark.triangle", tint: BrandPalette.warning)
             }
             Text("Mở Xdesk trên điện thoại, chọn \"Quét mã QR trên Mac\" rồi quét mã này.")
                 .font(.callout).lineLimit(3).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)

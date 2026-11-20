@@ -41,7 +41,19 @@ final class AgentController {
         runtime = AgentRuntime(host: host, settings: settings)
     }
 
-    var controlSummary: String { runtime.control.summary }
+    /// Bản hiển thị cho người dùng (theo ngôn ngữ app); `ControlSnapshot.summary` giữ tiếng Việt cho agent đọc qua `xdesk_status`.
+    var controlSummary: String {
+        let control = runtime.control
+        let holder = control.holder ?? "agent"
+        switch control.phase {
+        case .none: return String(localized: "không có")
+        case .requested: return String(localized: "đang chờ người dùng duyệt (\(holder))")
+        case .granted: return String(localized: "\(holder) (đang hoạt động)")
+        case .paused:
+            guard let reason = control.reason else { return String(localized: "\(holder) (tạm dừng)") }
+            return String(localized: "\(holder) (tạm dừng: \(reason))")
+        }
+    }
     var hasAgentDisplay: Bool { runtime.displays.displayID != nil }
     var inputMonitorMissing: Bool { runtime.control.phase != .none && !runtime.inputMonitorActive }
     func removeAgentDisplay() { runtime.removeDisplay() }
@@ -75,16 +87,16 @@ final class AgentController {
         pasteboard.setString(McpToken.claudeCodeCommand(port: port, token: token), forType: .string)
         // Quy ước nspasteboard.org: trình quản lý clipboard bỏ qua mục này, token không nằm lại trong lịch sử.
         pasteboard.setData(Data(), forType: NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType"))
-        notice = "Đã sao chép lệnh cấu hình"
+        notice = String(localized: "Đã sao chép lệnh cấu hình")
     }
 
     func rotateToken() {
         do {
             _ = try tokenStore.rotate()
-            notice = "Đã đổi token, hãy sao chép lệnh cấu hình mới"
+            notice = String(localized: "Đã đổi token, hãy sao chép lệnh cấu hình mới")
         } catch {
             log.error("Đổi token MCP lỗi: \(String(describing: error), privacy: .public)")
-            notice = "Không đổi được token: \(error)"
+            notice = String(localized: "Không đổi được token: \(error.localizedDescription)")
         }
     }
 

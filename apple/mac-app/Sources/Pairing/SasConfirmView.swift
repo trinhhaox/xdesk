@@ -48,10 +48,10 @@ struct SasConfirmView: View {
     }
 
     private var approveTitle: String {
-        if case .sas = request.method { "Khớp, cho phép" } else { "Cho phép" }
+        if case .sas = request.method { String(localized: "Khớp, cho phép") } else { String(localized: "Cho phép") }
     }
 
     private var rejectTitle: String {
-        if case .sas = request.method { "Không khớp" } else { "Từ chối" }
+        if case .sas = request.method { String(localized: "Không khớp") } else { String(localized: "Từ chối") }
     }
 }

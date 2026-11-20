@@ -24,7 +24,7 @@ extension ViewerSession {
                 default: break
                 }
             }
-            await fail("Host đã ngắt kết nối")
+            await fail(String(localized: "Host đã ngắt kết nối", bundle: .module))
         } catch {
             await fail(error.localizedDescription)
         }
@@ -50,7 +50,7 @@ extension ViewerSession {
                 handleInputAck(packet)
                 handleAudio(packet)
             case .peerConnected: break
-            case .linkLost: await fail("Mất liên lạc với host (UDP)")
+            case .linkLost: await fail(String(localized: "Mất liên lạc với host (UDP)", bundle: .module))
             }
         }
     }

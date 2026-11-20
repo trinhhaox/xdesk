@@ -12,7 +12,7 @@ struct SettingsView: View {
             GeneralSettingsPane(host: host)
                 .tabItem { Label("Chung", systemImage: "gearshape") }
             ConnectionSettingsPane(host: host)
-                .tabItem { Label("Kết nối", systemImage: "network") }
+                .tabItem { Label(String(localized: "settings.tab.connection", defaultValue: "Kết nối", comment: "Tên tab Cài đặt; khác nút \"Kết nối\" (Connect)"), systemImage: "network") }
             DevicesSettingsPane(security: security, agent: agent)
                 .tabItem { Label("Thiết bị", systemImage: "ipad.and.iphone") }
             AgentSettingsPane(agent: agent)

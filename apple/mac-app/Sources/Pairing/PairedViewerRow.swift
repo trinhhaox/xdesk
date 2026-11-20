@@ -37,7 +37,7 @@ struct PairedViewerRow: View {
         }
     }
 
-    private func toggle(_ title: String, _ key: WritableKeyPath<DevicePermissions, Bool>) -> some View {
+    private func toggle(_ title: LocalizedStringKey, _ key: WritableKeyPath<DevicePermissions, Bool>) -> some View {
         Toggle(title, isOn: Binding(
             get: { device.permissions[keyPath: key] },
             set: { value in

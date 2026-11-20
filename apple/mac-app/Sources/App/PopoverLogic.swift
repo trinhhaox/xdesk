@@ -8,17 +8,17 @@ enum PermissionKind: String, CaseIterable, Sendable, Identifiable {
 
     var title: String {
         switch self {
-        case .screenRecording: "Ghi màn hình"
-        case .accessibility: "Trợ năng"
-        case .inputMonitoring: "Giám sát đầu vào"
+        case .screenRecording: String(localized: "Ghi màn hình")
+        case .accessibility: String(localized: "Trợ năng")
+        case .inputMonitoring: String(localized: "Giám sát đầu vào")
         }
     }
 
     var reason: String {
         switch self {
-        case .screenRecording: "Để chia sẻ màn hình tới thiết bị khác."
-        case .accessibility: "Để điều khiển Mac từ thiết bị khác."
-        case .inputMonitoring: "Để agent AI tự dừng khi bạn chạm vào màn hình của nó."
+        case .screenRecording: String(localized: "Để chia sẻ màn hình tới thiết bị khác.")
+        case .accessibility: String(localized: "Để điều khiển Mac từ thiết bị khác.")
+        case .inputMonitoring: String(localized: "Để agent AI tự dừng khi bạn chạm vào màn hình của nó.")
         }
     }
 
@@ -55,10 +55,10 @@ enum StatusPill: Equatable, Sendable {
 
     var title: String {
         switch self {
-        case .sharing: "Đang chia sẻ"
-        case .stopped: "Đã dừng"
-        case .needsPermission: "Cần cấp quyền"
-        case .failed: "Gặp lỗi"
+        case .sharing: String(localized: "Đang chia sẻ")
+        case .stopped: String(localized: "Đã dừng")
+        case .needsPermission: String(localized: "Cần cấp quyền")
+        case .failed: String(localized: "Gặp lỗi")
         }
     }
 
@@ -87,8 +87,8 @@ enum TailscaleDetector {
 /// Một dòng kênh kết nối trong popover/cài đặt.
 enum TailscaleLine {
     static func text(allowed: Bool, address: String?, port: UInt16?) -> String {
-        guard let address else { return allowed ? "Tailscale: chưa bật trên máy này" : "Tailscale: tắt" }
+        guard let address else { return allowed ? String(localized: "Tailscale: chưa bật trên máy này") : String(localized: "Tailscale: tắt") }
         let endpoint = port.map { EndpointFormat.hostPort(address, $0) } ?? address
-        return allowed ? "Tailscale \(endpoint)" : "Tailscale \(address) · đang tắt trong Cài đặt"
+        return allowed ? String(localized: "Tailscale \(endpoint)") : String(localized: "Tailscale \(address) · đang tắt trong Cài đặt")
     }
 }

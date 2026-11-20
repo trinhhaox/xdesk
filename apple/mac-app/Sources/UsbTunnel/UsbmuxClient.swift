@@ -67,7 +67,7 @@ final class UsbmuxSocket: @unchecked Sendable {
     private init(_ connection: NWConnection) { self.connection = connection }
 
     static func open(path: String) async throws -> UsbmuxSocket {
-        guard FileManager.default.fileExists(atPath: path) else { throw UsbmuxError.unavailable("không có \(path)") }
+        guard FileManager.default.fileExists(atPath: path) else { throw UsbmuxError.unavailable(String(localized: "không có \(path)")) }
         let socket = UsbmuxSocket(NWConnection(to: .unix(path: path), using: .tcp))
         try await socket.waitReady()
         return socket
@@ -97,14 +97,14 @@ final class UsbmuxSocket: @unchecked Sendable {
         return try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Data, any Error>) in
             if let timeoutSeconds {
                 queue.asyncAfter(deadline: .now() + timeoutSeconds) {
-                    if gate.claim() { cont.resume(throwing: UsbmuxError.unavailable("usbmuxd không trả lời")); self.connection.cancel() }
+                    if gate.claim() { cont.resume(throwing: UsbmuxError.unavailable(String(localized: "usbmuxd không trả lời"))); self.connection.cancel() }
                 }
             }
             connection.receive(minimumIncompleteLength: count, maximumLength: count) { data, _, _, error in
                 guard gate.claim() else { return }
                 if let error { cont.resume(throwing: UsbmuxError.unavailable("\(error)")) }
                 else if let data, data.count == count { cont.resume(returning: data) }
-                else { cont.resume(throwing: UsbmuxError.unavailable("usbmuxd đóng socket")) }
+                else { cont.resume(throwing: UsbmuxError.unavailable(String(localized: "usbmuxd đóng socket"))) }
             }
         }
     }
@@ -116,12 +116,12 @@ final class UsbmuxSocket: @unchecked Sendable {
                 switch state {
                 case .ready: if gate.claim() { cont.resume() }
                 case .failed(let error): if gate.claim() { cont.resume(throwing: UsbmuxError.unavailable("\(error)")) }
-                case .cancelled: if gate.claim() { cont.resume(throwing: UsbmuxError.unavailable("đã huỷ")) }
+                case .cancelled: if gate.claim() { cont.resume(throwing: UsbmuxError.unavailable(String(localized: "đã huỷ"))) }
                 default: break
                 }
             }
             queue.asyncAfter(deadline: .now() + 5) {
-                if gate.claim() { cont.resume(throwing: UsbmuxError.unavailable("quá hạn nối socket")); self.connection.cancel() }
+                if gate.claim() { cont.resume(throwing: UsbmuxError.unavailable(String(localized: "quá hạn nối socket"))); self.connection.cancel() }
             }
             connection.start(queue: queue)
         }

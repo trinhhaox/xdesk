@@ -55,7 +55,8 @@ struct MenuPopoverLive: View {
             usbMessage: host.usbMessage,
             secureInput: host.secureInputActive,
             updateVersion: updater.pendingVersion,
-            canCheckUpdates: updater.canCheckForUpdates)
+            canCheckUpdates: updater.canCheckForUpdates,
+            version: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String)
     }
 
     private var actions: PopoverActions {
@@ -87,17 +88,8 @@ struct MenuPopoverLive: View {
                 NSApp.activate(ignoringOtherApps: true)
                 openSettings()
             },
-            checkForUpdates: { [updater] in updater.checkForUpdates() },
+            checkForUpdates: { [updater] in dismiss(); updater.checkForUpdates() },
             quit: { NSApplication.shared.terminate(nil) },
-            relaunch: Self.relaunch)
-    }
-
-    /// Mở một bản Xdesk mới rồi thoát bản hiện tại.
-    private static func relaunch() {
-        let config = NSWorkspace.OpenConfiguration()
-        config.createsNewApplicationInstance = true
-        NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: config) { _, _ in
-            Task { @MainActor in NSApplication.shared.terminate(nil) }
-        }
+            relaunch: { AppRelauncher.relaunch() })
     }
 }

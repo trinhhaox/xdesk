@@ -20,9 +20,9 @@ enum PairingAvailability: Equatable {
     var blockedMessage: String? {
         switch self {
         case .ready: nil
-        case .hostStopped: "Chưa bật chia sẻ màn hình. Hãy chọn \"Bắt đầu chia sẻ màn hình\" trong menu rồi mở lại cửa sổ này."
-        case .plaintextMode: "Bản thử nghiệm đang chạy không mã hoá nên không có ghép đôi. Hãy chạy lại không kèm --plaintext."
-        case .sessionActive: "Đang có thiết bị xem màn hình này. Để người đó không nhìn thấy mã, Xdesk chỉ hiện mã khi không ai đang xem. Hãy ngắt kết nối rồi thử lại."
+        case .hostStopped: String(localized: "Chưa bật chia sẻ màn hình. Hãy chọn \"Bắt đầu chia sẻ màn hình\" trong menu rồi mở lại cửa sổ này.")
+        case .plaintextMode: String(localized: "Bản thử nghiệm đang chạy không mã hoá nên không có ghép đôi. Hãy chạy lại không kèm --plaintext.")
+        case .sessionActive: String(localized: "Đang có thiết bị xem màn hình này. Để người đó không nhìn thấy mã, Xdesk chỉ hiện mã khi không ai đang xem. Hãy ngắt kết nối rồi thử lại.")
         }
     }
 }
@@ -52,8 +52,8 @@ enum PairingCountdown {
 extension PairingRequest.Method {
     var title: String {
         switch self {
-        case .qr: "Quét mã QR"
-        case .sas: "So mã 6 số"
+        case .qr: String(localized: "Quét mã QR")
+        case .sas: String(localized: "So mã 6 số")
         }
     }
 }

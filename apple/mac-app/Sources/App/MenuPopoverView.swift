@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// Nội dung popover thanh menu: đầu trang + nút chia sẻ, thẻ quyền (nếu thiếu), viewer đang xem, hành động, kênh kết nối, chân trang.
@@ -10,12 +11,12 @@ struct MenuPopoverView: View {
         VStack(alignment: .leading, spacing: 12) {
             PopoverHeader(state: state, toggle: actions.toggleSharing)
             if !state.missing.isEmpty { PermissionCard(missing: state.missing, open: actions.openPermission, relaunch: actions.relaunch) }
-            if state.secureInput { NoticeRow(symbol: "lock.fill", text: "Đang bật nhập liệu bảo mật: chữ gõ từ xa có thể không vào ô mật khẩu.") }
+            if state.secureInput { NoticeRow(symbol: "lock.fill", text: String(localized: "Đang bật nhập liệu bảo mật: chữ gõ từ xa có thể không vào ô mật khẩu.")) }
             SessionsCard(sessions: state.sessions, disconnect: actions.disconnect)
             VStack(spacing: 4) {
-                ActionRow(symbol: "qrcode", title: "Ghép đôi thiết bị mới…", prominent: true, action: actions.pairNewDevice)
-                ActionRow(symbol: "ipad.and.iphone", title: "Thiết bị đã ghép…", prominent: true, action: actions.showPairedDevices)
-                ActionRow(symbol: "laptopcomputer.and.arrow.down", title: "Kết nối tới máy khác…", prominent: false, action: actions.connectToMac)
+                ActionRow(symbol: "qrcode", title: "Ghép đôi thiết bị mới…", action: actions.pairNewDevice)
+                ActionRow(symbol: "ipad.and.iphone", title: "Thiết bị đã ghép…", action: actions.showPairedDevices)
+                ActionRow(symbol: "laptopcomputer.and.arrow.down", title: "Kết nối tới máy khác…", action: actions.connectToMac)
             }
             ChannelsCard(state: state, connectUsb: actions.connectUsb)
             Divider()
@@ -33,14 +34,16 @@ private struct PopoverHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
-                Image(systemName: "display.2")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 34, height: 34)
-                    .background(BrandPalette.primaryStrong, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                // Dùng đúng biểu tượng app để đồng nhất với Dock, Finder và hộp thoại hệ thống.
+                Image(nsImage: NSApplication.shared.applicationIconImage)
+                    .resizable()
+                    .frame(width: 38, height: 38)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Xdesk").font(.headline)
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text("Xdesk").font(.headline)
+                        if let version = state.version { Text(version).font(.caption).foregroundStyle(.secondary) }
+                    }
                     StatusPillView(pill: state.pill)
                 }
                 Spacer(minLength: 0)
@@ -51,11 +54,11 @@ private struct PopoverHeader: View {
                 Text(message).font(.footnote).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Button(action: toggle) {
-                Label(state.isHosting ? "Dừng chia sẻ" : "Bắt đầu chia sẻ", systemImage: state.isHosting ? "stop.fill" : "play.fill")
+                Label(state.isHosting ? String(localized: "Dừng chia sẻ") : String(localized: "Bắt đầu chia sẻ"), systemImage: state.isHosting ? "stop.fill" : "play.fill")
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(BigButtonStyle(filled: !state.isHosting))
-            .accessibilityHint(state.isHosting ? "Ngắt mọi thiết bị đang xem" : "Cho phép thiết bị đã ghép nhìn thấy Mac này")
+            .buttonStyle(BigButtonStyle(kind: state.isHosting ? .destructive : .primary))
+            .accessibilityHint(state.isHosting ? String(localized: "Ngắt mọi thiết bị đang xem") : String(localized: "Cho phép thiết bị đã ghép nhìn thấy Mac này"))
         }
     }
 }
@@ -86,16 +89,18 @@ struct StatusPillView: View {
 }
 
 struct BigButtonStyle: ButtonStyle {
-    let filled: Bool
+    /// `.destructive` dùng cho "Dừng chia sẻ": tông đỏ nhạt để không trông như nút bị vô hiệu hoá.
+    enum Kind { case primary, destructive }
+    let kind: Kind
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.body.weight(.semibold))
-            .foregroundStyle(filled ? Color.white : Color.primary)
+            .foregroundStyle(kind == .primary ? Color.white : Color.red)
             .padding(.vertical, 9)
             .background(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(filled ? BrandPalette.primaryStrong : Color.primary.opacity(0.1))
+                    .fill(kind == .primary ? BrandPalette.primaryStrong : Color.red.opacity(0.14))
                     .opacity(configuration.isPressed ? 0.75 : 1))
             .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }

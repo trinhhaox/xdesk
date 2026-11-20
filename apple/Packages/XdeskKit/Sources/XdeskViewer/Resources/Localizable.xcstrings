@@ -1,0 +1,83 @@
+{
+  "sourceLanguage" : "vi",
+  "strings" : {
+    "Chưa có liên kết ghép đôi." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No pairing link yet." } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Chưa có liên kết ghép đôi." } }
+      }
+    },
+    "Chưa ghép" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Not paired" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Chưa ghép" } }
+      }
+    },
+    "Đã ghép" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Paired" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Đã ghép" } }
+      }
+    },
+    "Host đã ngắt kết nối" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The host Mac disconnected" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Host đã ngắt kết nối" } }
+      }
+    },
+    "Khoá đã đổi" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Key changed" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Khoá đã đổi" } }
+      }
+    },
+    "Không thấy trên mạng" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Not found on the network" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Không thấy trên mạng" } }
+      }
+    },
+    "Mã ghép đôi bị hỏng hoặc không đầy đủ. Hãy tạo mã mới trên Mac rồi quét lại." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The pairing code is damaged or incomplete. Create a new code on the Mac and scan it again." } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Mã ghép đôi bị hỏng hoặc không đầy đủ. Hãy tạo mã mới trên Mac rồi quét lại." } }
+      }
+    },
+    "Mã này không phải mã ghép đôi của Xdesk. Hãy quét mã trong cửa sổ \"Ghép đôi thiết bị mới\" trên Mac." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This isn't an Xdesk pairing code. Scan the code shown in the \"Pair a New Device\" window on the Mac." } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Mã này không phải mã ghép đôi của Xdesk. Hãy quét mã trong cửa sổ \"Ghép đôi thiết bị mới\" trên Mac." } }
+      }
+    },
+    "Mất liên lạc với host (UDP)" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Lost contact with the host Mac (UDP)" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Mất liên lạc với host (UDP)" } }
+      }
+    },
+    "Qua địa chỉ %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Via address %@" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Qua địa chỉ %@" } }
+      }
+    },
+    "Sẵn sàng" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Ready" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Sẵn sàng" } }
+      }
+    }
+  },
+  "version" : "1.0"
+}

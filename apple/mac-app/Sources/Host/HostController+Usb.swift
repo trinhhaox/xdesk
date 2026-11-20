@@ -23,7 +23,7 @@ extension HostController {
         }
         guard let listener = currentListener, let key = await security.hostPublicKey else {
             tunnel.cancel()
-            throw TransportError.listenerFailed("hãy bật chia sẻ màn hình trước")
+            throw TransportError.listenerFailed(String(localized: "hãy bật chia sẻ màn hình trước"))
         }
         try await listener.adoptUsbTunnel(tunnel, hostPublicKey: key)
     }

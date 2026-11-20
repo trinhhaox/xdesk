@@ -43,7 +43,7 @@ final class UsbDeviceMonitor {
                     delaySeconds = 1
                     apply(event)
                 }
-                status = .retrying("usbmuxd đã đóng kết nối")
+                status = .retrying(String(localized: "usbmuxd đã đóng kết nối"))
             } catch {
                 status = .retrying(error.localizedDescription)
                 log.error("usbmuxd listen: \(error.localizedDescription, privacy: .public)")

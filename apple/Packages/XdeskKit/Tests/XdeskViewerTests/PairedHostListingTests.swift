@@ -22,7 +22,7 @@ import XdeskTransport
         let rows = PairedHostListing.rows(paired: [c, b, a], discoveredIds: [a.id], manual: [])
         #expect(rows.map(\.device.name) == ["A", "B", "C"])
         #expect(rows.map(\.status) == [.ready, .viaAddress("100.64.0.2:47800"), .offline])
-        #expect(rows[1].status.text == "Qua địa chỉ 100.64.0.2:47800")
+        #expect(rows[1].status.text.contains("100.64.0.2:47800"))
     }
 
     @Test func discoveredWinsOverAddressAndNoDuplicate() throws {

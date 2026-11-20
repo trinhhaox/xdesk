@@ -40,7 +40,7 @@ final class ApprovalCoordinator: ApprovalPrompting {
                                            summary: String(request.summary.prefix(400)), expiresAt: expiresMs)
         return await withCheckedContinuation { continuation in
             pending[request.id] = continuation
-            let window = SecureWindow(title: "Agent AI xin quyền", floating: true, onClose: { [weak self] in self?.resolve(request.id, allow: false) },
+            let window = SecureWindow(title: String(localized: "Agent AI xin quyền"), floating: true, onClose: { [weak self] in self?.resolve(request.id, allow: false) },
                                       content: ApprovalView(request: request) { [weak self] allow in self?.resolve(request.id, allow: allow) })
             windows[request.id] = window
             window.show()

@@ -9,7 +9,7 @@ enum DisplayArrangement {
         case failed(CGError)
         var errorDescription: String? {
             guard case .failed(let code) = self else { return nil }
-            return "Không sắp xếp được màn hình ảo (CGError \(code.rawValue))"
+            return String(localized: "Không sắp xếp được màn hình ảo (CGError \(String(code.rawValue)))")
         }
     }
 

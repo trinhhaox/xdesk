@@ -9,8 +9,8 @@ enum CaptureError: Error, LocalizedError, Equatable {
 
     var errorDescription: String? {
         switch self {
-        case .permissionDenied: "Chưa có quyền Ghi màn hình. \(PermissionsCheck.settingsHint)"
-        case .displayNotFound(let id): "Không tìm thấy màn hình \(id) để capture"
+        case .permissionDenied: String(localized: "Chưa có quyền Ghi màn hình. \(PermissionsCheck.settingsHint)")
+        case .displayNotFound(let id): String(localized: "Không tìm thấy màn hình \(String(id)) để capture")
         }
     }
 }

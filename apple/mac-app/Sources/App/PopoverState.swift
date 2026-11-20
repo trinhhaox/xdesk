@@ -18,12 +18,14 @@ struct PopoverState: Equatable {
     var missing: [PermissionKind] = []
     var sessions: [Session] = []
     var lanText: String?
-    var tailscaleText = "Tailscale: tắt"
+    var tailscaleText = String(localized: "Tailscale: tắt")
     var usb: [Usb] = []
     var usbMessage: String?
     var secureInput = false
     var updateVersion: String?
     var canCheckUpdates = true
+    /// Phiên bản đang chạy, hiện cạnh tên app ở đầu popover.
+    var version: String?
 }
 
 /// Hành động người dùng trong popover; mặc định không làm gì (dùng cho ảnh chụp giao diện).

@@ -9,9 +9,9 @@ public enum HostBadge: Sendable, Equatable {
 
     public var title: String {
         switch self {
-        case .paired: "Đã ghép"
-        case .unpaired: "Chưa ghép"
-        case .keyChanged: "Khoá đã đổi"
+        case .paired: String(localized: "Đã ghép", bundle: .module)
+        case .unpaired: String(localized: "Chưa ghép", bundle: .module)
+        case .keyChanged: String(localized: "Khoá đã đổi", bundle: .module)
         }
     }
 }
@@ -38,9 +38,9 @@ public enum PairingInputError: Error, Equatable, LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .empty: "Chưa có liên kết ghép đôi."
-        case .notXdesk: "Mã này không phải mã ghép đôi của Xdesk. Hãy quét mã trong cửa sổ \"Ghép đôi thiết bị mới\" trên Mac."
-        case .malformed: "Mã ghép đôi bị hỏng hoặc không đầy đủ. Hãy tạo mã mới trên Mac rồi quét lại."
+        case .empty: String(localized: "Chưa có liên kết ghép đôi.", bundle: .module)
+        case .notXdesk: String(localized: "Mã này không phải mã ghép đôi của Xdesk. Hãy quét mã trong cửa sổ \"Ghép đôi thiết bị mới\" trên Mac.", bundle: .module)
+        case .malformed: String(localized: "Mã ghép đôi bị hỏng hoặc không đầy đủ. Hãy tạo mã mới trên Mac rồi quét lại.", bundle: .module)
         }
     }
 }

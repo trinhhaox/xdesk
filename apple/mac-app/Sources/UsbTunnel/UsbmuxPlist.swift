@@ -26,10 +26,10 @@ struct UsbmuxResult: Equatable, Sendable {
     var description: String {
         switch number {
         case 0: "OK"
-        case 2: "thiết bị không còn cắm cáp"
-        case 3: "app Xdesk trên thiết bị chưa mở (cổng bị từ chối)"
-        case 6: "usbmuxd không hiểu phiên bản giao thức"
-        default: "usbmuxd trả lỗi \(number)"
+        case 2: String(localized: "thiết bị không còn cắm cáp")
+        case 3: String(localized: "app Xdesk trên thiết bị chưa mở (cổng bị từ chối)")
+        case 6: String(localized: "usbmuxd không hiểu phiên bản giao thức")
+        default: String(localized: "usbmuxd trả lỗi \(String(number))")
         }
     }
 }
@@ -49,10 +49,10 @@ enum UsbmuxError: Error, Equatable, LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .malformedHeader(let why): "usbmuxd gửi header sai: \(why)"
-        case .malformedPlist(let why): "usbmuxd gửi plist sai: \(why)"
-        case .unavailable(let why): "không nối được usbmuxd: \(why)"
-        case .refused(let result): "usbmuxd từ chối: \(result.description)"
+        case .malformedHeader(let why): String(localized: "usbmuxd gửi header sai: \(why)")
+        case .malformedPlist(let why): String(localized: "usbmuxd gửi plist sai: \(why)")
+        case .unavailable(let why): String(localized: "không nối được usbmuxd: \(why)")
+        case .refused(let result): String(localized: "usbmuxd từ chối: \(result.description)")
         }
     }
 }

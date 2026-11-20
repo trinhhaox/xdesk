@@ -84,12 +84,13 @@ private struct AgentBannerView: View {
 
     var body: some View {
         let paused = model.control.phase == .paused
+        let holderName = model.control.holder ?? String(localized: "Agent AI")
         HStack(spacing: 10) {
             Circle().fill(paused ? Color.orange : Color.green).frame(width: 10, height: 10)
-            Text(paused ? "Agent đã tạm dừng" : "\(model.control.holder ?? "Agent AI") đang điều khiển")
+            Text(paused ? String(localized: "Agent đã tạm dừng") : String(localized: "\(holderName) đang điều khiển"))
                 .font(.system(size: 13, weight: .medium)).lineLimit(1)
             Spacer(minLength: 4)
-            Button(paused ? "Tiếp tục" : "Tạm dừng") { paused ? onResume() : onPause() }
+            Button(paused ? String(localized: "Tiếp tục") : String(localized: "Tạm dừng")) { paused ? onResume() : onPause() }
             Button("Dừng", role: .destructive, action: onStop)
         }
         .controlSize(.small)

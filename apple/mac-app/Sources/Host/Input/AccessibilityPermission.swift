@@ -3,8 +3,8 @@ import ApplicationServices
 
 /// Quyền Trợ năng (Accessibility): bắt buộc để `CGEventPost` có tác dụng. Không thể tự cấp: chỉ kiểm tra, hiện hộp thoại và mở đúng trang cài đặt.
 enum AccessibilityPermission {
-    static let menuTitle = "Cần quyền Trợ năng để điều khiển"
-    static let guidance = "Để điều khiển Mac từ thiết bị khác: Cài đặt hệ thống › Quyền riêng tư & Bảo mật › Trợ năng › bật Xdesk."
+    static let menuTitle = String(localized: "Cần quyền Trợ năng để điều khiển")
+    static let guidance = String(localized: "Để điều khiển Mac từ thiết bị khác: Cài đặt hệ thống › Quyền riêng tư & Bảo mật › Trợ năng › bật Xdesk.")
     private static let settingsURL = "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
 
     static var isGranted: Bool { AXIsProcessTrusted() }

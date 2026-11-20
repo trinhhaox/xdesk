@@ -25,14 +25,14 @@ struct PairedDevicesSettings<Extra: View>: View {
                     }
                 }
                 if let error = security.startupError {
-                    warning("Không mở được kho khoá bảo mật: \(error). Ghép đôi và kết nối mã hoá đang tắt.", tint: .red)
+                    warning(String(localized: "Không mở được kho khoá bảo mật: \(String(describing: error)). Ghép đôi và kết nối mã hoá đang tắt."), tint: .red)
                 }
                 if security.keychainWarning {
-                    warning("Khoá của Mac nằm ở chùm khoá đăng nhập cũ nên kém an toàn hơn. Hãy cài bản Xdesk đã ký đầy đủ rồi ghép đôi lại.", tint: BrandPalette.warning)
+                    warning(String(localized: "Khoá của Mac nằm ở chùm khoá đăng nhập cũ nên kém an toàn hơn. Hãy cài bản Xdesk đã ký đầy đủ rồi ghép đôi lại."), tint: BrandPalette.warning)
                 }
                 if security.integrityNotice {
                     VStack(alignment: .leading, spacing: 6) {
-                        warning("Danh sách thiết bị từng bị sửa hoặc hỏng nên Xdesk đã bỏ đi và tạo danh sách trống. Hãy ghép đôi lại các thiết bị của bạn.", tint: BrandPalette.warning)
+                        warning(String(localized: "Danh sách thiết bị từng bị sửa hoặc hỏng nên Xdesk đã bỏ đi và tạo danh sách trống. Hãy ghép đôi lại các thiết bị của bạn."), tint: BrandPalette.warning)
                         Button("Đã hiểu") { Task { await security.acknowledgeIntegrityNotice() } }
                     }
                 }

@@ -84,8 +84,8 @@ import Testing
     }
 
     @Test func resultDescriptionsAreHumanReadable() {
-        #expect(UsbmuxResult(number: 3).description.contains("chưa mở"))
-        #expect(UsbmuxResult(number: 2).description.contains("không còn cắm"))
+        #expect(UsbmuxResult(number: 3).description == String(localized: "app Xdesk trên thiết bị chưa mở (cổng bị từ chối)"))
+        #expect(UsbmuxResult(number: 2).description == String(localized: "thiết bị không còn cắm cáp"))
         #expect(UsbmuxResult(number: 0).isOK)
     }
 

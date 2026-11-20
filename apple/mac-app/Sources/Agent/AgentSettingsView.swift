@@ -44,9 +44,9 @@ struct AgentSettingsView: View {
 
     private func label(_ rule: AppRule) -> String {
         switch rule {
-        case .allow: "Cho phép"
-        case .ask: "Hỏi"
-        case .never: "Cấm"
+        case .allow: String(localized: "Cho phép")
+        case .ask: String(localized: "Hỏi")
+        case .never: String(localized: "Cấm")
         }
     }
 }

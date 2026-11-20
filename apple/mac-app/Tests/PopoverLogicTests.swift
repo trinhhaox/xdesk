@@ -33,22 +33,22 @@ import XdeskWire
     }
 
     @Test func tailscaleLineStates() {
-        #expect(TailscaleLine.text(allowed: false, address: nil, port: nil) == "Tailscale: tắt")
-        #expect(TailscaleLine.text(allowed: true, address: nil, port: 47800) == "Tailscale: chưa bật trên máy này")
+        #expect(TailscaleLine.text(allowed: false, address: nil, port: nil) == String(localized: "Tailscale: tắt"))
+        #expect(TailscaleLine.text(allowed: true, address: nil, port: 47800) == String(localized: "Tailscale: chưa bật trên máy này"))
         #expect(TailscaleLine.text(allowed: true, address: "100.1.2.3", port: 47810) == "Tailscale 100.1.2.3:47810")
-        #expect(TailscaleLine.text(allowed: false, address: "100.1.2.3", port: 47810).contains("đang tắt"))
+        #expect(TailscaleLine.text(allowed: false, address: "100.1.2.3", port: 47810).contains(String(localized: "đang tắt trong Cài đặt")))
     }
 
     @Test func viewerInfoDescribesModeAndTransport() {
         var config = DisplayConfig(w: 1024, h: 768, scale: 2, fps: 60, codec: .h264)
         #expect(ViewerSessionInfo.make(name: " iPad ", config: config, isUsb: false, isTailscale: false)
-            == ViewerSessionInfo(name: "iPad", transport: .lan, modeLabel: "Mở rộng"))
+            == ViewerSessionInfo(name: "iPad", transport: .lan, modeLabel: String(localized: "Mở rộng")))
         config.mode = .mirror
         config.mirrorFit = .touch
         let usb = ViewerSessionInfo.make(name: "", config: config, isUsb: true, isTailscale: true)
         #expect(usb.transport == .usb)
-        #expect(usb.modeLabel == "Bản sao · Cảm ứng")
-        #expect(usb.name == "Thiết bị chưa đặt tên")
+        #expect(usb.modeLabel == String(localized: "Bản sao · Cảm ứng"))
+        #expect(usb.name == String(localized: "Thiết bị chưa đặt tên"))
         #expect(ViewerSessionInfo.make(name: "x", config: config, isUsb: false, isTailscale: true).transport == .tailscale)
     }
 }

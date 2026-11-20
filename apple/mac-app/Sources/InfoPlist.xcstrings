@@ -1,0 +1,13 @@
+{
+  "sourceLanguage" : "vi",
+  "strings" : {
+    "NSLocalNetworkUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Xdesk uses the local network to find and connect to your devices." } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Xdesk dùng mạng nội bộ để tìm và kết nối thiết bị của bạn." } }
+      }
+    }
+  },
+  "version" : "1.0"
+}

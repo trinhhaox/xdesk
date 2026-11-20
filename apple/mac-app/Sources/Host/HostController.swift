@@ -65,7 +65,7 @@ final class HostController {
         status = .starting
         guard PermissionsCheck.hasScreenRecording else {
             PermissionsCheck.requestScreenRecording()
-            status = .failed("Chưa có quyền Ghi màn hình. \(PermissionsCheck.settingsHint)")
+            status = .failed(String(localized: "Chưa có quyền Ghi màn hình. \(PermissionsCheck.settingsHint)"))
             return
         }
         if !AccessibilityPermission.isGranted, !promptedAccessibility {
@@ -74,7 +74,7 @@ final class HostController {
         }
         let encrypted = AppSecurity.current == .encrypted
         if encrypted, security.hostAuthenticator == nil {
-            status = .failed(security.startupError ?? "Không mở được kho khoá bảo mật")
+            status = .failed(security.startupError ?? String(localized: "Không mở được kho khoá bảo mật"))
             return
         }
         await security.attach()

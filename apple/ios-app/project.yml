@@ -1,6 +1,8 @@
 name: XdeskIOS
 options:
   bundleIdPrefix: vn.xox
+  # iOS chưa có bản tiếng Anh: cố định tiếng Việt để chuỗi đã dịch trong XdeskKit không lẫn tiếng Anh.
+  developmentLanguage: vi
   deploymentTarget:
     iOS: "17.0"
 packages:
@@ -35,6 +37,7 @@ targets:
       path: Sources/Info.plist
       properties:
         CFBundleDisplayName: Xdesk
+        CFBundleLocalizations: [vi]
         UILaunchScreen: {}
         ITSAppUsesNonExemptEncryption: true
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
