@@ -14,6 +14,7 @@ import vn.xox.xdesk.media.VideoDecoder
 import vn.xox.xdesk.transport.AgentApprovalRequest
 import vn.xox.xdesk.transport.DisplayConfigPlanner
 import vn.xox.xdesk.transport.KnownHost
+import vn.xox.xdesk.transport.SasPrompt
 import vn.xox.xdesk.transport.ViewerAuth
 import vn.xox.xdesk.transport.ViewerSession
 import vn.xox.xdesk.transport.ViewerState
@@ -42,7 +43,7 @@ class ViewerController(internal val container: AppContainer, private val deviceN
     var knownHosts by mutableStateOf<List<KnownHost>>(container.knownHosts.all())
     var connecting by mutableStateOf(false)
     var streaming by mutableStateOf(false)
-    var sasCode by mutableStateOf<String?>(null)
+    var sasPrompt by mutableStateOf<SasPrompt?>(null)
     var failure by mutableStateOf<ConnectionFailure?>(null)
     var pairTarget by mutableStateOf<ViewerTarget?>(null)
     var pairOnSas by mutableStateOf(false)
@@ -69,7 +70,7 @@ class ViewerController(internal val container: AppContainer, private val deviceN
 
     fun connect(target: ViewerTarget) = start(listOf(target), ViewerAuth.Automatic)
 
-    fun pairWithSas(target: ViewerTarget) = start(listOf(target), ViewerAuth.Sas { code -> post { sasCode = code } }, isPairing = true)
+    fun pairWithSas(target: ViewerTarget) = start(listOf(target), ViewerAuth.Sas { prompt -> post { if (prompt.isPending) sasPrompt = prompt } }, isPairing = true)
 
     internal fun start(targets: List<ViewerTarget>, auth: ViewerAuth, isPairing: Boolean = false) {
         val trust = trust ?: return run { failure = ConnectionFailure(identityError.orEmpty(), false) }
@@ -78,7 +79,7 @@ class ViewerController(internal val container: AppContainer, private val deviceN
             w.toDouble(), h.toDouble(), density.toDouble(), mode = container.display.mode, mirrorFit = container.display.fit,
         ) ?: return
         failure = null
-        sasCode = null
+        sasPrompt = null
         connecting = true
         progress.begin(isPairing)
         screen = Screen.STREAM
@@ -99,13 +100,13 @@ class ViewerController(internal val container: AppContainer, private val deviceN
     private fun onState(state: ViewerState) {
         when (state) {
             ViewerState.Streaming -> {
-                connecting = false; streaming = true; sasCode = null; startDecoderIfReady(); checkViewport()
+                connecting = false; streaming = true; sasPrompt = null; startDecoderIfReady(); checkViewport()
                 progress.finish(true)
             }
             ViewerState.Connecting -> connecting = true
             ViewerState.Idle -> { connecting = false; streaming = false }
             is ViewerState.Failed -> {
-                connecting = false; streaming = false; sasCode = null; agentApproval = null
+                connecting = false; streaming = false; sasPrompt = null; agentApproval = null
                 decoder.stop()
                 failure = ConnectionFailure(state.message, state.code in REPAIRABLE_CODES, state.code, progress.targetName)
                 progress.finish(false)
@@ -140,6 +141,9 @@ class ViewerController(internal val container: AppContainer, private val deviceN
     }
 
     fun disconnect() {
+        // Huỷ lúc đang so mã: trả lời "không khớp" để đóng kết nối và nhả luồng đang chờ ngay.
+        sasPrompt?.answer(false)
+        sasPrompt = null
         val ending = session ?: return
         endSession()
         session = null

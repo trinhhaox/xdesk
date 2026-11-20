@@ -49,7 +49,7 @@ struct ViewerBrowserView: View {
                 Toggle("Retina (HiDPI 2×, 3840×2400)", isOn: $controller.options.retina)
                 Toggle("Mở toàn màn hình", isOn: $controller.options.fullScreen)
             }
-            if let code = controller.sasCode { SasCodePanel(code: code) }
+            if let prompt = controller.sasPrompt { SasCodePanel(prompt: prompt) }
             else if controller.isConnecting { ProgressView("Đang kết nối…") }
             if let message = controller.errorMessage ?? controller.manualHostError { Text(message).foregroundStyle(.red) }
         }
@@ -149,13 +149,26 @@ private struct ManualHostRow: View {
 }
 
 private struct SasCodePanel: View {
-    let code: String
+    let prompt: SasPrompt
+    @State private var confirmedCode: String?
 
     var body: some View {
         VStack(spacing: 6) {
-            Text(code).font(.system(size: 40, weight: .bold, design: .monospaced)).foregroundStyle(BrandPalette.primary)
-            Text("Trên Mac kia, kiểm tra cùng mã này rồi bấm \"Khớp, cho phép\". Đang chờ xác nhận…").font(.callout).multilineTextAlignment(.center)
-            ProgressView()
+            Text(prompt.code).font(.system(size: 40, weight: .bold, design: .monospaced)).foregroundStyle(BrandPalette.primary)
+            if confirmedCode == prompt.code {
+                Text("Trên Mac kia, kiểm tra cùng mã này rồi bấm \"Khớp, cho phép\". Đang chờ xác nhận…").font(.callout).multilineTextAlignment(.center)
+                ProgressView()
+            } else {
+                Text("So với mã trên Mac kia. Chỉ bấm \"Khớp\" khi hai mã giống hệt nhau.").font(.callout).multilineTextAlignment(.center)
+                HStack {
+                    Button("Không khớp") { prompt.answer(false) }
+                    // Không gán phím Return: xác nhận bảo mật phải là một cú bấm có chủ ý sau khi so mã.
+                    Button("Khớp") {
+                        confirmedCode = prompt.code
+                        prompt.answer(true)
+                    }
+                }
+            }
         }
         .frame(maxWidth: .infinity)
     }

@@ -781,6 +781,16 @@
         }
       }
     },
+    "Khớp": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Matches"
+          }
+        }
+      }
+    },
     "Khớp, cho phép": {
       "localizations": {
         "en": {
@@ -1257,6 +1267,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Compare 6-Digit Code"
+          }
+        }
+      }
+    },
+    "So với mã trên Mac kia. Chỉ bấm \"Khớp\" khi hai mã giống hệt nhau.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compare with the code on the other Mac. Click \"Matches\" only if both codes are identical."
           }
         }
       }

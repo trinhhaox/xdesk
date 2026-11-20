@@ -67,7 +67,7 @@ struct StreamView: View {
 
     @ViewBuilder private var connectingOverlay: some View {
         Group {
-            if model.isPairing { SasView(code: model.sasCode) } else { connectingCard }
+            if model.isPairing { SasView(prompt: model.sasPrompt) } else { connectingCard }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

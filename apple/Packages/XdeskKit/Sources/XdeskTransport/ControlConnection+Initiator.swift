@@ -8,8 +8,9 @@ public enum ViewerAuthMode: Sendable {
     case reconnect(hostKey: [UInt8])
     /// XXpsk3: quét QR; khoá host trong QR được ghim trước khi gửi message 3.
     case qr(PairingURI)
-    /// XX + SAS: so mã 6 số. `onCode` nhận "NNN NNN" để hiện lên màn hình trong lúc chờ host bấm "Khớp".
-    case sas(onCode: @Sendable (String) async -> Void)
+    /// XX + SAS: so mã 6 số. `onCode` nhận `SasPrompt` để hiện mã; người dùng ở viewer phải bấm "Khớp"
+    /// (`prompt.answer(true)`) thì mới ghép xong, dù host đã đồng ý.
+    case sas(onCode: @Sendable (SasPrompt) async -> Void)
 }
 
 public struct InitiatorOutcome: Sendable, Equatable {
@@ -27,8 +28,9 @@ extension ControlConnection {
         identity: DeviceIdentity, deviceName: String, mode: ViewerAuthMode
     ) async throws -> InitiatorOutcome {
         let outcome: InitiatorOutcome
+        let prompt: SasPrompt?
         do {
-            outcome = try await withDeadline(seconds: Self.handshakeTotalTimeoutSeconds) {
+            (outcome, prompt) = try await withDeadline(seconds: Self.handshakeTotalTimeoutSeconds) {
                 try await runInitiator(identity: identity, deviceName: deviceName, mode: mode)
             }
         } catch {
@@ -36,11 +38,24 @@ extension ControlConnection {
             throw error
         }
         if case .reconnect = mode { return outcome }
-        try await awaitPairingResult()
+        do {
+            try await awaitPairingResult()
+        } catch {
+            // Người dùng ở viewer bấm "Không khớp" → kết nối bị đóng giữa chừng: báo đúng lý do.
+            if prompt?.answered == false { throw TransportError.pairingDenied }
+            throw error
+        }
+        if let prompt, !(await prompt.decision(timeoutSeconds: Self.pairingDecisionTimeoutSeconds)) {
+            close()
+            throw TransportError.pairingDenied
+        }
+        pendingSasPrompt = nil
         return outcome
     }
 
-    private func runInitiator(identity: DeviceIdentity, deviceName: String, mode: ViewerAuthMode) async throws -> InitiatorOutcome {
+    private func runInitiator(
+        identity: DeviceIdentity, deviceName: String, mode: ViewerAuthMode
+    ) async throws -> (InitiatorOutcome, SasPrompt?) {
         let pattern: NoisePattern
         var hostKeyHint: [UInt8]?
         var psk: [UInt8]?
@@ -71,14 +86,17 @@ extension ControlConnection {
             try await sendHandshake(.noise(try state.write(payload: try payload.encode())))
             method = pattern == .xx ? .sasPaired : .qrPaired
         }
-        if case .sas(let onCode) = mode, let h2 = state.messageTwoHash {
+        installSession(keys: try state.sessionKeys())
+        var prompt: SasPrompt?
+        if case .sas(let onCode) = mode {
+            guard let h2 = state.messageTwoHash else { throw CryptoError.invalidHandshakePayload }
             let code = ShortAuthString.format(try ShortAuthString.code(messageTwoHash: h2, nonce: nonce))
-            installSession(keys: try state.sessionKeys())
-            Task { await onCode(code) }
-        } else {
-            installSession(keys: try state.sessionKeys())
+            let sasPrompt = SasPrompt(code: code) { [weak self] in Task { await self?.close() } }
+            prompt = sasPrompt
+            pendingSasPrompt = sasPrompt
+            Task { await onCode(sasPrompt) }
         }
-        return InitiatorOutcome(hostKey: hostKey, hostName: hostPayload.deviceName, method: method)
+        return (InitiatorOutcome(hostKey: hostKey, hostName: hostPayload.deviceName, method: method), prompt)
     }
 
     /// XX/XXpsk3: host phản hồi `pair.result` sau khi người dùng quyết định.

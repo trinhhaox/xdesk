@@ -58,7 +58,7 @@ class MacHostInteropTest {
         // 4) Ghép đôi bằng so mã SAS (XX + commitment), danh tính mới.
         val sasViewer = InteropViewer("Android-JVM-sas", kotlin.io.path.createTempFile("known-hosts", ".txt").toFile().also { it.deleteOnExit() })
         var code = ""
-        assertTrue(sasViewer.connect(target, ViewerAuth.Sas { code = it }), "SAS: ${sasViewer.session.state.describe()}")
+        assertTrue(sasViewer.connect(target, ViewerAuth.Sas { code = it.code; it.answer(true) }), "SAS: ${sasViewer.session.state.describe()}")
         InteropEnv.report("SAS pairing OK, code=$code (host --auto-approve-pairing tự Khớp)")
         sasViewer.awaitFrames(3)
         InteropEnv.report("SAS session ${InteropEnv.summary(sasViewer.collector, 3)}")

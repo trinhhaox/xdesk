@@ -21,8 +21,8 @@ final class ViewerController {
     private(set) var errorMessage: String?
     /// Trạng thái ghép đôi của từng host Bonjour (theo `DiscoveredHost.id`); rỗng khi chạy không mã hoá.
     private(set) var hostStates: [String: ViewerTrust.HostState] = [:]
-    /// Mã 6 số đang hiển thị để so với màn hình host (nil = không đang so mã).
-    private(set) var sasCode: String?
+    /// Mã 6 số đang hiển thị để so với màn hình host, kèm câu trả lời của người dùng (nil = không đang so mã).
+    private(set) var sasPrompt: SasPrompt?
     var options = Options()
     /// Máy nhập tay (Tailscale/MagicDNS/IP): Bonjour không đi qua Tailscale nên lưu lại để chọn lần sau.
     internal(set) var manualHosts: [ManualHost] = []
@@ -75,13 +75,13 @@ final class ViewerController {
         hostStates = next
     }
 
-    /// Ghép đôi bằng mã 6 số: hiện mã trong `sasCode` tới khi host bấm "Khớp"/"Không khớp" hoặc quá hạn.
+    /// Ghép đôi bằng mã 6 số: hiện `sasPrompt`; xong khi cả máy này lẫn host bấm "Khớp" (hoặc lỗi/quá hạn).
     func pairWithCode(to target: ViewerTarget, title: String) async {
-        sasCode = nil
-        await connect(to: target, title: title, auth: .sas(onCode: { [weak self] code in
-            await MainActor.run { self?.sasCode = code }
+        sasPrompt = nil
+        await connect(to: target, title: title, auth: .sas(onCode: { [weak self] prompt in
+            await MainActor.run { if prompt.isPending { self?.sasPrompt = prompt } }
         }))
-        sasCode = nil
+        sasPrompt = nil
     }
 
     /// Bỏ khoá cũ của host đã đổi khoá; lần kết nối sau sẽ phải ghép đôi lại.

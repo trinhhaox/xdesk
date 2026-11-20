@@ -177,9 +177,11 @@ enum AutomationHooks {
     private static func pairWithSas(_ hostPort: String, viewer: ViewerController) async {
         try? await Task.sleep(for: .seconds(1.5))
         guard let target = ViewerTarget.parse(manual: hostPort) else { log.error("pair-sas: sai định dạng"); return }
-        await viewer.connect(to: target, title: "sas", auth: .sas(onCode: { code in
-            print("xdesk-sas-viewer-code \(code)")
+        // Script kiểm thử so mã in ra với mã phía host; phía viewer coi như đã bấm "Khớp".
+        await viewer.connect(to: target, title: "sas", auth: .sas(onCode: { prompt in
+            print("xdesk-sas-viewer-code \(prompt.code)")
             fflush(stdout)
+            prompt.answer(true)
         }))
         log.notice("pair-sas state: \(String(describing: viewer.session?.state), privacy: .public) error: \(viewer.errorMessage ?? "-", privacy: .public)")
     }

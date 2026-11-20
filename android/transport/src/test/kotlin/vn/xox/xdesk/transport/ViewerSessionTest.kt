@@ -92,8 +92,30 @@ class ViewerSessionTest {
     @Test
     fun sasPairingShowsSixDigitCode() {
         var code = ""
-        assertTrue(session.connect(listOf(target), config, ViewerAuth.Sas { code = it }))
+        assertTrue(session.connect(listOf(target), config, ViewerAuth.Sas { code = it.code; it.answer(true) }))
         assertTrue(Regex("\\d{3} \\d{3}").matches(code), code)
+        assertEquals(1, store.all().size)
+    }
+
+    @Test
+    fun sasMismatchOnTheViewerSavesNothingEvenThoughTheHostAccepted() {
+        assertTrue(!session.connect(listOf(target), config, ViewerAuth.Sas { it.answer(false) }))
+        assertEquals(TransportErrorCode.PAIRING_DENIED, failedCode())
+        assertTrue(store.all().isEmpty())
+    }
+
+    @Test
+    fun sasWaitsForTheViewersOwnConfirmation() {
+        var prompt: SasPrompt? = null
+        val confirmer = Thread {
+            await("mã SAS") { prompt != null }
+            Thread.sleep(300)
+            assertTrue(store.all().isEmpty(), "host đồng ý thôi chưa đủ: chưa được lưu host")
+            prompt?.answer(true)
+        }
+        confirmer.start()
+        assertTrue(session.connect(listOf(target), config, ViewerAuth.Sas { prompt = it }))
+        confirmer.join()
         assertEquals(1, store.all().size)
     }
 

@@ -38,8 +38,8 @@ final class StreamViewModel {
     var hostStates: [String: ViewerTrust.HostState] = [:]
     /// Các host đã ghép (cho màn Cài đặt bảo mật).
     var knownHosts: [PairedDevice] = []
-    /// Mã 6 số đang hiển thị để so với màn hình Mac (nil = không đang so mã).
-    var sasCode: String?
+    /// Mã 6 số đang hiển thị để so với màn hình Mac, kèm nút "Khớp"/"Không khớp" (nil = không đang so mã).
+    var sasPrompt: SasPrompt?
     /// Đang ghép đôi (QR hoặc mã 6 số): màn hình stream hiện "Đang chờ Mac xác nhận…".
     var isPairing = false
     /// Mac đã ghép vừa từ chối kết nối (thường do đã thu hồi): danh sách hỏi có ghép đôi lại không.

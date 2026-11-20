@@ -38,6 +38,7 @@ public enum ViewerAuth: Sendable {
     case automatic
     /// Quét QR (XXpsk3). Dùng `ViewerSession.pair(with:config:)`.
     case qr(PairingURI)
-    /// So mã 6 số: `onCode` nhận mã hiển thị trong lúc chờ host bấm "Khớp".
-    case sas(onCode: @Sendable (String) async -> Void)
+    /// So mã 6 số: `onCode` nhận `SasPrompt` (mã + nút trả lời). Chỉ ghép xong khi host đồng ý
+    /// và người dùng ở viewer bấm "Khớp".
+    case sas(onCode: @Sendable (SasPrompt) async -> Void)
 }

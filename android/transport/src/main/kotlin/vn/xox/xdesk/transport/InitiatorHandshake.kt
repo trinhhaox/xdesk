@@ -21,8 +21,11 @@ sealed interface ViewerAuthMode {
     /** XXpsk3: quét QR; khoá host trong QR được ghim trước khi gửi message 3. */
     class Qr(val uri: PairingURI) : ViewerAuthMode
 
-    /** XX + SAS: `onCode` nhận "NNN NNN" trong lúc chờ host bấm "Khớp"; phải trả về ngay (không chặn). */
-    class Sas(val onCode: (String) -> Unit) : ViewerAuthMode
+    /**
+     * XX + SAS: `onCode` nhận [SasPrompt] để hiện mã; phải trả về ngay (không chặn). Chỉ ghép xong khi host
+     * đồng ý VÀ người dùng ở viewer bấm "Khớp" (`prompt.answer(true)`).
+     */
+    class Sas(val onCode: (SasPrompt) -> Unit) : ViewerAuthMode
 }
 
 enum class PairMethod { RECONNECT, QR_PAIRED, SAS_PAIRED }
@@ -39,7 +42,7 @@ object InitiatorHandshake {
      * UI đề nghị "Ghép đôi lại".
      */
     fun run(conn: ControlConnection, identity: DeviceIdentity, deviceName: String, mode: ViewerAuthMode): InitiatorOutcome {
-        val outcome = try {
+        val (outcome, prompt) = try {
             runNoise(conn, identity, deviceName, mode)
         } catch (e: TransportException) {
             conn.close()
@@ -50,11 +53,26 @@ object InitiatorHandshake {
             conn.close()
             throw e
         }
-        if (mode !is ViewerAuthMode.Reconnect) awaitPairingResult(conn)
+        if (mode is ViewerAuthMode.Reconnect) return outcome
+        try {
+            awaitPairingResult(conn)
+        } catch (e: Exception) {
+            val viewerSaidMismatch = prompt?.answered == false
+            prompt?.abandon()
+            // Người dùng ở viewer bấm "Không khớp" → kết nối bị đóng giữa chừng: báo đúng lý do.
+            if (viewerSaidMismatch) transportError(TransportErrorCode.PAIRING_DENIED, cause = e)
+            throw e
+        }
+        if (prompt != null && !prompt.awaitDecision(PAIRING_DECISION_TIMEOUT_MS.toLong())) {
+            conn.close()
+            transportError(TransportErrorCode.PAIRING_DENIED)
+        }
         return outcome
     }
 
-    private fun runNoise(conn: ControlConnection, identity: DeviceIdentity, deviceName: String, mode: ViewerAuthMode): InitiatorOutcome {
+    private fun runNoise(
+        conn: ControlConnection, identity: DeviceIdentity, deviceName: String, mode: ViewerAuthMode,
+    ): Pair<InitiatorOutcome, SasPrompt?> {
         val pattern = when (mode) {
             is ViewerAuthMode.Reconnect -> NoisePattern.IK
             is ViewerAuthMode.Qr -> NoisePattern.XX_PSK3
@@ -92,11 +110,13 @@ object InitiatorHandshake {
             method = if (pattern == NoisePattern.XX) PairMethod.SAS_PAIRED else PairMethod.QR_PAIRED
         }
         conn.installSession(state.sessionKeys())
+        var prompt: SasPrompt? = null
         if (mode is ViewerAuthMode.Sas) {
             val hash = state.messageTwoHash ?: transportError(TransportErrorCode.PROTOCOL_VIOLATION, "thiếu hash message 2")
-            mode.onCode(ShortAuthString.format(ShortAuthString.code(hash, nonce)))
+            prompt = SasPrompt(ShortAuthString.format(ShortAuthString.code(hash, nonce))) { conn.close() }
+            mode.onCode(prompt)
         }
-        return InitiatorOutcome(hostKey, hostPayload.deviceName, method)
+        return InitiatorOutcome(hostKey, hostPayload.deviceName, method) to prompt
     }
 
     /** XX/XXpsk3: host trả `pair.result` sau khi người dùng quyết định. */

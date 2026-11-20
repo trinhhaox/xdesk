@@ -6,8 +6,14 @@ import XdeskWire
 @testable import XdeskTransport
 
 actor CodeBox {
-    private(set) var code: String?
-    func set(_ code: String) { self.code = code }
+    private(set) var prompt: SasPrompt?
+    var code: String? { prompt?.code }
+    func set(_ prompt: SasPrompt) { self.prompt = prompt }
+}
+
+actor DoneFlag {
+    private(set) var done = false
+    func mark() { done = true }
 }
 
 @Suite struct SecureSasPairingTests {
@@ -16,7 +22,7 @@ actor CodeBox {
         let box = CodeBox()
         let viewer = try await rig.openViewer()
         let outcome = try await viewer.performInitiatorHandshake(
-            identity: rig.viewerIdentity, deviceName: "Mac của Hào", mode: .sas(onCode: { await box.set($0) }))
+            identity: rig.viewerIdentity, deviceName: "Mac của Hào", mode: .sas(onCode: { await box.set($0); $0.answer(true) }))
         #expect(outcome.method == .sasPaired)
         #expect(outcome.hostKey == rig.hostKey)
         let request = try #require(await rig.probe.requests.first)
@@ -65,6 +71,63 @@ actor CodeBox {
         #expect(await rig.probe.requests.isEmpty)
         #expect(await rig.hostStore.devices.isEmpty)
         await rig.stop()
+    }
+
+    @Test(.timeLimit(.minutes(1))) func viewerWaitsForItsOwnConfirmationEvenAfterTheHostAccepts() async throws {
+        let rig = try await SecureRig.make()
+        let box = CodeBox()
+        let done = DoneFlag()
+        let viewer = try await rig.openViewer()
+        let handshake = Task {
+            let outcome = try await viewer.performInitiatorHandshake(
+                identity: rig.viewerIdentity, deviceName: "V", mode: .sas(onCode: { await box.set($0) }))
+            await done.mark()
+            return outcome
+        }
+        #expect(await eventually { await !rig.hostStore.devices.isEmpty })
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(await !done.done, "host đồng ý thôi chưa đủ: viewer phải tự xác nhận")
+        let prompt = try #require(await box.prompt)
+        prompt.answer(true)
+        #expect(try await handshake.value.method == .sasPaired)
+        await rig.stop()
+    }
+
+    @Test(.timeLimit(.minutes(1))) func mismatchOnTheViewerAbortsEvenThoughTheHostAccepted() async throws {
+        let rig = try await SecureRig.make()
+        let viewer = try await rig.openViewer()
+        await #expect(throws: TransportError.pairingDenied) {
+            _ = try await viewer.performInitiatorHandshake(
+                identity: rig.viewerIdentity, deviceName: "V", mode: .sas(onCode: { $0.answer(false) }))
+        }
+        #expect(await eventually { (try? await viewer.nextInbound()) == nil })
+        await rig.stop()
+    }
+
+    @Test(.timeLimit(.minutes(1))) func closingTheConnectionWhileWaitingReleasesThePromptAtOnce() async throws {
+        let rig = try await SecureRig.make()
+        let box = CodeBox()
+        let viewer = try await rig.openViewer()
+        let handshake = Task {
+            try await viewer.performInitiatorHandshake(
+                identity: rig.viewerIdentity, deviceName: "V", mode: .sas(onCode: { await box.set($0) }))
+        }
+        #expect(await eventually { await !rig.hostStore.devices.isEmpty })
+        #expect(await eventually { await box.prompt != nil })
+        await viewer.close()
+        await #expect(throws: TransportError.pairingDenied) { _ = try await handshake.value }
+        #expect(await box.prompt?.isPending == false, "UI không được hiện lại prompt đã bỏ")
+        await rig.stop()
+    }
+
+    @Test func promptKeepsTheFirstAnswerAndTimesOutAsMismatch() async {
+        let mismatches = DoneFlag()
+        let prompt = SasPrompt(code: "123 456") { Task { await mismatches.mark() } }
+        prompt.answer(true)
+        prompt.answer(false)
+        #expect(await prompt.decision(timeoutSeconds: 5))
+        #expect(await !mismatches.done)
+        #expect(await !SasPrompt(code: "000 000").decision(timeoutSeconds: 0.05))
     }
 
     @Test func limiterAllowsThreeFailuresPerTenMinutes() {

@@ -34,6 +34,8 @@ public actor ControlConnection {
     var nextMessageId: UInt32 = 1
     var closed = false
     var onClose: (@Sendable () -> Void)?
+    /// Mã 6 số đang chờ người dùng ở viewer trả lời; đóng kết nối thì bỏ (để không treo chờ tới hết hạn).
+    var pendingSasPrompt: SasPrompt?
     var watchdogFired = false
     var mode: Mode
     var cipher: ControlCipher?
@@ -108,6 +110,8 @@ public actor ControlConnection {
     public func close() {
         guard !closed else { return }
         closed = true
+        pendingSasPrompt?.abandon()
+        pendingSasPrompt = nil
         connection.cancel()
         onClose?()
         onClose = nil

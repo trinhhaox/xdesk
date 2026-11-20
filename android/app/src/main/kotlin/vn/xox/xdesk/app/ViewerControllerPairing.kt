@@ -38,4 +38,4 @@ fun ViewerController.openPairing(target: ViewerTarget?, startOnSas: Boolean = fa
 }
 
 /** Lớp phủ "Đang kết nối" hiện từ lúc chạm Mac tới khi có khung hình đầu tiên; màn mã SAS có giao diện riêng. */
-val ViewerController.awaitingFrame: Boolean get() = sasCode == null && (connecting || (streaming && !progress.frameShown))
+val ViewerController.awaitingFrame: Boolean get() = sasPrompt == null && (connecting || (streaming && !progress.frameShown))

@@ -42,7 +42,11 @@ extension ControlConnection {
         sessionId: String,
         prepareDisplay: @Sendable (Hello, DisplayConfig) async throws -> DisplayReady
     ) async throws -> HostHandshakeResult {
-        try await withDeadline(seconds: Self.handshakeTimeoutSeconds) {
+        // Vừa ghép bằng mã 6 số: viewer chỉ gửi hello sau khi người dùng ở viewer cũng bấm "Khớp".
+        let helloDeadline = peer?.method == .sasPaired
+            ? Self.pairingDecisionTimeoutSeconds + Self.handshakeTimeoutSeconds
+            : Self.handshakeTimeoutSeconds
+        return try await withDeadline(seconds: helloDeadline) {
             var helloId: UInt32 = 0
             let hello = try await expect { envelope in
                 if case .hello(let h) = envelope.message { helloId = envelope.id; return h }

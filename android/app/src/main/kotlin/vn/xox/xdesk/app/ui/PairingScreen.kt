@@ -1,10 +1,12 @@
 package vn.xox.xdesk.app.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,8 +15,11 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -40,6 +45,7 @@ import vn.xox.xdesk.app.describe
 import vn.xox.xdesk.app.pairWithQr
 import vn.xox.xdesk.app.ui.theme.XdeskOverlay
 import vn.xox.xdesk.app.ui.theme.extras
+import vn.xox.xdesk.transport.SasPrompt
 import vn.xox.xdesk.transport.ViewerTarget
 
 /**
@@ -103,14 +109,37 @@ internal fun OverlayCard(modifier: Modifier = Modifier, content: @Composable Col
  * có nhãn đọc riêng từng chữ số cho TalkBack.
  */
 @Composable
-fun SasCodeView(code: String, modifier: Modifier = Modifier) {
+fun SasCodeView(prompt: SasPrompt, modifier: Modifier = Modifier) {
+    // Hai phía đều phải bấm "Khớp": máy này không tin máy nào tự nhận là Mac nếu người dùng chưa so mã.
+    var confirmedCode by remember { mutableStateOf<String?>(null) }
+    val code = prompt.code
     OverlayCard(modifier.padding(24.dp)) {
         Text(
             code, color = XdeskOverlay.accentLight, fontSize = 34.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, maxLines = 1,
             modifier = Modifier.semantics { contentDescription = "Mã ghép đôi ${code.filter { it.isDigit() }.toList().joinToString(" ")}" },
         )
-        Text("Trên Mac, kiểm tra cùng mã này rồi bấm \"Khớp, cho phép\".", color = XdeskOverlay.content, textAlign = TextAlign.Center, fontSize = 15.sp)
-        CircularProgressIndicator(color = XdeskOverlay.content)
-        Text("Đang chờ Mac xác nhận…", color = XdeskOverlay.content, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+        if (confirmedCode == code) {
+            Text("Trên Mac, bấm \"Khớp, cho phép\".", color = XdeskOverlay.content, textAlign = TextAlign.Center, fontSize = 15.sp)
+            CircularProgressIndicator(color = XdeskOverlay.content)
+            Text("Đang chờ Mac xác nhận…", color = XdeskOverlay.content, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+        } else {
+            Text(
+                "So với mã trên Mac. Chỉ bấm \"Khớp\" khi hai mã giống hệt nhau.",
+                color = XdeskOverlay.content, textAlign = TextAlign.Center, fontSize = 15.sp,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(
+                    { prompt.answer(false) }, Modifier.heightIn(min = 48.dp), border = BorderStroke(1.dp, XdeskOverlay.outline),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = XdeskOverlay.content),
+                ) { Text("Không khớp") }
+                Button(
+                    {
+                        confirmedCode = code
+                        prompt.answer(true)
+                    },
+                    Modifier.heightIn(min = 48.dp), colors = ButtonDefaults.buttonColors(containerColor = XdeskOverlay.accent),
+                ) { Text("Khớp") }
+            }
+        }
     }
 }

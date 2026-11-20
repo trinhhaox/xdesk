@@ -36,16 +36,16 @@ extension StreamViewModel {
         pairingFinished()
     }
 
-    /// Ghép đôi bằng mã 6 số: `sasCode` hiện trên màn hình stream tới khi Mac bấm "Khớp".
+    /// Ghép đôi bằng mã 6 số: `sasPrompt` hiện trên màn hình stream; xong khi cả iPhone lẫn Mac bấm "Khớp".
     func pairWithCode(to target: ViewerTarget) async {
         isPairing = true
-        sasCode = nil
+        sasPrompt = nil
         await begin(target) { config in
-            await self.session.connect(to: target, config: config, auth: .sas(onCode: { code in
-                await MainActor.run { self.sasCode = code }
+            await self.session.connect(to: target, config: config, auth: .sas(onCode: { prompt in
+                await MainActor.run { if prompt.isPending { self.sasPrompt = prompt } }
             }))
         }
-        sasCode = nil
+        sasPrompt = nil
         isPairing = false
         pairingFinished()
     }

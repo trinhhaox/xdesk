@@ -8,7 +8,8 @@ sealed interface ViewerAuth {
     /** Host đã ghép → IK; chưa ghép → `PAIRING_REQUIRED`; khoá đổi → `HOST_KEY_MISMATCH`. */
     object Automatic : ViewerAuth
     class Qr(val uri: PairingURI) : ViewerAuth
-    class Sas(val onCode: (String) -> Unit) : ViewerAuth
+    /** So mã 6 số: `onCode` nhận [SasPrompt]; người dùng phải bấm "Khớp" ở cả viewer lẫn host. */
+    class Sas(val onCode: (SasPrompt) -> Unit) : ViewerAuth
 }
 
 /** Kết quả bước kết nối + xác thực: kênh đã mã hoá, chưa hello/welcome. */
