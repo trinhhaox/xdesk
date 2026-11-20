@@ -22,6 +22,7 @@ class PointerSettingsStore(context: Context) {
             .putFloat(SPEED, next.speed)
             .putBoolean(NATURAL, next.naturalScroll)
             .putBoolean(LONG_PRESS, next.longPressRightClick)
+            .putBoolean(DOUBLE_TAP_KEYBOARD, next.doubleTapOpensKeyboard)
             .apply()
     }
 
@@ -34,6 +35,7 @@ class PointerSettingsStore(context: Context) {
             speed = PointerSettings.clampSpeed(prefs.getFloat(SPEED, fallback.speed)),
             naturalScroll = prefs.getBoolean(NATURAL, fallback.naturalScroll),
             longPressRightClick = prefs.getBoolean(LONG_PRESS, fallback.longPressRightClick),
+            doubleTapOpensKeyboard = prefs.getBoolean(DOUBLE_TAP_KEYBOARD, fallback.doubleTapOpensKeyboard),
         )
     }
 
@@ -43,5 +45,6 @@ class PointerSettingsStore(context: Context) {
         const val SPEED = "speed"
         const val NATURAL = "natural_scroll"
         const val LONG_PRESS = "long_press_right_click"
+        const val DOUBLE_TAP_KEYBOARD = "double_tap_opens_keyboard"
     }
 }

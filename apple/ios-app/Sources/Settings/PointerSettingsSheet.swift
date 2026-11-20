@@ -43,8 +43,11 @@ struct PointerSettingsForm: View {
                 Section {
                     Toggle("Cuộn tự nhiên", isOn: $store.settings.naturalScroll)
                     Toggle("Nhấn giữ để chuột phải", isOn: $store.settings.longPressRightClick)
+                    if store.settings.mode == .direct {
+                        Toggle("Chạm 2 lần để mở bàn phím", isOn: $store.settings.doubleTapOpensKeyboard)
+                    }
                 } footer: {
-                    Text("Cuộn tự nhiên: nội dung đi theo ngón tay. Hai ngón chạm cùng lúc luôn là chuột phải.")
+                    Text("Cuộn tự nhiên: nội dung đi theo ngón tay. Hai ngón chạm cùng lúc luôn là chuột phải. Chạm 2 lần để mở bàn phím thay cho double-click; tắt đi để chạm 2 lần là double-click.")
                 }
             }
             .scrollContentBackground(.hidden)
@@ -55,7 +58,7 @@ struct PointerSettingsForm: View {
 
     private var modeHelp: String {
         switch store.settings.mode {
-        case .direct: "Chạm đâu click đó. Vuốt một ngón để cuộn lên xuống (hất mạnh để trang trôi nhanh), nhấn giữ rồi kéo để kéo thả, nhấn giữ rồi nhả để chuột phải."
+        case .direct: "Chạm đâu click đó, chạm 2 lần vào ô cần gõ để mở bàn phím. Vuốt một ngón để cuộn lên xuống (hất mạnh để trang trôi nhanh), nhấn giữ rồi kéo để kéo thả, nhấn giữ rồi nhả để chuột phải."
         case .trackpad: "Trượt một ngón để di chuyển con trỏ, chạm để click. Hai ngón chạm = chuột phải, hai ngón trượt = cuộn, chạm rồi chạm-giữ-trượt = kéo."
         }
     }

@@ -68,6 +68,8 @@ class StreamInputRouter(private val session: ViewerSession) {
 
     /** Nhấn giữ đủ lâu (sẵn sàng kéo thả / click phải): view rung nhẹ báo người dùng. */
     var onHoldArmed: () -> Unit = {}
+    /** Người dùng chạm 2 lần vào chỗ cần gõ: view mở bàn phím. */
+    var onKeyboardRequest: () -> Unit = {}
 
     /** `displayedWidthDp`: bề ngang video đang hiện (dp, kể cả zoom) để ngưỡng chạm tính theo ngón tay; 0 = chưa biết. */
     fun onTouch(samples: List<TouchSample>, displayedWidthDp: Float = 0f) {
@@ -76,6 +78,7 @@ class StreamInputRouter(private val session: ViewerSession) {
             engine.setHostPointsPerViewPoint(hostWidth / displayedWidthDp)
         }
         session.sendInput(samples.flatMap(engine::handle))
+        if (engine.takeKeyboardRequest()) onKeyboardRequest()
         engine.cursor?.let { cursor = it; cursorStamp++ }
         samples.lastOrNull { it.phase == TouchPhase.BEGAN || it.phase == TouchPhase.ENDED }?.let { lastTouchY = it.y }
         if (samples.any { it.phase == TouchPhase.ENDED || it.phase == TouchPhase.CANCELLED }) focusY = engine.cursor?.second ?: lastTouchY

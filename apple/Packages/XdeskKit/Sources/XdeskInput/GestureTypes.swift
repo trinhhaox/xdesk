@@ -37,6 +37,8 @@ public struct GestureConfig: Sendable, Equatable {
     public var longPressRightClick = true
     /// Cuộn tự nhiên: nội dung đi theo ngón tay; tắt thì đảo chiều.
     public var naturalScroll = true
+    /// Chạm 2 lần = mở bàn phím: cú chạm đầu đã click đặt con trỏ gõ, cú thứ hai không gửi gì mà báo UI mở bàn phím.
+    public var doubleTapOpensKeyboard = false
 
     public init(surfaceWidth: Float, surfaceHeight: Float) {
         self.surfaceWidth = surfaceWidth

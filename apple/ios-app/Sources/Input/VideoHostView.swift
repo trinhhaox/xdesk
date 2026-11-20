@@ -16,6 +16,8 @@ final class VideoHostView: UIView {
     private var obscuredHeight: CGFloat = 0
     private var keyboardObserver: NSObjectProtocol?
     private var hideCursorTask: Task<Void, Never>?
+    /// Khoảng chừa trên bàn phím cho dòng đang gõ: đủ chỗ cho bong bóng xem trước chữ Telex (~40 điểm) nằm ngay trên bàn phím.
+    private static let focusMargin: Float = 64
     private var zoomController: VideoZoomController?
     private let zoomState: VideoZoomState
 
@@ -44,6 +46,10 @@ final class VideoHostView: UIView {
         touchView.onCursor = { [weak self] in self?.showCursor($0) }
         touchView.onSequenceEnded = { [weak self] in self?.applyPan(duration: 0.2, options: .curveEaseInOut) }
         touchView.onViewportChanged = { [weak self] in self?.viewportChanged() }
+        touchView.onKeyboardRequest = { [weak controller] in
+            Haptics.light()
+            controller?.isActive = true
+        }
         zoomController = VideoZoomController(host: self, touchView: touchView) { [weak self] in self?.viewportChanged() }
         zoomState.reset = { [weak self] in self?.zoomController?.reset() }
     }
@@ -125,7 +131,7 @@ final class VideoHostView: UIView {
         let viewport = touchView.viewport
         let focusY = viewport.toView(x: 0, y: Float(rect.minY + CGFloat(focus) * rect.height), in: mapper).y
         let videoBottom = viewport.toView(x: 0, y: Float(rect.maxY), in: mapper).y
-        return CGFloat(VideoPan.offset(focusY: focusY, viewHeight: Float(bounds.height), obscuredHeight: Float(obscuredHeight), videoBottom: videoBottom))
+        return CGFloat(VideoPan.offset(focusY: focusY, viewHeight: Float(bounds.height), obscuredHeight: Float(obscuredHeight), videoBottom: videoBottom, margin: Self.focusMargin))
     }
 
     // MARK: Con trỏ cục bộ

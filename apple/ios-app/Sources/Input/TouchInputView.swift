@@ -38,6 +38,8 @@ final class TouchInputView: UIView {
     var onViewportChanged: (() -> Void)?
     /// Vừa nhả ngón cuối: nơi người dùng chạm đã đổi, tính lại độ dịch.
     var onSequenceEnded: (() -> Void)?
+    /// Người dùng chạm 2 lần vào chỗ cần gõ: mở bàn phím.
+    var onKeyboardRequest: (() -> Void)?
 
     /// Khung video thật trong view (chưa dịch); nil khi chưa biết kích thước.
     var contentRect: CGRect? {
@@ -119,8 +121,10 @@ final class TouchInputView: UIView {
     private func feed(_ sample: TouchSample) {
         guard var current = engine else { return }
         let events = current.handle(sample)
+        let keyboardRequested = current.takeKeyboardRequest()
         engine = current
         session.sendInput(events)
+        if keyboardRequested { onKeyboardRequest?() }
         if let cursor = current.cursor {
             revealCursor(cursor)
             onCursor?(viewPoint(cursor))

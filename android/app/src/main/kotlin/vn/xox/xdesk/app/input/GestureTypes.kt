@@ -21,6 +21,8 @@ data class GestureConfig(
      * điện thoại nhỏ thì 8 điểm host chỉ còn ~3 dp dưới ngón: chạm dễ bị hiểu thành vuốt.
      */
     val hostPointsPerViewPoint: Float = 0f,
+    /** Chạm 2 lần = mở bàn phím: cú chạm đầu đã click đặt con trỏ gõ, cú thứ hai không gửi gì mà báo UI mở bàn phím. */
+    val doubleTapOpensKeyboard: Boolean = false,
     /** Giữ một ngón đủ [longPressMs] rồi nhả (không kéo) = click phải; tắt thì nhả ra là click trái. */
     val longPressRightClick: Boolean = true,
     /** Cuộn tự nhiên: nội dung đi theo ngón tay; tắt thì đảo chiều. */

@@ -87,3 +87,28 @@ class GestureMomentumAndSlopTest {
         assertFalse(g.isHolding)
     }
 }
+
+/** Chạm 2 lần vào chỗ cần gõ = đặt con trỏ gõ (cú đầu) rồi mở bàn phím (cú thứ hai không gửi gì sang Mac). */
+class DoubleTapKeyboardTest {
+    private fun GestureInterpreter.tap(id: Int, t: Long) =
+        handle(TouchSample(id, 0.3f, 0.8f, BEGAN, t)) + handle(TouchSample(id, 0.3f, 0.8f, ENDED, t + 50))
+
+    @Test
+    fun doubleTapClicksOnceThenAsksForTheKeyboard() {
+        val g = GestureInterpreter(GestureConfig(1000f, 500f, doubleTapOpensKeyboard = true))
+        assertEquals(listOf(InputKind.MOVE, InputKind.DOWN, InputKind.UP), g.tap(1, 0).map { it.kind }, "cú đầu đặt con trỏ gõ")
+        assertFalse(g.takeKeyboardRequest())
+        assertTrue(g.tap(2, 150).isEmpty(), "cú thứ hai không double-click (không bôi chọn chữ)")
+        assertTrue(g.takeKeyboardRequest())
+        assertFalse(g.takeKeyboardRequest(), "đọc xong thì xoá")
+        assertEquals(1f, g.tap(3, 300)[1].dx, "chạm tiếp là click đơn mới")
+    }
+
+    @Test
+    fun settingOffKeepsDoubleClick() {
+        val g = GestureInterpreter(GestureConfig(1000f, 500f))
+        g.tap(1, 0)
+        assertEquals(2f, g.tap(2, 150)[1].dx)
+        assertFalse(g.takeKeyboardRequest())
+    }
+}

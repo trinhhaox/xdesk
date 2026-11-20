@@ -8,7 +8,7 @@ import XdeskWire
 /// Không phụ thuộc UIKit để test được.
 /// Đầu ra có `seq` = 0; gửi qua `InputSequencer`/`ViewerSession.sendInput`.
 public struct GestureInterpreter: Sendable {
-    private enum Mode: Equatable {
+    enum Mode: Equatable {
         case idle
         case pending(id: Int)
         /// Một ngón vuốt: cuộn theo ngón tay.
@@ -21,12 +21,13 @@ public struct GestureInterpreter: Sendable {
         case consumed
     }
 
-    private typealias Point = GesturePoint
+    typealias Point = GesturePoint
 
-    private var config: GestureConfig
-    private var momentum = ScrollMomentum()
-    private var mode = Mode.idle
-    private var touches: [Int: Point] = [:]
+    var config: GestureConfig
+    var momentum = ScrollMomentum()
+    var keyboardRequested = false
+    var mode = Mode.idle
+    var touches: [Int: Point] = [:]
     private var startPoint = Point(x: 0, y: 0)
     private var startMs: Int64 = 0
     private var lastTap: (point: Point, endMs: Int64, count: Int)?
@@ -36,14 +37,6 @@ public struct GestureInterpreter: Sendable {
     private var swipeAxis = Point(x: 1, y: 1)
 
     public init(config: GestureConfig) { self.config = config }
-
-    /// Đang giữ một ngón đủ lâu (sẵn sàng kéo thả / click phải): UI rung nhẹ khi trạng thái này bật lên.
-    public var isHolding: Bool { if case .held = mode { true } else { false } }
-    /// Còn việc cần `tick` (chờ nhấn giữ hoặc đang cuộn quán tính) dù không còn ngón nào trên màn hình.
-    public var needsTick: Bool { momentum.isActive || !touches.isEmpty }
-
-    /// Cập nhật tỉ lệ điểm host / điểm màn hình (đổi zoom, xoay máy) mà không mất trạng thái cử chỉ.
-    public mutating func setHostPointsPerViewPoint(_ scale: Float) { config.hostPointsPerViewPoint = scale }
 
     public mutating func handle(_ sample: TouchSample) -> [InputEvent] {
         let point = Point(x: sample.x, y: sample.y)
@@ -131,6 +124,11 @@ public struct GestureInterpreter: Sendable {
         case .pending(let pendingId) where pendingId == id:
             let count = nextTapCount(at: point, timeMs: timeMs)
             lastTap = (point, timeMs, count)
+            if config.doubleTapOpensKeyboard, count == 2 {
+                lastTap = nil
+                keyboardRequested = true
+                return []
+            }
             return [.move(x: point.x, y: point.y)] + GestureMath.click(InputButton.left, at: point, count: count)
         case .held(let heldId) where heldId == id:
             let button = config.longPressRightClick ? InputButton.right : InputButton.left

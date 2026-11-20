@@ -72,10 +72,23 @@ fun KeyBar(router: StreamInputRouter, onHide: () -> Unit, modifier: Modifier = M
                 PlainKey("→", "Mũi tên phải", router, HidKeys.RIGHT)
             }
             Divider()
-            Key("⌄", "Ẩn bàn phím", State.OFF, null, Modifier.padding(horizontal = 4.dp), onHide)
+            HideKeyboardButton(onHide)
         }
     }
 }
+
+/** Nút ẩn bàn phím: chữ "Xong" trên nền màu nhấn để dễ thấy, luôn ghim ở mép phải. */
+@Composable
+private fun HideKeyboardButton(onHide: () -> Unit) = Box(
+    Modifier
+        .padding(horizontal = 6.dp)
+        .sizeIn(minWidth = 64.dp, minHeight = 36.dp)
+        .background(XdeskOverlay.accent, RoundedCornerShape(18.dp))
+        .clickable(onClickLabel = "Ẩn bàn phím", onClick = onHide)
+        .semantics { role = Role.Button; contentDescription = "Ẩn bàn phím" }
+        .padding(horizontal = 14.dp),
+    contentAlignment = Alignment.Center,
+) { Text("Xong", color = XdeskOverlay.content, fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
 
 @Composable
 private fun Divider() = Box(Modifier.padding(horizontal = 2.dp).width(1.dp).height(24.dp).background(XdeskOverlay.divider))

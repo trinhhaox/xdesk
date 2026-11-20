@@ -74,3 +74,36 @@ import XdeskWire
 
     private func kinds(_ events: [InputEvent]) -> [InputKind] { events.map(\.kind) }
 }
+
+/// Chạm 2 lần vào chỗ cần gõ = đặt con trỏ gõ (cú đầu) rồi mở bàn phím (cú thứ hai không gửi gì sang Mac).
+@Suite struct DoubleTapKeyboardTests {
+    private func touch(_ id: Int, _ x: Float, _ y: Float, _ phase: TouchPhase, _ t: Int64) -> TouchSample {
+        TouchSample(id: id, x: x, y: y, phase: phase, timeMs: t)
+    }
+
+    private func engine(doubleTapOpensKeyboard: Bool) -> PointerEngine {
+        PointerEngine(settings: PointerSettings(doubleTapOpensKeyboard: doubleTapOpensKeyboard), surfaceWidth: 1000, surfaceHeight: 500)
+    }
+
+    @Test func doubleTapClicksOnceThenAsksForTheKeyboard() {
+        var e = engine(doubleTapOpensKeyboard: true)
+        _ = e.handle(touch(1, 0.3, 0.8, .began, 0))
+        do { let out = e.handle(touch(1, 0.3, 0.8, .ended, 50)); #expect(out.map(\.kind) == [.move, .down, .up], "cú đầu đặt con trỏ gõ") }
+        do { let r = e.takeKeyboardRequest(); #expect(!r) }
+        _ = e.handle(touch(2, 0.3, 0.8, .began, 150))
+        do { let out = e.handle(touch(2, 0.3, 0.8, .ended, 200)); #expect(out.isEmpty, "cú thứ hai không double-click (không bôi chọn chữ)") }
+        do { let r = e.takeKeyboardRequest(); #expect(r) }
+        do { let r = e.takeKeyboardRequest(); #expect(!r, "đọc xong thì xoá") }
+        // Chạm tiếp ngay sau đó là click đơn mới, không thành triple-click.
+        _ = e.handle(touch(3, 0.3, 0.8, .began, 300))
+        do { let out = e.handle(touch(3, 0.3, 0.8, .ended, 350)); #expect(out[1].dx == 1) }
+    }
+
+    @Test func settingOffKeepsDoubleClick() {
+        var e = engine(doubleTapOpensKeyboard: false)
+        _ = e.handle(touch(1, 0.3, 0.8, .began, 0)); _ = e.handle(touch(1, 0.3, 0.8, .ended, 50))
+        _ = e.handle(touch(2, 0.3, 0.8, .began, 150))
+        do { let out = e.handle(touch(2, 0.3, 0.8, .ended, 200)); #expect(out[1].dx == 2) }
+        do { let r = e.takeKeyboardRequest(); #expect(!r) }
+    }
+}

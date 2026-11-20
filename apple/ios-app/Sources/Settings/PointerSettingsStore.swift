@@ -11,6 +11,7 @@ final class PointerSettingsStore {
         static let speed = "xdesk.pointer.speed"
         static let naturalScroll = "xdesk.pointer.naturalScroll"
         static let longPress = "xdesk.pointer.longPressRightClick"
+        static let doubleTapKeyboard = "xdesk.pointer.doubleTapOpensKeyboard"
     }
 
     var settings: PointerSettings { didSet { save() } }
@@ -23,7 +24,8 @@ final class PointerSettingsStore {
             mode: defaults.string(forKey: Key.mode).flatMap(PointerMode.init(rawValue:)) ?? fallback.mode,
             speed: (defaults.object(forKey: Key.speed) as? Double).map(Float.init) ?? fallback.speed,
             naturalScroll: defaults.object(forKey: Key.naturalScroll) as? Bool ?? fallback.naturalScroll,
-            longPressRightClick: defaults.object(forKey: Key.longPress) as? Bool ?? fallback.longPressRightClick
+            longPressRightClick: defaults.object(forKey: Key.longPress) as? Bool ?? fallback.longPressRightClick,
+            doubleTapOpensKeyboard: defaults.object(forKey: Key.doubleTapKeyboard) as? Bool ?? fallback.doubleTapOpensKeyboard
         )
     }
 
@@ -34,6 +36,7 @@ final class PointerSettingsStore {
         defaults.set(Double(settings.speed), forKey: Key.speed)
         defaults.set(settings.naturalScroll, forKey: Key.naturalScroll)
         defaults.set(settings.longPressRightClick, forKey: Key.longPress)
+        defaults.set(settings.doubleTapOpensKeyboard, forKey: Key.doubleTapKeyboard)
     }
 }
 

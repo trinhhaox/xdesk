@@ -49,7 +49,7 @@ fun PointerSettingsGroups(store: PointerSettingsStore, modifier: Modifier = Modi
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 SegmentedPicker(PointerMode.entries.map { it to it.title() }, s.mode) { mode -> store.update { it.copy(mode = mode) } }
                 Text(
-                    if (s.mode == PointerMode.DIRECT) "Chạm đâu click đó. Vuốt một ngón để cuộn lên xuống (hất mạnh để trang trôi nhanh), nhấn giữ rồi kéo để kéo thả, nhấn giữ rồi nhả để chuột phải."
+                    if (s.mode == PointerMode.DIRECT) "Chạm đâu click đó, chạm 2 lần vào ô cần gõ để mở bàn phím. Vuốt một ngón để cuộn lên xuống (hất mạnh để trang trôi nhanh), nhấn giữ rồi kéo để kéo thả, nhấn giữ rồi nhả để chuột phải."
                     else "Trượt một ngón để di chuyển con trỏ, chạm để click. Hai ngón chạm = chuột phải, hai ngón trượt = cuộn, chạm rồi chạm-giữ-trượt = kéo.",
                     Modifier.padding(horizontal = 8.dp), fontSize = 14.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -70,10 +70,17 @@ fun PointerSettingsGroups(store: PointerSettingsStore, modifier: Modifier = Modi
                 Text("Chỉ dùng ở chế độ Con trỏ.", Modifier.padding(start = XdeskDims.rowPad, end = XdeskDims.rowPad, bottom = 12.dp), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        Group(footer = "Cuộn tự nhiên: nội dung đi theo ngón tay. Hai ngón chạm cùng lúc luôn là chuột phải.") {
+        Group(
+            footer = "Cuộn tự nhiên: nội dung đi theo ngón tay. Hai ngón chạm cùng lúc luôn là chuột phải. " +
+                "Chạm 2 lần để mở bàn phím thay cho double-click; tắt đi để chạm 2 lần là double-click.",
+        ) {
             SwitchRow("Cuộn tự nhiên", s.naturalScroll) { v -> store.update { it.copy(naturalScroll = v) } }
             GroupDivider()
             SwitchRow("Nhấn giữ để chuột phải", s.longPressRightClick) { v -> store.update { it.copy(longPressRightClick = v) } }
+            if (s.mode == PointerMode.DIRECT) {
+                GroupDivider()
+                SwitchRow("Chạm 2 lần để mở bàn phím", s.doubleTapOpensKeyboard) { v -> store.update { it.copy(doubleTapOpensKeyboard = v) } }
+            }
         }
     }
 }

@@ -19,6 +19,8 @@ data class PointerSettings(
     val naturalScroll: Boolean = true,
     /** Nhấn giữ một ngón = click phải. */
     val longPressRightClick: Boolean = true,
+    /** Chế độ chạm trực tiếp: chạm 2 lần vào chỗ cần gõ = đặt con trỏ ở đó và mở bàn phím (thay cho double-click). */
+    val doubleTapOpensKeyboard: Boolean = true,
 ) {
     /** Tốc độ luôn nằm trong [SPEED_RANGE]; số không hữu hạn (file cài đặt hỏng) quay về 1. */
     val safeSpeed: Float get() = clampSpeed(speed)
@@ -49,6 +51,8 @@ interface PointerGestures {
     fun tick(nowMs: Long): List<InputEvent>
     /** Đang giữ một ngón đủ lâu (sẵn sàng kéo thả / click phải): UI rung nhẹ khi trạng thái này bật lên. */
     val isHolding: Boolean get() = false
+    /** Người dùng vừa chạm 2 lần để gõ: UI mở bàn phím. Đọc xong thì xoá. */
+    fun takeKeyboardRequest(): Boolean = false
     /** Số điểm host ứng với một dp màn hình (cỡ video đang hiện, kể cả zoom) để ngưỡng chạm tính theo ngón tay. */
     fun setHostPointsPerViewPoint(scale: Float) {}
 }
@@ -57,7 +61,10 @@ interface PointerGestures {
 fun createPointerGestures(settings: PointerSettings, surfaceWidth: Float, surfaceHeight: Float, cursor: Pair<Float, Float>? = null): PointerGestures =
     when (settings.mode) {
         PointerMode.DIRECT -> GestureInterpreter(
-            GestureConfig(surfaceWidth, surfaceHeight, longPressRightClick = settings.longPressRightClick, naturalScroll = settings.naturalScroll),
+            GestureConfig(
+                surfaceWidth, surfaceHeight, longPressRightClick = settings.longPressRightClick, naturalScroll = settings.naturalScroll,
+                doubleTapOpensKeyboard = settings.doubleTapOpensKeyboard,
+            ),
         )
         PointerMode.TRACKPAD -> TrackpadInterpreter(
             TrackpadConfig(surfaceWidth, surfaceHeight, settings.safeSpeed, settings.naturalScroll, settings.longPressRightClick),

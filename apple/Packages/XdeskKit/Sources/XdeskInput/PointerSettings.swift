@@ -17,12 +17,18 @@ public struct PointerSettings: Sendable, Equatable {
     public var naturalScroll: Bool
     /// Nhấn giữ một ngón = click phải.
     public var longPressRightClick: Bool
+    /// Chế độ chạm trực tiếp: chạm 2 lần vào chỗ cần gõ = đặt con trỏ ở đó và mở bàn phím (thay cho double-click).
+    public var doubleTapOpensKeyboard: Bool
 
-    public init(mode: PointerMode = .direct, speed: Float = 1, naturalScroll: Bool = true, longPressRightClick: Bool = true) {
+    public init(
+        mode: PointerMode = .direct, speed: Float = 1, naturalScroll: Bool = true, longPressRightClick: Bool = true,
+        doubleTapOpensKeyboard: Bool = true
+    ) {
         self.mode = mode
         self.speed = Self.clampedSpeed(speed)
         self.naturalScroll = naturalScroll
         self.longPressRightClick = longPressRightClick
+        self.doubleTapOpensKeyboard = doubleTapOpensKeyboard
     }
 
     /// Giá trị không hữu hạn (file cài đặt hỏng) quay về 1.

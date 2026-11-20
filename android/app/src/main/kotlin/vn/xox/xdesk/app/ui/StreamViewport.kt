@@ -31,6 +31,10 @@ class StreamViewport(context: Context) : FrameLayout(context) {
             surfaceView.router = value
             // Rung nhẹ khi nhấn giữ đủ lâu: báo có thể kéo thả, hoặc nhả ra để click phải.
             value?.onHoldArmed = { performHapticFeedback(HapticFeedbackConstants.LONG_PRESS) }
+            value?.onKeyboardRequest = {
+                performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                surfaceView.showKeyboard()
+            }
         }
 
     /** Cỡ video (px); null = chưa biết, video lấp đầy khung. */
@@ -149,7 +153,7 @@ class StreamViewport(context: Context) : FrameLayout(context) {
         val focus = router?.focusY ?: return 0f
         val focusY = viewport.toView(0f, m.originY + focus * m.height, m).second
         val bottom = viewport.toView(0f, m.originY + m.height, m).second
-        return VideoPan.offset(focusY, height.toFloat(), obscured, bottom)
+        return VideoPan.offset(focusY, height.toFloat(), obscured, bottom, FOCUS_MARGIN_DP * resources.displayMetrics.density)
     }
 
     override fun dispatchDraw(canvas: Canvas) {
@@ -174,5 +178,7 @@ class StreamViewport(context: Context) : FrameLayout(context) {
         const val TICK_MS = 50L
         const val CURSOR_VISIBLE_MS = 1500L
         const val REVEAL_MARGIN_DP = 40f
+        /** Khoảng chừa trên bàn phím cho dòng đang gõ: đủ chỗ cho dòng chữ Telex xem trước nằm trên thanh phím phụ. */
+        const val FOCUS_MARGIN_DP = 64f
     }
 }

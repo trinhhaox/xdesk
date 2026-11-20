@@ -16,6 +16,7 @@ public struct PointerEngine: Sendable {
             var config = GestureConfig(surfaceWidth: surfaceWidth, surfaceHeight: surfaceHeight)
             config.longPressRightClick = settings.longPressRightClick
             config.naturalScroll = settings.naturalScroll
+            config.doubleTapOpensKeyboard = settings.doubleTapOpensKeyboard
             backend = .direct(GestureInterpreter(config: config))
         case .trackpad:
             var config = TrackpadConfig(surfaceWidth: surfaceWidth, surfaceHeight: surfaceHeight)
@@ -36,6 +37,14 @@ public struct PointerEngine: Sendable {
     public var isHolding: Bool {
         if case .direct(let gesture) = backend { return gesture.isHolding }
         return false
+    }
+
+    /// Người dùng vừa chạm 2 lần để gõ: UI mở bàn phím. Đọc xong thì xoá.
+    public mutating func takeKeyboardRequest() -> Bool {
+        guard case .direct(var gesture) = backend else { return false }
+        let requested = gesture.takeKeyboardRequest()
+        backend = .direct(gesture)
+        return requested
     }
 
     /// Còn cần gọi `tick` (cuộn quán tính vẫn chạy sau khi nhả ngón).

@@ -40,6 +40,9 @@ class GestureInterpreter(private var config: GestureConfig) : PointerGestures {
     private val momentum = ScrollMomentum()
 
     override val isHolding: Boolean get() = mode is Mode.Held
+    private var keyboardRequested = false
+
+    override fun takeKeyboardRequest(): Boolean = keyboardRequested.also { keyboardRequested = false }
 
     /** Còn việc cần [tick] (chờ nhấn giữ hoặc đang cuộn quán tính) dù không còn ngón nào trên màn hình. */
     val needsTick: Boolean get() = momentum.isActive || touches.isNotEmpty()
@@ -138,7 +141,11 @@ class GestureInterpreter(private var config: GestureConfig) : PointerGestures {
             is Mode.Pending -> if (m.id == id) {
                 val count = nextTapCount(p, timeMs)
                 lastTap = Tap(p, timeMs, count)
-                listOf(InputEvents.move(p.x, p.y)) + GestureMath.click(InputButton.LEFT, p, count)
+                if (config.doubleTapOpensKeyboard && count == 2) {
+                    lastTap = null
+                    keyboardRequested = true
+                    emptyList()
+                } else listOf(InputEvents.move(p.x, p.y)) + GestureMath.click(InputButton.LEFT, p, count)
             } else emptyList()
             is Mode.Held -> if (m.id == id) GestureMath.click(if (config.longPressRightClick) InputButton.RIGHT else InputButton.LEFT, start, 1) else emptyList()
             is Mode.Dragging -> if (m.id == id) listOf(InputEvents.button(false, p.x, p.y)) else emptyList()

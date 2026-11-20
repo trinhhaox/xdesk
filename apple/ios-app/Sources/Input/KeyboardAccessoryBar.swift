@@ -56,10 +56,14 @@ struct KeyboardAccessoryBar: View {
             }
             Rectangle().fill(Color(uiColor: .separator)).frame(width: 1, height: 28)
             Button { controller.isActive = false } label: {
-                Image(systemName: "keyboard.chevron.compact.down")
-                    .font(.system(size: 20))
-                    .foregroundStyle(Color(uiColor: .label))
-                    .frame(width: 52, height: KeyboardAccessoryView.barHeight)
+                Label("Xong", systemImage: "keyboard.chevron.compact.down")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .frame(height: 36)
+                    .background(BrandPalette.primaryFill, in: Capsule())
+                    .padding(.horizontal, 8)
+                    .frame(height: KeyboardAccessoryView.barHeight)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
