@@ -9,15 +9,23 @@ enum McpListenerError: Error, CustomStringConvertible {
 }
 
 /// Máy chủ HTTP/1.1 tối thiểu trên NWListener, CHỈ bind 127.0.0.1. Mỗi kết nối phục vụ một yêu cầu rồi đóng.
-/// Trạng thái `activeConnections` chỉ đụng trong `queue`, nên an toàn khi đánh dấu `@unchecked Sendable`.
+/// Trạng thái `slots` chỉ đụng trong `queue`, nên an toàn khi đánh dấu `@unchecked Sendable`.
 final class McpHttpListener: @unchecked Sendable {
-    private static let maxConnections = 32
-    private static let connectionTimeout: DispatchTimeInterval = .seconds(10)
+    /// Thời gian tối đa để client gửi xong một yêu cầu (chặn kết nối treo/gửi rỉ rả).
+    private let requestTimeout: DispatchTimeInterval
+    /// Thời gian tối đa để trả lời một yêu cầu đã nhận đủ. Phải dài hơn thời gian chờ người duyệt
+    /// (`ControlArbiter`, mặc định 60 giây) để `xdesk_request_control` không mất kết quả.
+    private let responseTimeout: DispatchTimeInterval
+
+    init(requestTimeout: DispatchTimeInterval = .seconds(10), responseTimeout: DispatchTimeInterval = .seconds(120)) {
+        self.requestTimeout = requestTimeout
+        self.responseTimeout = responseTimeout
+    }
 
     private let log = Logger(subsystem: "vn.xox.xdesk", category: "mcp-listener")
     private let queue = DispatchQueue(label: "vn.xox.xdesk.mcp-listener")
     private var listener: NWListener?
-    private var activeConnections = 0
+    private var slots = McpConnectionSlots(limit: 32)
 
     func start(port: UInt16, server: McpServer) async throws {
         guard let nwPort = NWEndpoint.Port(rawValue: port) else { throw McpListenerError.failed("Cổng không hợp lệ: \(port)") }
@@ -56,30 +64,44 @@ final class McpHttpListener: @unchecked Sendable {
     }
 
     private func accept(_ connection: NWConnection, server: McpServer) {
-        guard activeConnections < Self.maxConnections else { connection.cancel(); return }
-        activeConnections += 1
+        guard let slot = slots.acquire() else { connection.cancel(); return }
         connection.stateUpdateHandler = { [weak self] state in
             switch state {
-            case .cancelled, .failed: self?.activeConnections -= 1
+            case .cancelled, .failed: self?.slots.release(slot)
             default: break
             }
         }
         connection.start(queue: queue)
-        queue.asyncAfter(deadline: .now() + Self.connectionTimeout) { connection.cancel() }
-        receive(on: connection, buffer: Data(), server: server)
+        let progress = RequestProgress()
+        queue.asyncAfter(deadline: .now() + self.requestTimeout) {
+            if !progress.received { connection.cancel() }
+        }
+        receive(on: connection, buffer: Data(), server: server, progress: progress)
     }
 
-    private func receive(on connection: NWConnection, buffer: Data, server: McpServer) {
+    /// Đã nhận đủ yêu cầu thì chuyển sang hạn trả lời dài hơn.
+    private func requestReceived(on connection: NWConnection, progress: RequestProgress) {
+        progress.received = true
+        queue.asyncAfter(deadline: .now() + self.responseTimeout) { connection.cancel() }
+    }
+
+    private func receive(on connection: NWConnection, buffer: Data, server: McpServer, progress: RequestProgress) {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 64 * 1024) { [weak self] data, _, isComplete, error in
             guard let self else { return }
             var buffer = buffer
             if let data { buffer.append(data) }
             switch HttpRequestParser.parse(buffer) {
             case .needMore:
-                if error != nil || isComplete { connection.cancel() } else { receive(on: connection, buffer: buffer, server: server) }
+                if error != nil || isComplete {
+                    connection.cancel()
+                } else {
+                    receive(on: connection, buffer: buffer, server: server, progress: progress)
+                }
             case .failure(let status, let message):
+                requestReceived(on: connection, progress: progress)
                 send(.failure(status: status, message: message), on: connection)
             case .request(let request, _):
+                requestReceived(on: connection, progress: progress)
                 Task { send(await server.handle(request), on: connection) }
             }
         }
@@ -88,4 +110,9 @@ final class McpHttpListener: @unchecked Sendable {
     private func send(_ response: HttpResponse, on connection: NWConnection) {
         connection.send(content: response.serialized(), contentContext: .finalMessage, isComplete: true, completion: .contentProcessed { _ in connection.cancel() })
     }
+}
+
+/// Một kết nối đã nhận đủ yêu cầu chưa; chỉ đụng trong `queue` của listener.
+private final class RequestProgress: @unchecked Sendable {
+    var received = false
 }
