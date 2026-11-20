@@ -42,7 +42,7 @@ targets:
         # Only CryptoKit (encryption provided by iOS) is used, which is exempt from export documentation.
         ITSAppUsesNonExemptEncryption: false
         CFBundleShortVersionString: "1.0"
-        CFBundleVersion: "3"
+        CFBundleVersion: "4"
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
         UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
         NSLocalNetworkUsageDescription: Xdesk dùng mạng nội bộ để tìm và kết nối với máy Mac của bạn.
