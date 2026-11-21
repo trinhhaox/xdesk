@@ -20,6 +20,11 @@ public enum ControlMessage: Sendable, Equatable {
     case rekeyResync(RekeyResync)
     case pairResult(PairResult)
     case agentApprove(AgentApprove)
+    case systemLock(SystemLock)
+    case systemUnlock(SystemUnlock)
+    case fileOffer(FileOffer)
+    case fileData(FileData)
+    case agentHelp(AgentHelp)
     case unknown(type: String)
 
     /// Giá trị trường `t` trên wire.
@@ -48,6 +53,11 @@ public enum ControlMessage: Sendable, Equatable {
         case .rekeyResync(let p): ("rekey.resync", p)
         case .pairResult(let p): ("pair.result", p)
         case .agentApprove(let p): ("agent.approve", p)
+        case .systemLock(let p): ("system.lock", p)
+        case .systemUnlock(let p): ("system.unlock", p)
+        case .fileOffer(let p): ("file.offer", p)
+        case .fileData(let p): ("file.data", p)
+        case .agentHelp(let p): ("agent.help", p)
         case .unknown(let type): (type, nil)
         }
     }

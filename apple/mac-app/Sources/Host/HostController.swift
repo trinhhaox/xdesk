@@ -41,6 +41,8 @@ final class HostController {
     private var listener: ControlListener?
     /// AgentController đặt: nhận trả lời `agent.approve` từ điện thoại (requestId, allow).
     var agentAnswerSink: (@MainActor (String, Bool) -> Void)?
+    /// AgentController đặt: nhận phản hồi `agent.help` khi người dùng can thiệp xong (requestId, resolved).
+    var agentHelpSink: (@MainActor (String, Bool) -> Void)?
     private var promptedAccessibility = false
     private var acceptTask: Task<Void, Never>?
     private var sessions: [UUID: (session: HostSession, task: Task<Void, Never>)] = [:]
@@ -138,6 +140,11 @@ final class HostController {
         for entry in Array(sessions.values) { await entry.session.sendAgentApproval(request) }
     }
 
+    /// Gửi thông báo agent cần trợ giúp tới mọi viewer đang xem.
+    func broadcastAgentHelp(_ help: AgentHelp) async {
+        for entry in Array(sessions.values) { await entry.session.sendAgentHelp(help) }
+    }
+
     private func startListener(_ listener: ControlListener) async throws -> UInt16 {
         do { return try await listener.start(port: Self.preferredPort) } catch { return try await listener.start(port: 0) }
     }
@@ -149,6 +156,7 @@ final class HostController {
             report: { [weak self] state in Task { @MainActor in self?.update(id, state) } },
             onSecureInput: { [weak self] active in Task { @MainActor in self?.secureInputActive = active } },
             onAgentAnswer: { [weak self] requestId, allow in Task { @MainActor in self?.agentAnswerSink?(requestId, allow) } },
+            onAgentHelp: { [weak self] requestId, resolved in Task { @MainActor in self?.agentHelpSink?(requestId, resolved) } },
             pasteboard: clipboardPasteboard, audioSettings: audioOptions.settings,
             permissionLookup: { [weak self] key in await self?.permissions(forViewerKey: key) }
         )

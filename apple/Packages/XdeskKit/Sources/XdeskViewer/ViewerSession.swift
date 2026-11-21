@@ -41,6 +41,17 @@ public final class ViewerSession {
     @ObservationIgnored var connectedHostId: String?
     /// Yêu cầu duyệt quyền điều khiển cho agent AI đang chờ trả lời (xem `agent.approve`); nil khi không có/đã hết hạn.
     public internal(set) var pendingAgentApproval: AgentApprovalRequest?
+    public struct AgentHelpNotice: Sendable, Equatable, Identifiable {
+        public var id: String { requestId }
+        public let requestId: String
+        public let reason: String
+        public init(requestId: String, reason: String) {
+            self.requestId = requestId
+            self.reason = reason
+        }
+    }
+    /// Yêu cầu người dùng hỗ trợ của Agent AI; nil khi không có/đã hoàn thành.
+    public internal(set) var pendingAgentHelp: AgentHelpNotice?
     /// Host đã cấp quyền clipboard cho thiết bị này và phiên đang đồng bộ (iOS dùng để hiện nút "Gửi clipboard sang Mac").
     public internal(set) var clipboardAvailable = false
     /// Số liệu phát audio (nil khi phiên không có audio); cập nhật mỗi 500 ms.
@@ -180,6 +191,7 @@ public final class ViewerSession {
 
     func teardown() async {
         pendingAgentApproval = nil
+        pendingAgentHelp = nil
         await stopClipboard()
         stopAudio()
         tasks.forEach { $0.cancel() }
@@ -198,5 +210,45 @@ public final class ViewerSession {
         recvKbps = 0
         rttMs = nil
         clockOffsetMs = nil
+    }
+
+    public func resolveAgentHelp() async {
+        guard let help = pendingAgentHelp else { return }
+        pendingAgentHelp = nil
+        guard let connection else { return }
+        do {
+            _ = try await connection.send(.agentHelp(.resolve(requestId: help.requestId)))
+        } catch {
+            log.error("gửi agent.help resolve lỗi: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    public func sendSystemLock() async {
+        guard let connection else { return }
+        _ = try? await connection.send(.systemLock(SystemLock()))
+    }
+
+    public func sendSystemUnlock() async {
+        guard let connection else { return }
+        _ = try? await connection.send(.systemUnlock(SystemUnlock()))
+    }
+
+    public func sendFile(url: URL) async throws {
+        guard let connection else { return }
+        let fileName = url.lastPathComponent
+        let data = try Data(contentsOf: url)
+        let chunkSize = 32 * 1024
+        let totalChunks = UInt32((data.count + chunkSize - 1) / chunkSize)
+
+        _ = try await connection.send(.fileOffer(FileOffer(name: fileName, size: UInt32(data.count))))
+
+        for seq in 0..<totalChunks {
+            let start = Int(seq) * chunkSize
+            let end = min(start + chunkSize, data.count)
+            let chunkData = data.subdata(in: start..<end)
+            let base64 = chunkData.base64EncodedString()
+            let isLast = (seq == totalChunks - 1)
+            _ = try await connection.send(.fileData(FileData(name: fileName, chunk: base64, isLast: isLast)))
+        }
     }
 }

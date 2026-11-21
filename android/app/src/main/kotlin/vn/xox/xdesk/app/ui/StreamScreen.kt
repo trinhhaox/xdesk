@@ -2,6 +2,9 @@ package vn.xox.xdesk.app.ui
 
 import android.view.SurfaceHolder
 import android.view.Window
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -10,6 +13,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.Button
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.ime
@@ -75,6 +81,14 @@ fun StreamScreen(controller: ViewerController, window: Window) {
     var viewRef by remember { mutableStateOf<StreamViewport?>(null) }
     var zoomed by remember { mutableStateOf(false) }
     val density = LocalDensity.current
+    val context = LocalContext.current
+    val filePickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let {
+            val name = uri.lastPathSegment?.substringAfterLast('/') ?: "file"
+            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+            if (bytes != null) controller.sendFile(name, bytes)
+        }
+    }
     val imeBottom = WindowInsets.ime.getBottom(density)
     val obscured = if (imeBottom > 0) imeBottom + with(density) { KeyBarHeight.toPx() } else 0f
     controller.input?.focusY // đọc để tính lại độ dịch khi vùng thao tác đổi
@@ -109,7 +123,10 @@ fun StreamScreen(controller: ViewerController, window: Window) {
 
         Overlay(controller)
         controller.agentApproval?.takeIf { controller.streaming }?.let { AgentApprovalDialog(it, controller::answerAgentApproval) }
-        val actions = floatingActions(controller, pointerStore, zoomed, keyboardShown = imeBottom > 0, onKeyboard = { if (imeBottom > 0) viewRef?.surfaceView?.hideKeyboard() else viewRef?.surfaceView?.showKeyboard() }, onResetZoom = { viewRef?.resetZoom() }) { showPointerSettings = true }
+        controller.agentHelp?.takeIf { controller.streaming }?.let { help ->
+            AgentHelpBanner(help.reason, onResolved = { controller.resolveAgentHelp(help.id) })
+        }
+        val actions = floatingActions(controller, pointerStore, zoomed, keyboardShown = imeBottom > 0, onKeyboard = { if (imeBottom > 0) viewRef?.surfaceView?.hideKeyboard() else viewRef?.surfaceView?.showKeyboard() }, onResetZoom = { viewRef?.resetZoom() }, onSendFile = { filePickerLauncher.launch("*/*") }) { showPointerSettings = true }
         val shortcuts = dockShortcuts(controller)
         if (!controller.awaitingFrame && controller.sasPrompt == null) FloatingControl(floatingStore, controller.stats, actions, shortcuts, Modifier.padding(bottom = with(density) { obscured.toDp() }))
         controller.input?.takeIf { imeBottom > 0 }?.let {
@@ -127,7 +144,7 @@ fun StreamScreen(controller: ViewerController, window: Window) {
 
 private fun floatingActions(
     controller: ViewerController, store: PointerSettingsStore, zoomed: Boolean, keyboardShown: Boolean,
-    onKeyboard: () -> Unit, onResetZoom: () -> Unit, onPointerSettings: () -> Unit,
+    onKeyboard: () -> Unit, onResetZoom: () -> Unit, onSendFile: () -> Unit, onPointerSettings: () -> Unit,
 ) = buildList {
     add(FloatingAction("Ngắt kết nối", XdeskIcons.Stop, onClick = controller::disconnect))
     add(FloatingAction(if (keyboardShown) "Ẩn bàn phím" else "Bàn phím", XdeskIcons.Keyboard, onClick = onKeyboard))
@@ -136,6 +153,7 @@ private fun floatingActions(
     if (zoomed) add(FloatingAction("Vừa khung màn hình", XdeskIcons.FitScreen, "Thu về vừa khung màn hình", onClick = onResetZoom))
     controller.nextFit()?.let { next -> add(FloatingAction("Kiểu: ${controller.display.fit.title()}", XdeskIcons.Laptop, "Đổi kiểu Bản sao sang ${next.title()}, kết nối lại") { controller.switchFit(next) }) }
     add(FloatingAction("Chụp màn hình Mac", XdeskIcons.Camera, "Chụp vùng màn hình (⌘ ⇧ 4)") { controller.input?.tapKey(0x21, 9) })
+    add(FloatingAction("Gửi tệp sang Mac", XdeskIcons.FileTransfer, "Gửi tệp sang máy Mac", onClick = onSendFile))
 }
 
 private fun dockShortcuts(controller: ViewerController) = listOf(
@@ -151,10 +169,42 @@ private fun dockShortcuts(controller: ViewerController) = listOf(
     DockShortcut("Undo", XdeskIcons.Undo, "Hoàn tác (⌘ Z)") {
         controller.input?.tapKey(0x1D, 8)
     },
-    DockShortcut("Lock", XdeskIcons.Lock, "Khóa máy Mac (⌃ ⌘ Q)") {
-        controller.input?.tapKey(0x14, 10)
+    DockShortcut("Lock", XdeskIcons.Lock, "Khóa máy Mac") {
+        controller.sendSystemLock()
+    },
+    DockShortcut("Unlock", XdeskIcons.Unlock, "Mở khóa/đánh thức Mac") {
+        controller.sendSystemUnlock()
     },
 )
+
+@Composable
+private fun AgentHelpBanner(reason: String, onResolved: () -> Unit) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        contentAlignment = Alignment.TopCenter
+    ) {
+        Row(
+            Modifier
+                .background(Color(0xFF1E1E1E), shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("Agent AI cần trợ giúp", color = Color(0xFFFFB74D), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Text(reason, color = Color.White, fontSize = 12.sp, maxLines = 2)
+            }
+            Button(
+                onClick = onResolved,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32), contentColor = Color.White)
+            ) {
+                Text("Đã xong", fontSize = 12.sp)
+            }
+        }
+    }
+}
 
 /** Mã SAS có lớp phủ riêng; còn lại, từ lúc chạm Mac tới khung hình đầu tiên là lớp phủ "Đang kết nối" có nút Huỷ. */
 @Composable

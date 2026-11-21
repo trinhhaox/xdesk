@@ -23,6 +23,16 @@ extension HostSession {
             case .agentApprove(let answer) where !answer.isRequest:
                 // Chỉ thiết bị có quyền điều khiển mới được duyệt quyền cho agent.
                 if permissions.input { onAgentAnswer(answer.requestId, answer.allow ?? false) }
+            case .agentHelp(let help) where help.isResolved:
+                if permissions.input { onAgentHelp(help.requestId, true) }
+            case .systemLock:
+                await handleSystemLock()
+            case .systemUnlock:
+                await handleSystemUnlock()
+            case .fileOffer(let offer):
+                await handleFileOffer(offer)
+            case .fileData(let data):
+                await handleFileData(data)
             case .bye: return
             default: break
             }

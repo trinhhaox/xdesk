@@ -27,6 +27,7 @@ actor HostSession {
     private let report: @Sendable (HostSessionState) -> Void
     let onSecureInput: @Sendable (Bool) -> Void
     let onAgentAnswer: @Sendable (_ requestId: String, _ allow: Bool) -> Void
+    let onAgentHelp: @Sendable (_ requestId: String, _ resolved: Bool) -> Void
     let log = Logger(subsystem: "vn.xox.xdesk", category: "host-session")
     private(set) var channel: UdpMediaChannel?
     var pipeline: HostPipeline?
@@ -44,12 +45,14 @@ actor HostSession {
     let pasteboard: (any PasteboardAccess)?
     let permissionLookup: @Sendable ([UInt8]) async -> DevicePermissions?
     var clipboard: ClipboardSync?
+    var fileTransfers: [String: ActiveFileTransfer] = [:]
 
     init(
         connection: ControlConnection, provider: VirtualDisplayProvider, windowFit: WindowFitter? = nil, caps: Capabilities,
         report: @escaping @Sendable (HostSessionState) -> Void,
         onSecureInput: @escaping @Sendable (Bool) -> Void = { _ in },
         onAgentAnswer: @escaping @Sendable (String, Bool) -> Void = { _, _ in },
+        onAgentHelp: @escaping @Sendable (String, Bool) -> Void = { _, _ in },
         pasteboard: (any PasteboardAccess)? = nil,
         audioSettings: HostAudioSettings = HostAudioSettings(),
         permissionLookup: @escaping @Sendable ([UInt8]) async -> DevicePermissions? = { _ in nil }
@@ -58,6 +61,7 @@ actor HostSession {
         self.pasteboard = pasteboard
         self.permissionLookup = permissionLookup
         self.onAgentAnswer = onAgentAnswer
+        self.onAgentHelp = onAgentHelp
         self.connection = connection
         self.provider = provider
         self.windowFit = windowFit
@@ -93,6 +97,35 @@ actor HostSession {
         guard viewerReady, permissions.input else { return }
         do { _ = try await connection.send(.agentApprove(request)) } catch {
             log.error("gửi agent.approve lỗi: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// Gửi thông báo agent cần trợ giúp tới viewer.
+    func sendAgentHelp(_ help: AgentHelp) async {
+        guard viewerReady else { return }
+        do { _ = try await connection.send(.agentHelp(help)) } catch {
+            log.error("gửi agent.help lỗi: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    func handleSystemLock() async {
+        guard permissions.input else { return }
+        log.notice("Nhận lệnh khóa màn hình Mac từ xa")
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/pmset")
+        process.arguments = ["displaysleepnow"]
+        try? process.run()
+    }
+
+    func handleSystemUnlock() async {
+        guard permissions.input else { return }
+        log.notice("Nhận lệnh mở khóa/đánh thức Mac từ xa")
+        let src = CGEventSource(stateID: .hidSystemState)
+        if let event = CGEvent(keyboardEventSource: src, virtualKey: 0x35, keyDown: true) { // 0x35 = Escape
+            event.post(tap: .cghidEventTap)
+        }
+        if let eventUp = CGEvent(keyboardEventSource: src, virtualKey: 0x35, keyDown: false) {
+            eventUp.post(tap: .cghidEventTap)
         }
     }
 

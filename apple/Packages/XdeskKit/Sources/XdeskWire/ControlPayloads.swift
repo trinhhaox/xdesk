@@ -194,3 +194,55 @@ public struct AgentApprove: Codable, Sendable, Equatable {
         guard (summary?.utf8.count ?? 0) <= Self.maxSummaryBytes else { throw WireError.invalidField("agent.approve.summary") }
     }
 }
+
+/// Yêu cầu khoá màn hình Mac từ xa.
+public struct SystemLock: Codable, Sendable, Equatable {
+    public init() {}
+}
+
+/// Yêu cầu đánh thức/mở khoá màn hình Mac từ xa.
+public struct SystemUnlock: Codable, Sendable, Equatable {
+    public var token: String?
+    public init(token: String? = nil) { self.token = token }
+}
+
+/// Chào tệp tin gửi giữa các máy.
+public struct FileOffer: Codable, Sendable, Equatable {
+    public var name: String
+    public var size: UInt32
+    public var hash: String
+    public init(name: String, size: UInt32, hash: String = "") {
+        self.name = name; self.size = size; self.hash = hash
+    }
+}
+
+/// Mảnh dữ liệu tệp tin.
+public struct FileData: Codable, Sendable, Equatable {
+    public var name: String
+    public var chunk: String
+    public var isLast: Bool
+    public init(name: String, chunk: String, isLast: Bool) {
+        self.name = name; self.chunk = chunk; self.isLast = isLast
+    }
+}
+
+/// Agent xin trợ giúp người dùng (captcha, OTP, tài khoản) và phản hồi khi người dùng đã giải quyết xong.
+public struct AgentHelp: Codable, Sendable, Equatable {
+    public var requestId: String
+    public var reason: String?
+    public var resolved: Bool?
+    public init(requestId: String, reason: String? = nil, resolved: Bool? = nil) {
+        self.requestId = requestId; self.reason = reason; self.resolved = resolved
+    }
+    public static func request(requestId: String, reason: String) -> AgentHelp {
+        AgentHelp(requestId: requestId, reason: reason)
+    }
+    public static func resolved(requestId: String) -> AgentHelp {
+        AgentHelp(requestId: requestId, resolved: true)
+    }
+    public static func resolve(requestId: String) -> AgentHelp {
+        resolved(requestId: requestId)
+    }
+    public var isRequest: Bool { resolved != true }
+    public var isResolved: Bool { resolved == true }
+}

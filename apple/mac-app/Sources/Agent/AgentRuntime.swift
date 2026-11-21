@@ -2,6 +2,7 @@ import AppKit
 import Foundation
 import os
 import XdeskAgent
+import XdeskWire
 
 /// Gom mọi thành phần của agent: màn hình, quyền điều khiển, luật app, banner, giám sát người thật, phím tắt.
 /// Các tool giữ tham chiếu tới đối tượng này (MainActor nên Sendable) và gọi qua `await`.
@@ -10,6 +11,7 @@ final class AgentRuntime {
     static let log = Logger(subsystem: "vn.xox.xdesk", category: "agent-runtime")
 
     let settings: AgentSettings
+    let host: HostController
     let displays = AgentDisplayManager()
     let refs = UiRefTable()
     let poster = AgentEventPoster()
@@ -24,8 +26,10 @@ final class AgentRuntime {
     private let hotkey = StopHotkey()
     private var idleTask: Task<Void, Never>?
     private var changes: AsyncStream<ControlSnapshot>.Continuation?
+    private var pendingHelpRequests: [String: CheckedContinuation<Bool, Never>] = [:]
 
     init(host: HostController, settings: AgentSettings) {
+        self.host = host
         self.settings = settings
         let approvals = ApprovalCoordinator(host: host)
         self.approvals = approvals
@@ -34,6 +38,7 @@ final class AgentRuntime {
         arbiter = ControlArbiter(prompter: approvals, idleTimeout: Double(settings.idleSeconds), onChange: { continuation.yield($0) })
         gate = AppGate(policy: { await MainActor.run { settings.policy } }, prompter: approvals)
         host.agentAnswerSink = { [approvals] id, allow in approvals.resolve(id, allow: allow) }
+        host.agentHelpSink = { [weak self] id, resolved in self?.resolveUserHelp(requestId: id, resolved: resolved) }
         settings.onIdleChange = { [arbiter] seconds in Task { await arbiter.setIdleTimeout(Double(seconds)) } }
         banner = AgentBanner(
             onPause: { [weak self] in self?.pause("người dùng bấm Tạm dừng") },
@@ -133,6 +138,29 @@ final class AgentRuntime {
             return "Cửa sổ đang focus không nằm trên màn hình agent. Hãy xdesk_pointer click vào cửa sổ trên màn hình agent trước khi gõ/nhấn phím."
         }
         return await verdict(focus.app)
+    }
+
+    func requestUserHelp(reason: String, timeoutSeconds: Int = 120) async -> Bool {
+        let requestId = UUID().uuidString
+        let message = AgentHelp.request(requestId: requestId, reason: reason)
+        await host.broadcastAgentHelp(message)
+
+        return await withCheckedContinuation { continuation in
+            pendingHelpRequests[requestId] = continuation
+            Task {
+                try? await Task.sleep(nanoseconds: UInt64(timeoutSeconds) * 1_000_000_000)
+                await MainActor.run { [weak self] in
+                    if let c = self?.pendingHelpRequests.removeValue(forKey: requestId) {
+                        c.resume(returning: false)
+                    }
+                }
+            }
+        }
+    }
+
+    func resolveUserHelp(requestId: String, resolved: Bool) {
+        guard let continuation = pendingHelpRequests.removeValue(forKey: requestId) else { return }
+        continuation.resume(returning: resolved)
     }
 
     private func verdict(_ app: AppIdentity) async -> String? {

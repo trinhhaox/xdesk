@@ -63,6 +63,19 @@ sealed interface ControlMessage {
             fun response(requestId: String, allow: Boolean) = AgentApprove(requestId, allow = allow)
         }
     }
+    data object SystemLock : ControlMessage
+    data class SystemUnlock(val token: String? = null) : ControlMessage
+    data class FileOffer(val name: String, val size: Long, val hash: String) : ControlMessage
+    data class FileData(val name: String, val chunk: String, val isLast: Boolean) : ControlMessage
+    data class AgentHelp(val requestId: String, val reason: String? = null, val resolved: Boolean? = null) : ControlMessage {
+        val isRequest: Boolean get() = resolved != true
+        val isResolved: Boolean get() = resolved == true
+        companion object {
+            fun request(requestId: String, reason: String) = AgentHelp(requestId, reason = reason)
+            fun resolved(requestId: String) = AgentHelp(requestId, resolved = true)
+            fun resolve(requestId: String) = resolved(requestId)
+        }
+    }
     data class Unknown(val type: String) : ControlMessage
 }
 

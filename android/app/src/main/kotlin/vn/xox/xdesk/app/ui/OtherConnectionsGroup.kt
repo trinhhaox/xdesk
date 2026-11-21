@@ -54,10 +54,22 @@ internal fun OtherConnectionsGroup(address: String, onAddressChange: (String) ->
         GroupDivider(XdeskDims.rowPad + XdeskDims.iconBox + XdeskDims.iconGap)
         DisclosureRow(XdeskIcons.Cable, "Cáp USB", usbOpen) { usbOpen = !usbOpen }
         AnimatedVisibility(usbOpen) {
-            Text(
-                "Cắm cáp vào Mac rồi chọn \"Phát qua USB\" trong menu Xdesk trên Mac. Cần đã ghép đôi với Mac này qua Wi-Fi trước.",
-                Modifier.padding(horizontal = XdeskDims.rowPad, vertical = 8.dp), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Column(Modifier.padding(horizontal = XdeskDims.rowPad, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "Cắm cáp USB vào Mac (đã bật USB Debugging). Cổng 47800 sẽ đi thẳng qua cáp USB độ trễ siêu thấp.",
+                    fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Button(
+                    onClick = {
+                        onAddressChange("127.0.0.1:47800")
+                        onConnect()
+                    },
+                    modifier = Modifier.heightIn(min = 44.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.extras.primaryFill, contentColor = Color.White),
+                ) {
+                    Text("Nối cáp USB (127.0.0.1:47800)")
+                }
+            }
         }
     }
 }

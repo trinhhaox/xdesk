@@ -24,6 +24,7 @@ class ViewerSession(
     private val threadFactory: (Runnable) -> Thread = { Thread(it, "xdesk-udp") },
     private val nowMs: () -> Long = System::currentTimeMillis,
     onAgentApproval: (AgentApprovalRequest?) -> Unit = {},
+    onAgentHelp: (AgentHelpRequest?) -> Unit = {},
     private val audioSink: AudioSink? = null,
     val preferHevc: Boolean = false,
 ) {
@@ -36,6 +37,7 @@ class ViewerSession(
     private var streamId = 0
     private val metrics = SessionMetrics()
     private val approvals = AgentApprovalGate(nowMs, { delayMs, task -> io?.schedule(task, delayMs, TimeUnit.MILLISECONDS) }, onAgentApproval)
+    private val agentHelps = AgentHelpGate(onAgentHelp)
     private var lastKeyframeRequestMs = 0L
     private var audioActive = false
 
@@ -55,6 +57,8 @@ class ViewerSession(
     val udpStats: UdpChannelStats? get() = channel?.stats
     /** Yêu cầu duyệt agent AI đang chờ (null nếu không có / đã hết hạn / đã trả lời). */
     val pendingAgentApproval: AgentApprovalRequest? get() = approvals.pending
+    /** Yêu cầu hỗ trợ agent AI đang chờ (null nếu không có / đã giải quyết). */
+    val pendingAgentHelp: AgentHelpRequest? get() = agentHelps.pending
 
     /** Chặn tới khi streaming hoặc lỗi. Trả `true` nếu streaming. */
     fun connect(candidates: List<ViewerTarget>, config: ControlMessage.DisplayConfig, auth: ViewerAuth = ViewerAuth.Automatic): Boolean {
@@ -105,6 +109,35 @@ class ViewerSession(
         runIo { connection?.send(ControlMessage.AgentApprove.response(request.id, allow)) }
     }
 
+    fun resolveAgentHelp(requestId: String) {
+        agentHelps.take()
+        runIo { connection?.send(ControlMessage.AgentHelp.resolve(requestId)) }
+    }
+
+    fun sendSystemLock() {
+        runIo { connection?.send(ControlMessage.SystemLock) }
+    }
+
+    fun sendSystemUnlock() {
+        runIo { connection?.send(ControlMessage.SystemUnlock()) }
+    }
+
+    fun sendFile(name: String, bytes: ByteArray) {
+        runIo {
+            val chunkSize = 32 * 1024
+            val totalChunks = ((bytes.size + chunkSize - 1) / chunkSize).coerceAtLeast(1)
+            connection?.send(ControlMessage.FileOffer(name, bytes.size.toLong(), ""))
+            for (seq in 0 until totalChunks) {
+                val start = seq * chunkSize
+                val end = minOf(start + chunkSize, bytes.size)
+                val chunk = bytes.copyOfRange(start, end)
+                val base64 = java.util.Base64.getEncoder().encodeToString(chunk)
+                val isLast = (seq == totalChunks - 1)
+                connection?.send(ControlMessage.FileData(name, base64, isLast))
+            }
+        }
+    }
+
     fun requestKeyframe() = runIo { requestKeyframeNow() }
     fun hostNowMs(): Long? = metrics.hostNowMs()
 
@@ -126,7 +159,7 @@ class ViewerSession(
         )
         val reader = ControlReader(
             conn, { metrics.updateClock(ClockSample(it, ClockSync.wallClockMs())) }, { channel?.handleResync(it) },
-            { approvals.receive(it, hostNowMs()) }, { connectedHostId?.let(trust.knownHosts::remove) }, ::fail,
+            { approvals.receive(it, hostNowMs()) }, { agentHelps.receive(it) }, { connectedHostId?.let(trust.knownHosts::remove) }, ::fail,
         )
         Thread(reader::run, "xdesk-control").apply { isDaemon = true }.start()
         executor.scheduleWithFixedDelay({ guardedIo { inputPump?.maintain(nowMs()) } }, 50, InputPump.MAINTENANCE_INTERVAL_MS, TimeUnit.MILLISECONDS)
@@ -195,6 +228,7 @@ class ViewerSession(
 
     private fun teardown() {
         approvals.clear()
+        agentHelps.clear()
         stopAudio()
         io?.shutdownNow()
         io = null

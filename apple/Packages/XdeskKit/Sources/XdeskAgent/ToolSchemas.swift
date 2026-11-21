@@ -62,5 +62,7 @@ public enum ToolSchemas {
              object(["width": number("Chiều rộng (pixel)"), "height": number("Chiều cao (pixel)")], required: ["width", "height"]), idempotent: true),
         tool("xdesk_clipboard_read", "Đọc clipboard", "Đọc văn bản trong clipboard; bỏ qua mục ẩn (mật khẩu).", readOnly: true),
         tool("xdesk_clipboard_write", "Ghi clipboard", "Ghi văn bản vào clipboard.", object(["text": text("Văn bản cần ghi")], required: ["text"]), destructive: true),
+        tool("xdesk_request_user_help", "Yêu cầu người dùng hỗ trợ", "Yêu cầu người dùng (trên Mac hoặc điện thoại kết nối) can thiệp thao tác (như giải CAPTCHA, 2FA, OTP) và tạm dừng chờ người dùng báo hoàn thành.",
+             object(["reason": text("Lý do cần can thiệp"), "timeoutSeconds": number("Thời gian chờ tối đa (giây)")], required: ["reason"])),
     ]
 }

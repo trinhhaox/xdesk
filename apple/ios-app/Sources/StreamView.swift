@@ -1,3 +1,4 @@
+import LocalAuthentication
 import SwiftUI
 import UIKit
 import XdeskInput
@@ -13,6 +14,7 @@ struct StreamView: View {
     @State private var composer: TextComposerController
     @State private var pointer = PointerSettingsStore()
     @State private var showPointerSettings = false
+    @State private var showFileImporter = false
     @State private var modeNotice: String?
     @State private var zoom = VideoZoomState()
     @State private var floating = FloatingControlStore()
@@ -35,6 +37,7 @@ struct StreamView: View {
                 }
                 FloatingControl(store: floating, container: floatingArea(proxy.size)) { close in menuItems(close) }
                 if !composer.preview.isEmpty { composingPreview }
+                if let help = model.session.pendingAgentHelp { agentHelpBanner(help) }
                 if let notice = modeNotice ?? model.clipboardNotice { toast(notice) }
             }
             .onChange(of: proxy.size, initial: true) { _, size in
@@ -44,6 +47,20 @@ struct StreamView: View {
         .ignoresSafeArea(.keyboard)
         .background(Color.black.ignoresSafeArea())
         .sheet(isPresented: $showPointerSettings) { PointerSettingsSheet(store: pointer) }
+        .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.item]) { result in
+            if case .success(let url) = result {
+                guard url.startAccessingSecurityScopedResource() else { return }
+                defer { url.stopAccessingSecurityScopedResource() }
+                Task {
+                    do {
+                        try await model.session.sendFile(url: url)
+                        modeNotice = "Đã gửi tệp \(url.lastPathComponent) sang Mac"
+                    } catch {
+                        modeNotice = "Gửi tệp thất bại: \(error.localizedDescription)"
+                    }
+                }
+            }
+        }
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
         .alert("Agent AI xin quyền điều khiển", isPresented: approvalPresented, presenting: model.session.pendingAgentApproval) { _ in
@@ -103,6 +120,7 @@ struct StreamView: View {
             if model.session.clipboardAvailable {
                 item("Gửi clipboard sang Mac", "doc.on.clipboard", close) { Task { await model.sendClipboardToMac() } }
             }
+            item("Gửi tệp sang Mac…", "arrow.up.doc", close) { showFileImporter = true }
             if model.screenMode == .mirror { MirrorFitMenu(fit: mirrorFit) }
             if zoom.isZoomed { item("Vừa khung màn hình", "arrow.down.right.and.arrow.up.left", close) { zoom.reset?() } }
             item("Chụp ảnh màn hình Mac", "camera.viewfinder", close) { sendShortcut(usage: 0x21, mods: [.command, .shift]) }
@@ -128,7 +146,11 @@ struct StreamView: View {
                 close()
             }
             dockButton(systemName: "lock", label: "Khóa Mac") {
-                sendShortcut(usage: 0x14, mods: [.control, .command])
+                Task { await model.session.sendSystemLock() }
+                close()
+            }
+            dockButton(systemName: "faceid", label: "Mở khóa") {
+                unlockMacWithBiometrics()
                 close()
             }
         }
@@ -204,6 +226,57 @@ struct StreamView: View {
             try? await Task.sleep(for: .seconds(1.5))
             modeNotice = nil
         }
+    }
+
+    private func unlockMacWithBiometrics() {
+        let context = LAContext()
+        var error: NSError?
+        if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
+            context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: "Xác thực để mở khóa máy Mac") { success, _ in
+                if success {
+                    Task { await model.session.sendSystemUnlock() }
+                }
+            }
+        } else {
+            Task { await model.session.sendSystemUnlock() }
+        }
+    }
+
+    @ViewBuilder
+    private func agentHelpBanner(_ help: ViewerSession.AgentHelpNotice) -> some View {
+        VStack {
+            HStack(spacing: 12) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.yellow)
+                    .font(.system(size: 20))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Agent AI cần trợ giúp:")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(.white)
+                    Text(help.reason)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.white.opacity(0.85))
+                        .lineLimit(2)
+                }
+                Spacer()
+                Button("Đã xong") {
+                    Task { await model.session.resolveAgentHelp() }
+                }
+                .font(.system(size: 13, weight: .semibold))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color.green)
+                .foregroundStyle(.white)
+                .clipShape(Capsule())
+            }
+            .padding(12)
+            .background(Color.black.opacity(0.85))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            Spacer()
+        }
+        .transition(.move(edge: .top).combined(with: .opacity))
     }
 }
 

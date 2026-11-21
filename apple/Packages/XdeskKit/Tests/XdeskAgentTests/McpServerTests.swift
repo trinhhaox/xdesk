@@ -79,8 +79,8 @@ private func openSession(_ server: McpServer, version: String = "2025-11-25") as
         let session = await openSession(server)
         let response = await server.handle(post(#"{"jsonrpc":"2.0","id":3,"method":"tools/list"}"#, session: session))
         guard case .array(let tools)? = body(response)["result"]?["tools"] else { Issue.record("thiếu tools"); return }
-        #expect(tools.count == 14)
-        #expect(Set(tools.compactMap { $0["name"]?.stringValue }).count == 14)
+        #expect(tools.count == 15)
+        #expect(Set(tools.compactMap { $0["name"]?.stringValue }).count == 15)
         for tool in tools {
             #expect(tool["inputSchema"]?["type"] == "object")
             #expect(tool["annotations"]?["readOnlyHint"] != nil)

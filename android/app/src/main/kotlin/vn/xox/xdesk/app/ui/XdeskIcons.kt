@@ -146,4 +146,17 @@ internal object XdeskIcons {
             moveTo(8f, 6f); lineTo(9.5f, 3.5f); horizontalLineTo(14.5f); lineTo(16f, 6f)
         }
     }
+    val Unlock = build("Unlock") {
+        stroke(1.8f) {
+            roundRect(5f, 10f, 14f, 11f, 2f)
+            moveTo(8f, 10f); verticalLineTo(7f); arcTo(4f, 4f, 0f, false, true, 16f, 7f)
+        }
+    }
+    val FileTransfer = build("FileTransfer") {
+        stroke(1.8f) {
+            roundRect(4f, 3f, 16f, 18f, 2f)
+            moveTo(12f, 15f); verticalLineTo(8f)
+            moveTo(9f, 11f); lineTo(12f, 8f); lineTo(15f, 11f)
+        }
+    }
 }

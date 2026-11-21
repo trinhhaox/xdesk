@@ -21,6 +21,8 @@ extension ViewerSession {
                     throw TransportError.revokedByHost
                 case .rekeyResync(let resync): await channel?.handleResync(resync)
                 case .agentApprove(let approve) where approve.isRequest: receiveAgentApproval(approve)
+                case .agentHelp(let help) where !help.isResolved:
+                    pendingAgentHelp = AgentHelpNotice(requestId: help.requestId, reason: help.reason ?? "Cần người dùng hỗ trợ")
                 default: break
                 }
             }

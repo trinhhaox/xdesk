@@ -13,6 +13,7 @@ import vn.xox.xdesk.app.discovery.DiscoveredHost
 import vn.xox.xdesk.media.AndroidCodecList
 import vn.xox.xdesk.media.VideoDecoder
 import vn.xox.xdesk.transport.AgentApprovalRequest
+import vn.xox.xdesk.transport.AgentHelpRequest
 import vn.xox.xdesk.transport.DisplayConfigPlanner
 import vn.xox.xdesk.transport.KnownHost
 import vn.xox.xdesk.transport.SasPrompt
@@ -54,6 +55,8 @@ class ViewerController(internal val container: AppContainer, private val deviceN
     var stats by mutableStateOf("")
     /** Yêu cầu duyệt agent AI đang chờ; null khi hết hạn, đã trả lời hoặc Mac đã duyệt trước. */
     var agentApproval by mutableStateOf<AgentApprovalRequest?>(null)
+    /** Yêu cầu hỗ trợ agent AI đang chờ; null khi đã xong. */
+    var agentHelp by mutableStateOf<AgentHelpRequest?>(null)
     /** Cỡ khung video thật (px) để aspect-fit và đổi toạ độ chạm; null khi chưa biết (Giống màn hình Mac chờ decoder báo). */
     var videoSize by mutableStateOf<Pair<Int, Int>?>(null)
         private set
@@ -97,6 +100,7 @@ class ViewerController(internal val container: AppContainer, private val deviceN
         val current = ++generation
         val next = ViewerSession(trust, deviceName, { decoder.submit(it) }, { post { if (current == generation) onState(it) } },
             { Thread(it, "xdesk-udp").also { t -> t.priority = Thread.MAX_PRIORITY } }, onAgentApproval = { post { agentApproval = it } },
+            onAgentHelp = { post { agentHelp = it } },
             audioSink = audio.sink, preferHevc = hasHevc)
         session = next
         input = StreamInputRouter(next).also { it.configure(config.w / config.scale.toFloat(), config.h / config.scale.toFloat()) }
@@ -157,12 +161,20 @@ class ViewerController(internal val container: AppContainer, private val deviceN
         input = null
         decoder.stop()
         background.execute { ending.disconnect() }
-        connecting = false; streaming = false; agentApproval = null
+        connecting = false; streaming = false; agentApproval = null; agentHelp = null
         screen = Screen.HOSTS
         knownHosts = container.knownHosts.all()
     }
 
     fun answerAgentApproval(allow: Boolean) { session?.answerAgentApproval(allow); agentApproval = null }
+
+    fun resolveAgentHelp(requestId: String) { session?.resolveAgentHelp(requestId); agentHelp = null }
+
+    fun sendSystemLock() { session?.sendSystemLock() }
+
+    fun sendSystemUnlock() { session?.sendSystemUnlock() }
+
+    fun sendFile(name: String, bytes: ByteArray) { session?.sendFile(name, bytes) }
 
     fun refreshStats() {
         val s = session ?: return

@@ -27,4 +27,27 @@ extension HostController {
         }
         try await listener.adoptUsbTunnel(tunnel, hostPublicKey: key)
     }
+
+    /// Tự động forward cổng 47800 cho Android qua ADB khi cắm cáp USB (adb reverse tcp:47800 tcp:47800).
+    @discardableResult
+    func setupAndroidAdbReverse() async -> Bool {
+        let adbCandidates = [
+            "/opt/homebrew/bin/adb",
+            "/usr/local/bin/adb",
+            NSHomeDirectory() + "/Library/Android/sdk/platform-tools/adb"
+        ]
+        guard let adb = adbCandidates.first(where: { FileManager.default.fileExists(atPath: $0) }) else {
+            return false
+        }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: adb)
+        process.arguments = ["reverse", "tcp:\(HostController.preferredPort)", "tcp:\(HostController.preferredPort)"]
+        do {
+            try process.run()
+            process.waitUntilExit()
+            return process.terminationStatus == 0
+        } catch {
+            return false
+        }
+    }
 }

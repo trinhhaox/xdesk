@@ -43,8 +43,10 @@ struct AcquiredDisplay: Sendable, Equatable {
 final class VirtualDisplayProvider {
     private let backend: any VirtualDisplayBackend
     private let mainDisplayID: () -> CGDirectDisplayID
-    private var handle: (any VirtualDisplayHandle)?
-    private(set) var activeDisplay: AcquiredDisplay?
+    private var handles: [String: any VirtualDisplayHandle] = [:]
+    private(set) var activeDisplays: [String: AcquiredDisplay] = [:]
+
+    var activeDisplay: AcquiredDisplay? { activeDisplays["default"] }
 
     init(backend: any VirtualDisplayBackend = CGVirtualDisplayBackend(), mainDisplayID: @escaping () -> CGDirectDisplayID = { CGMainDisplayID() }) {
         self.backend = backend
@@ -52,12 +54,20 @@ final class VirtualDisplayProvider {
     }
 
     func acquire(_ spec: VirtualDisplaySpec) -> AcquiredDisplay {
-        release()
+        acquire(named: "default", spec: spec)
+    }
+
+    func acquire(named name: String, spec: VirtualDisplaySpec) -> AcquiredDisplay {
+        release(named: name)
         let acquired: AcquiredDisplay
         if backend.isAvailable {
             do {
-                let created = try backend.create(spec)
-                handle = created
+                var modifiedSpec = spec
+                if name != "default" && spec.name == "Xdesk" {
+                    modifiedSpec.name = "Xdesk \(name)"
+                }
+                let created = try backend.create(modifiedSpec)
+                handles[name] = created
                 acquired = AcquiredDisplay(displayID: created.displayID, mode: .extend, fallbackReason: nil)
             } catch {
                 acquired = mirror(reason: "tạo màn hình ảo thất bại: \(error.localizedDescription)")
@@ -65,22 +75,31 @@ final class VirtualDisplayProvider {
         } else {
             acquired = mirror(reason: "CGVirtualDisplay không khả dụng")
         }
-        activeDisplay = acquired
+        activeDisplays[name] = acquired
         return acquired
     }
 
     /// Giống màn hình Mac: dùng thẳng màn hình chính, không đụng cấu hình màn hình (không có gì để khôi phục khi kết thúc).
     func acquireNative() -> AcquiredDisplay {
-        release()
+        release(named: "default")
         let acquired = AcquiredDisplay(displayID: mainDisplayID(), mode: .native, fallbackReason: nil)
-        activeDisplay = acquired
+        activeDisplays["default"] = acquired
         return acquired
     }
 
     /// Huỷ màn hình ảo (nếu có).
     func release() {
-        handle = nil
-        activeDisplay = nil
+        release(named: "default")
+    }
+
+    func release(named name: String) {
+        handles.removeValue(forKey: name)
+        activeDisplays.removeValue(forKey: name)
+    }
+
+    func releaseAll() {
+        handles.removeAll()
+        activeDisplays.removeAll()
     }
 
     private func mirror(reason: String) -> AcquiredDisplay {

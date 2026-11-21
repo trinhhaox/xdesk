@@ -59,6 +59,11 @@ object ControlMessageCodec {
         is ControlMessage.RekeyResync -> "rekey.resync"
         is ControlMessage.PairResult -> "pair.result"
         is ControlMessage.AgentApprove -> "agent.approve"
+        ControlMessage.SystemLock -> "system.lock"
+        is ControlMessage.SystemUnlock -> "system.unlock"
+        is ControlMessage.FileOffer -> "file.offer"
+        is ControlMessage.FileData -> "file.data"
+        is ControlMessage.AgentHelp -> "agent.help"
         is ControlMessage.Unknown -> message.type
     }
 }

@@ -45,6 +45,23 @@ internal object ControlMessageFields {
                 m.expiresAt?.let { f["expiresAt"] = num(it) }
                 m.allow?.let { f["allow"] = JsonBool(it) }
             }
+            ControlMessage.SystemLock -> Unit
+            is ControlMessage.SystemUnlock -> m.token?.let { f["token"] = str(it) }
+            is ControlMessage.FileOffer -> {
+                f["name"] = str(m.name)
+                f["size"] = num(m.size)
+                f["hash"] = str(m.hash)
+            }
+            is ControlMessage.FileData -> {
+                f["name"] = str(m.name)
+                f["chunk"] = str(m.chunk)
+                f["isLast"] = JsonBool(m.isLast)
+            }
+            is ControlMessage.AgentHelp -> {
+                f["requestId"] = str(m.requestId)
+                m.reason?.let { f["reason"] = str(it) }
+                m.resolved?.let { f["resolved"] = JsonBool(it) }
+            }
             is ControlMessage.Unknown -> Unit
         }
     }
@@ -75,6 +92,17 @@ internal object ControlMessageFields {
         "pair.result" -> ControlMessage.PairResult(r.bool("accepted"))
         "agent.approve" -> ControlMessage.AgentApprove(
             r.string("requestId"), r.optString("agentName"), r.optString("summary"), r.optI64("expiresAt"), r.optBool("allow"),
+        )
+        "system.lock" -> ControlMessage.SystemLock
+        "system.unlock" -> ControlMessage.SystemUnlock(r.optString("token"))
+        "file.offer" -> ControlMessage.FileOffer(
+            r.string("name"), r.i64("size"), r.string("hash"),
+        )
+        "file.data" -> ControlMessage.FileData(
+            r.string("name"), r.string("chunk"), r.bool("isLast"),
+        )
+        "agent.help" -> ControlMessage.AgentHelp(
+            r.string("requestId"), r.optString("reason"), r.optBool("resolved"),
         )
         else -> ControlMessage.Unknown(type)
     }

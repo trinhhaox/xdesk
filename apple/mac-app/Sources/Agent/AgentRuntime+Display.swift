@@ -44,6 +44,7 @@ extension AgentRuntime {
         handlers["xdesk_set_workspace_size"] = gated(SetWorkspaceSizeTool(runtime: self))
         handlers["xdesk_clipboard_read"] = gated(ClipboardReadTool())
         handlers["xdesk_clipboard_write"] = gated(ClipboardWriteTool())
+        handlers["xdesk_request_user_help"] = gated(RequestUserHelpTool(runtime: self))
         return ToolRegistry(handlers: handlers)
     }
 }
