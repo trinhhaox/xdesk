@@ -24,6 +24,19 @@ struct SettingsView: View {
                      : "Điện thoại hiện đúng màn hình Mac. Chọn bên dưới Mac giữ nguyên hay đổi theo điện thoại.")
             }
             if model.screenMode == .mirror { MirrorFitPicker(fit: $model.mirrorFit, pointer: pointer) }
+            Section {
+                Picker("Bộ mã hoá", selection: $model.videoCodec) {
+                    Text("HEVC (H.265)").tag(VideoCodec.hevc)
+                    Text("H.264").tag(VideoCodec.h264)
+                }
+                .pickerStyle(.segmented)
+            } header: {
+                Text("Bộ mã hoá video")
+            } footer: {
+                Text(model.videoCodec == .hevc
+                     ? "HEVC nén tốt hơn ~40%, giảm độ trễ trên Wi-Fi/Tailscale và tiết kiệm pin."
+                     : "H.264 tương thích rộng nhất với mọi thiết bị.")
+            }
             AppearancePicker()
             Section("Điều khiển") {
                 NavigationLink {

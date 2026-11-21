@@ -110,7 +110,8 @@ fun StreamScreen(controller: ViewerController, window: Window) {
         Overlay(controller)
         controller.agentApproval?.takeIf { controller.streaming }?.let { AgentApprovalDialog(it, controller::answerAgentApproval) }
         val actions = floatingActions(controller, pointerStore, zoomed, keyboardShown = imeBottom > 0, onKeyboard = { if (imeBottom > 0) viewRef?.surfaceView?.hideKeyboard() else viewRef?.surfaceView?.showKeyboard() }, onResetZoom = { viewRef?.resetZoom() }) { showPointerSettings = true }
-        if (!controller.awaitingFrame && controller.sasPrompt == null) FloatingControl(floatingStore, controller.stats, actions, Modifier.padding(bottom = with(density) { obscured.toDp() }))
+        val shortcuts = dockShortcuts(controller)
+        if (!controller.awaitingFrame && controller.sasPrompt == null) FloatingControl(floatingStore, controller.stats, actions, shortcuts, Modifier.padding(bottom = with(density) { obscured.toDp() }))
         controller.input?.takeIf { imeBottom > 0 }?.let {
             KeyBar(it, onHide = { viewRef?.surfaceView?.hideKeyboard() }, modifier = Modifier.align(Alignment.BottomCenter).imePadding())
         }
@@ -134,7 +135,26 @@ private fun floatingActions(
     add(FloatingAction("Cài đặt chuột", XdeskIcons.Sliders, "Cài đặt chuột và con trỏ", onClick = onPointerSettings))
     if (zoomed) add(FloatingAction("Vừa khung màn hình", XdeskIcons.FitScreen, "Thu về vừa khung màn hình", onClick = onResetZoom))
     controller.nextFit()?.let { next -> add(FloatingAction("Kiểu: ${controller.display.fit.title()}", XdeskIcons.Laptop, "Đổi kiểu Bản sao sang ${next.title()}, kết nối lại") { controller.switchFit(next) }) }
+    add(FloatingAction("Chụp màn hình Mac", XdeskIcons.Camera, "Chụp vùng màn hình (⌘ ⇧ 4)") { controller.input?.tapKey(0x21, 9) })
 }
+
+private fun dockShortcuts(controller: ViewerController) = listOf(
+    DockShortcut("Spotlight", XdeskIcons.Search, "Tìm kiếm Spotlight (⌘ Space)") {
+        controller.input?.tapKey(0x2C, 8)
+    },
+    DockShortcut("Mission Control", XdeskIcons.Layers, "Mission Control (⌃ ↑)") {
+        controller.input?.tapKey(0x52, 2)
+    },
+    DockShortcut("App Switcher", XdeskIcons.AppWindow, "Chuyển ứng dụng (⌘ Tab)") {
+        controller.input?.tapKey(0x2B, 8)
+    },
+    DockShortcut("Undo", XdeskIcons.Undo, "Hoàn tác (⌘ Z)") {
+        controller.input?.tapKey(0x1D, 8)
+    },
+    DockShortcut("Lock", XdeskIcons.Lock, "Khóa máy Mac (⌃ ⌘ Q)") {
+        controller.input?.tapKey(0x14, 10)
+    },
+)
 
 /** Mã SAS có lớp phủ riêng; còn lại, từ lúc chạm Mac tới khung hình đầu tiên là lớp phủ "Đang kết nối" có nút Huỷ. */
 @Composable

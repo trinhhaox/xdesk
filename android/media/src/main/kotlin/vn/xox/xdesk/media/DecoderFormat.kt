@@ -3,8 +3,8 @@ package vn.xox.xdesk.media
 import android.media.MediaFormat
 
 internal object DecoderFormat {
-    fun build(width: Int, height: Int, quirk: DecoderQuirk?, extraFormat: Map<String, Int>): MediaFormat =
-        MediaFormat.createVideoFormat(AndroidCodecList.MIME_AVC, width, height).apply {
+    fun build(width: Int, height: Int, quirk: DecoderQuirk?, extraFormat: Map<String, Int>, mime: String = AndroidCodecList.MIME_AVC): MediaFormat =
+        MediaFormat.createVideoFormat(mime, width, height).apply {
             setInteger(MediaFormat.KEY_LOW_LATENCY, 1) // gửi cả khi không quảng bá FEATURE_LowLatency: codec không biết thì bỏ qua
             setInteger(MediaFormat.KEY_PRIORITY, 0)
             setInteger(MediaFormat.KEY_OPERATING_RATE, Short.MAX_VALUE.toInt())

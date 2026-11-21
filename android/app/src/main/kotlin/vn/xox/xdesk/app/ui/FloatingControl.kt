@@ -67,13 +67,15 @@ private const val EXPANDED_MS = 8000L
 
 class FloatingAction(val label: String, val icon: ImageVector, val description: String = label, val enabled: Boolean = true, val onClick: () -> Unit)
 
+class DockShortcut(val label: String, val icon: ImageVector, val description: String = label, val onClick: () -> Unit)
+
 /**
  * Một nút nổi 48 dp thay thanh công cụ cố định (thanh cũ che biểu tượng trạng thái trên menu bar Mac): đĩa đặc tối, chữ trắng, viền sáng
  * và bóng nên đọc được trên mọi nền Mac. Chạm mở menu đặc; kéo rồi thả thì dính mép trái/phải gần nhất (vị trí được lưu); sau 3 s không chạm
  * chỉ nhạt còn 70%. Phần tử này vẽ trên khung video nên nhận chạm trước; ngoài nút và menu không có pointerInput nên chạm xuyên xuống video.
  */
 @Composable
-fun FloatingControl(store: FloatingControlStore, status: String, actions: List<FloatingAction>, modifier: Modifier = Modifier) {
+fun FloatingControl(store: FloatingControlStore, status: String, actions: List<FloatingAction>, shortcuts: List<DockShortcut> = emptyList(), modifier: Modifier = Modifier) {
     BoxWithConstraints(modifier.fillMaxSize()) {
         val density = LocalDensity.current
         val size = with(density) { ButtonSize.toPx() }
@@ -103,6 +105,24 @@ fun FloatingControl(store: FloatingControlStore, status: String, actions: List<F
                     .verticalScroll(rememberScrollState()).padding(6.dp),
             ) {
                 if (status.isNotBlank()) Text(status, color = XdeskOverlay.contentMuted, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
+                if (shortcuts.isNotEmpty()) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp).background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(10.dp)).padding(vertical = 4.dp),
+                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        shortcuts.forEach { s ->
+                            Box(
+                                Modifier.size(36.dp).background(Color.White.copy(alpha = 0.12f), CircleShape)
+                                    .pointerInput(s) { detectTapGestures(onTap = { s.onClick(); expanded = false; activity++ }) }
+                                    .semantics { contentDescription = s.description; role = Role.Button; onClick { s.onClick(); expanded = false; activity++; true } },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(s.icon, contentDescription = null, Modifier.size(20.dp), tint = Color.White)
+                            }
+                        }
+                    }
+                }
                 actions.forEach { a ->
                     Box(
                         Modifier.fillMaxWidth().heightIn(min = 48.dp)

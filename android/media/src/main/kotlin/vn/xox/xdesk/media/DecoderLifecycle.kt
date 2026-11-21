@@ -1,7 +1,7 @@
 package vn.xox.xdesk.media
 
-/** Cấu hình decoder đang chạy: cùng Surface (so theo tham chiếu) + cỡ + khoá phụ thì không cần dựng lại. */
-internal data class DecoderKey(val surface: Any, val width: Int, val height: Int, val extra: Map<String, Int>)
+/** Cấu hình decoder đang chạy: cùng Surface (so theo tham chiếu) + cỡ + khoá phụ + mime thì không cần dựng lại. */
+internal data class DecoderKey(val surface: Any, val width: Int, val height: Int, val extra: Map<String, Int>, val mime: String = AndroidCodecList.MIME_AVC)
 
 /** Việc phải làm khi có yêu cầu start mới. */
 internal enum class StartPlan { SKIP_NO_SURFACE, SKIP_UNCHANGED, START, RESTART }

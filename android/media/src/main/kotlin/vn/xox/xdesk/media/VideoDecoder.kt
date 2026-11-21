@@ -47,26 +47,26 @@ class VideoDecoder(
     /**
      * Chọn decoder, cấu hình và start. Chạy trên thread decode, tuần tự với [stop]: codec cũ luôn được huỷ xong trước khi dựng codec mới
      * (Surface chỉ nối được một codec), yêu cầu trùng cấu hình đang chạy thì bỏ qua, Surface đã chết thì không configure.
-     * Trả `false` (và gọi [onError]) nếu máy không có decoder H.264 hoặc cấu hình lỗi; `true` kể cả khi bỏ qua vì đã chạy đúng cấu hình.
+     * Trả `false` (và gọi [onError]) nếu máy không có decoder phù hợp hoặc cấu hình lỗi; `true` kể cả khi bỏ qua vì đã chạy đúng cấu hình.
      */
-    fun start(surface: Surface, width: Int, height: Int, extraFormat: Map<String, Int> = emptyMap(), forceCodec: String? = null): Boolean {
-        val task = FutureTask { startOnThread(surface, width, height, extraFormat, forceCodec) }
+    fun start(surface: Surface, width: Int, height: Int, extraFormat: Map<String, Int> = emptyMap(), forceCodec: String? = null, mime: String = AndroidCodecList.MIME_AVC): Boolean {
+        val task = FutureTask { startOnThread(surface, width, height, extraFormat, forceCodec, mime) }
         if (!handler.post(task)) return false
         return try { task.get(START_TIMEOUT_S, TimeUnit.SECONDS) } catch (e: Exception) { fail("Khởi động decoder thất bại: ${DecoderLifecycle.describe(e)}") }
     }
 
-    private fun startOnThread(surface: Surface, width: Int, height: Int, extraFormat: Map<String, Int>, forceCodec: String?): Boolean {
-        val key = DecoderKey(surface, width, height, extraFormat)
+    private fun startOnThread(surface: Surface, width: Int, height: Int, extraFormat: Map<String, Int>, forceCodec: String?, mime: String): Boolean {
+        val key = DecoderKey(surface, width, height, extraFormat, mime)
         when (DecoderLifecycle.plan(activeKey, key, surface.isValid)) {
             StartPlan.SKIP_NO_SURFACE -> { log("bỏ qua start: Surface đã chết"); return false }
             StartPlan.SKIP_UNCHANGED -> return true
             StartPlan.RESTART -> teardown()
             StartPlan.START -> Unit
         }
-        val candidates = AndroidCodecList.decoders()
-        val choice = (forceCodec?.let { name -> candidates.firstOrNull { it.name == name } } ?: CodecSelector.select(candidates)) ?: return fail("Máy không có decoder H.264")
+        val candidates = AndroidCodecList.decoders(mime)
+        val choice = (forceCodec?.let { name -> candidates.firstOrNull { it.name == name } } ?: CodecSelector.select(candidates)) ?: return fail("Máy không có decoder cho $mime")
         val quirk = DecoderQuirks.forCodec(choice.name)
-        val format = DecoderFormat.build(width, height, quirk, extraFormat)
+        val format = DecoderFormat.build(width, height, quirk, extraFormat, mime)
         var created: MediaCodec? = null
         return try {
             created = MediaCodec.createByCodecName(choice.name)

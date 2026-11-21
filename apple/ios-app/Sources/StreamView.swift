@@ -93,6 +93,8 @@ struct StreamView: View {
 
     private func menuItems(_ close: @escaping () -> Void) -> some View {
         VStack(alignment: .leading, spacing: 0) {
+            quickDockRow(close)
+            Divider().background(Color.white.opacity(0.2)).padding(.vertical, 4)
             item("Ngắt kết nối", "xmark.circle", close) { Task { await model.disconnect() } }
             item(composer.isActive ? "Ẩn bàn phím" : "Bàn phím", composer.isActive ? "keyboard.fill" : "keyboard", close) { composer.isActive.toggle() }
                 .disabled(model.session.state != .streaming)
@@ -103,7 +105,59 @@ struct StreamView: View {
             }
             if model.screenMode == .mirror { MirrorFitMenu(fit: mirrorFit) }
             if zoom.isZoomed { item("Vừa khung màn hình", "arrow.down.right.and.arrow.up.left", close) { zoom.reset?() } }
+            item("Chụp ảnh màn hình Mac", "camera.viewfinder", close) { sendShortcut(usage: 0x21, mods: [.command, .shift]) }
         }
+    }
+
+    private func quickDockRow(_ close: @escaping () -> Void) -> some View {
+        HStack(spacing: 8) {
+            dockButton(systemName: "magnifyingglass", label: "Spotlight") {
+                sendShortcut(usage: 0x2C, mods: .command)
+                close()
+            }
+            dockButton(systemName: "square.2.layers.3d.top.filled", label: "Mission Control") {
+                sendShortcut(usage: 0x52, mods: .control)
+                close()
+            }
+            dockButton(systemName: "app.dashed", label: "App Switcher") {
+                sendShortcut(usage: 0x2B, mods: .command)
+                close()
+            }
+            dockButton(systemName: "arrow.uturn.backward", label: "Hoàn tác") {
+                sendShortcut(usage: 0x1D, mods: .command)
+                close()
+            }
+            dockButton(systemName: "lock", label: "Khóa Mac") {
+                sendShortcut(usage: 0x14, mods: [.control, .command])
+                close()
+            }
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 4)
+        .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+        .padding(.vertical, 2)
+    }
+
+    private func dockButton(systemName: String, label: String, action: @escaping () -> Void) -> some View {
+        Button {
+            Haptics.light()
+            action()
+        } label: {
+            Image(systemName: systemName)
+                .font(.system(size: 15, weight: .semibold))
+                .frame(width: 34, height: 34)
+                .background(Circle().fill(Color.white.opacity(0.12)))
+                .foregroundStyle(.white)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+    }
+
+    private func sendShortcut(usage: UInt16, mods: InputModifiers) {
+        model.session.sendInput([
+            .key(usage: usage, down: true, mods: mods),
+            .key(usage: usage, down: false, mods: mods)
+        ])
     }
 
     private func item(_ title: String, _ symbol: String, _ close: @escaping () -> Void, action: @escaping () -> Void) -> some View {

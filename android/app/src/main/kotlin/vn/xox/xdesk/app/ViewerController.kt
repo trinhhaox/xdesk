@@ -10,6 +10,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import java.util.concurrent.Executors
 import vn.xox.xdesk.app.discovery.DiscoveredHost
+import vn.xox.xdesk.media.AndroidCodecList
 import vn.xox.xdesk.media.VideoDecoder
 import vn.xox.xdesk.transport.AgentApprovalRequest
 import vn.xox.xdesk.transport.DisplayConfigPlanner
@@ -22,6 +23,7 @@ import vn.xox.xdesk.transport.ViewerTarget
 import vn.xox.xdesk.transport.ViewerTrust
 import vn.xox.xdesk.wire.ControlMessage
 import vn.xox.xdesk.wire.MirrorFit
+import vn.xox.xdesk.wire.VideoCodec
 
 /** Trạng thái UI + luồng kết nối. Việc mạng chạy trên một thread nền; trạng thái Compose chỉ ghi từ main thread. */
 class ViewerController(internal val container: AppContainer, private val deviceName: String, private val screenSize: () -> Triple<Int, Int, Float>) : ViewModel() {
@@ -75,8 +77,12 @@ class ViewerController(internal val container: AppContainer, private val deviceN
     internal fun start(targets: List<ViewerTarget>, auth: ViewerAuth, isPairing: Boolean = false) {
         val trust = trust ?: return run { failure = ConnectionFailure(identityError.orEmpty(), false) }
         val (w, h, density) = viewport.actual?.let { Triple(it.first, it.second, screenSize().third) } ?: screenSize()
+        val hasHevc = AndroidCodecList.hasHardwareHevc()
+        val requestedCodec = if (hasHevc) VideoCodec.HEVC else VideoCodec.H264
         val config = DisplayConfigPlanner.config(
-            w.toDouble(), h.toDouble(), density.toDouble(), mode = container.display.mode, mirrorFit = container.display.fit,
+            w.toDouble(), h.toDouble(), density.toDouble(),
+            codec = requestedCodec,
+            mode = container.display.mode, mirrorFit = container.display.fit,
         ) ?: return
         failure = null
         sasPrompt = null
@@ -91,7 +97,7 @@ class ViewerController(internal val container: AppContainer, private val deviceN
         val current = ++generation
         val next = ViewerSession(trust, deviceName, { decoder.submit(it) }, { post { if (current == generation) onState(it) } },
             { Thread(it, "xdesk-udp").also { t -> t.priority = Thread.MAX_PRIORITY } }, onAgentApproval = { post { agentApproval = it } },
-            audioSink = audio.sink)
+            audioSink = audio.sink, preferHevc = hasHevc)
         session = next
         input = StreamInputRouter(next).also { it.configure(config.w / config.scale.toFloat(), config.h / config.scale.toFloat()) }
         background.execute { next.connect(targets, config, auth) }
@@ -131,7 +137,8 @@ class ViewerController(internal val container: AppContainer, private val deviceN
         decoder.recorder = container.streamRecorder()
         // Giống màn hình Mac: cỡ thật do host quyết (tới 2560 cạnh dài) nên báo trần để decoder khỏi cấu hình lại.
         val maxSize = if (isNativeMirror) mapOf(MediaFormat.KEY_MAX_WIDTH to NATIVE_MAX_EDGE, MediaFormat.KEY_MAX_HEIGHT to NATIVE_MAX_EDGE) else emptyMap()
-        decoder.start(target, config.w.toInt(), config.h.toInt(), maxSize)
+        val mime = if (config.codec == VideoCodec.HEVC) AndroidCodecList.MIME_HEVC else AndroidCodecList.MIME_AVC
+        decoder.start(target, config.w.toInt(), config.h.toInt(), maxSize, mime = mime)
     }
 
     private fun onVideoSize(w: Int, h: Int) {

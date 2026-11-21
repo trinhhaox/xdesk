@@ -29,6 +29,13 @@ final class StreamViewModel {
             displayOptionsChanged()
         }
     }
+    /// Bộ mã hoá video (.hevc mặc định tiết kiệm 40% băng thông, .h264 tương thích rộng).
+    var videoCodec: VideoCodec = VideoCodec(rawValue: UserDefaults.standard.string(forKey: "xdesk.videoCodec") ?? "") ?? .hevc {
+        didSet {
+            UserDefaults.standard.set(videoCodec.rawValue, forKey: "xdesk.videoCodec")
+            displayOptionsChanged()
+        }
+    }
     let session: ViewerSession
     /// Danh tính + host đã ghép của iPhone/iPad; nil khi không mở được Keychain/file (xem `securityError`).
     let security: DeviceSecurityStores?
@@ -211,6 +218,7 @@ final class StreamViewModel {
         guard let metrics else { return nil }
         return DisplayConfigPlanner.config(
             pointsWidth: metrics.size.width, pointsHeight: metrics.size.height, scale: metrics.scale,
+            codec: videoCodec,
             mode: screenMode, mirrorFit: mirrorFit
         )
     }

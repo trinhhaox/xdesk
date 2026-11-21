@@ -6,6 +6,7 @@ import android.media.MediaCodecList
 /** Rút danh sách decoder cho một MIME từ MediaCodecList của máy (API 31+, nên `isHardwareAccelerated`/`isAlias` luôn có). */
 object AndroidCodecList {
     const val MIME_AVC = "video/avc"
+    const val MIME_HEVC = "video/hevc"
 
     fun decoders(mime: String = MIME_AVC): List<CodecCandidate> =
         MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos
@@ -20,4 +21,6 @@ object AndroidCodecList {
                         .isFeatureSupported(MediaCodecInfo.CodecCapabilities.FEATURE_LowLatency),
                 )
             }
+
+    fun hasHardwareHevc(): Boolean = decoders(MIME_HEVC).any { it.isHardwareAccelerated }
 }

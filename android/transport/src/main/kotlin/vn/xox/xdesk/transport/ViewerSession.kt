@@ -25,6 +25,7 @@ class ViewerSession(
     private val nowMs: () -> Long = System::currentTimeMillis,
     onAgentApproval: (AgentApprovalRequest?) -> Unit = {},
     private val audioSink: AudioSink? = null,
+    val preferHevc: Boolean = false,
 ) {
     private val connector = ViewerConnector(trust, deviceName, nowMs)
     private val lock = Any()
@@ -134,8 +135,10 @@ class ViewerSession(
     }
 
     /** Khả năng viewer đưa ra: audio chỉ khi app có [audioSink]; host chỉ giữ lại nếu thiết bị này được cấp quyền âm thanh. */
-    private fun offeredCaps(): Long =
-        if (audioSink == null) Capabilities.H264 else Capabilities.H264 or Capabilities.AUDIO_PCM or Capabilities.AUDIO_AAC_ELD
+    private fun offeredCaps(): Long {
+        val video = if (preferHevc) Capabilities.H264 or Capabilities.HEVC else Capabilities.H264
+        return if (audioSink == null) video else video or Capabilities.AUDIO_PCM or Capabilities.AUDIO_AAC_ELD
+    }
 
     private fun startAudio(negotiated: Long) {
         val sink = audioSink ?: return

@@ -110,4 +110,40 @@ internal object XdeskIcons {
         }
     }
     val Stop = build("Stop") { stroke(1.8f) { circle(12f, 12f, 9.5f); moveTo(8.5f, 8.5f); lineTo(15.5f, 15.5f); moveTo(15.5f, 8.5f); lineTo(8.5f, 15.5f) } }
+    val Search = build("Search") {
+        stroke(1.8f) { circle(10.5f, 10.5f, 6.5f); moveTo(15.2f, 15.2f); lineTo(21f, 21f) }
+    }
+    val Layers = build("Layers") {
+        stroke(1.8f) {
+            moveTo(12f, 3f); lineTo(21f, 7.5f); lineTo(12f, 12f); lineTo(3f, 7.5f); close()
+            moveTo(3f, 12f); lineTo(12f, 16.5f); lineTo(21f, 12f)
+            moveTo(3f, 16.5f); lineTo(12f, 21f); lineTo(21f, 16.5f)
+        }
+    }
+    val AppWindow = build("AppWindow") {
+        stroke(1.8f) {
+            roundRect(3f, 4f, 18f, 16f, 2f)
+            moveTo(3f, 9f); horizontalLineTo(21f)
+            circle(6f, 6.5f, 0.8f); circle(9f, 6.5f, 0.8f); circle(12f, 6.5f, 0.8f)
+        }
+    }
+    val Undo = build("Undo") {
+        stroke(1.8f) {
+            moveTo(8f, 7f); lineTo(3f, 12f); lineTo(8f, 17f)
+            moveTo(3f, 12f); horizontalLineTo(14f); arcTo(6f, 6f, 0f, false, true, 20f, 18f)
+        }
+    }
+    val Lock = build("Lock") {
+        stroke(1.8f) {
+            roundRect(5f, 10f, 14f, 11f, 2f)
+            moveTo(8f, 10f); verticalLineTo(7f); arcTo(4f, 4f, 0f, false, true, 16f, 7f); verticalLineTo(10f)
+        }
+    }
+    val Camera = build("Camera") {
+        stroke(1.8f) {
+            roundRect(3f, 6f, 18f, 14f, 2f)
+            circle(12f, 13f, 3.5f)
+            moveTo(8f, 6f); lineTo(9.5f, 3.5f); horizontalLineTo(14.5f); lineTo(16f, 6f)
+        }
+    }
 }
