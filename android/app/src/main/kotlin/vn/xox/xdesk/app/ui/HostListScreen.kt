@@ -61,7 +61,12 @@ fun HostListScreen(controller: ViewerController, onRefresh: () -> Unit) {
                 Group("Máy Mac của bạn") {
                     directory.paired.forEachIndexed { index, entry ->
                         if (index > 0) GroupDivider(XdeskDims.rowPad + XdeskDims.iconBox + XdeskDims.iconGap)
-                        PairedHostRow(entry, { controller.connectPaired(entry) }, { forgetting = entry.known })
+                        PairedHostRow(
+                            entry,
+                            onConnect = { controller.isTrackpadOnlyMode = false; controller.connectPaired(entry) },
+                            onOpenTrackpad = { controller.isTrackpadOnlyMode = true; controller.connectPaired(entry) },
+                            onForget = { forgetting = entry.known }
+                        )
                     }
                 }
             }

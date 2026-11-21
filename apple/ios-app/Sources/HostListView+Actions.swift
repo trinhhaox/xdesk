@@ -16,6 +16,12 @@ extension HostListView {
         }
     }
 
+    /// Kết nối thẳng vào chế độ Bàn phím & Chuột ảo toàn màn hình.
+    func tapPairedTrackpad(_ row: PairedHostRow) {
+        model.isTrackpadOnlyMode = true
+        tapPaired(row)
+    }
+
     func tapUnpaired(_ host: DiscoveredHost) {
         unreachable = nil
         switch model.hostStates[host.id] {

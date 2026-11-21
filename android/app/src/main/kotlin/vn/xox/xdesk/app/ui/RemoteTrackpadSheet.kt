@@ -7,6 +7,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -61,6 +62,8 @@ enum class RemoteTab(val title: String) {
 @Composable
 fun RemoteTrackpadSheet(
     controller: ViewerController,
+    isFullscreen: Boolean = false,
+    onSwitchToScreen: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     onDismiss: () -> Unit
 ) {
@@ -109,10 +112,17 @@ fun RemoteTrackpadSheet(
     }
 
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(Color(0xFF141416))
-            .padding(top = 8.dp, bottom = 16.dp)
+        modifier = if (isFullscreen) {
+            Modifier
+                .fillMaxSize()
+                .background(Color(0xFF141416))
+                .padding(top = 12.dp, bottom = 16.dp)
+        } else {
+            modifier
+                .fillMaxWidth()
+                .background(Color(0xFF141416))
+                .padding(top = 8.dp, bottom = 16.dp)
+        }
     ) {
         // Top Bar
         Row(
@@ -121,12 +131,32 @@ fun RemoteTrackpadSheet(
                 .padding(horizontal = 16.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onDismiss) {
-                Icon(
-                    imageVector = XdeskIcons.Chevron,
-                    contentDescription = "Đóng",
-                    tint = Color.White.copy(alpha = 0.8f)
-                )
+            if (isFullscreen) {
+                if (onSwitchToScreen != null) {
+                    IconButton(onClick = onSwitchToScreen) {
+                        Icon(
+                            imageVector = XdeskIcons.Monitor,
+                            contentDescription = "Xem màn hình Mac",
+                            tint = Color(0xFF3B82F6)
+                        )
+                    }
+                } else {
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            imageVector = XdeskIcons.Stop,
+                            contentDescription = "Ngắt kết nối",
+                            tint = Color.White.copy(alpha = 0.8f)
+                        )
+                    }
+                }
+            } else {
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = XdeskIcons.Chevron,
+                        contentDescription = "Đóng",
+                        tint = Color.White.copy(alpha = 0.8f)
+                    )
+                }
             }
 
             Spacer(Modifier.weight(1f))
@@ -161,12 +191,23 @@ fun RemoteTrackpadSheet(
 
             Spacer(Modifier.weight(1f))
 
-            IconButton(onClick = { controller.sendSystemLock() }) {
-                Icon(
-                    imageVector = XdeskIcons.Lock,
-                    contentDescription = "Khóa Mac",
-                    tint = Color.White.copy(alpha = 0.8f)
-                )
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                IconButton(onClick = { controller.sendSystemLock() }) {
+                    Icon(
+                        imageVector = XdeskIcons.Lock,
+                        contentDescription = "Khóa Mac",
+                        tint = Color.White.copy(alpha = 0.8f)
+                    )
+                }
+                if (isFullscreen) {
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            imageVector = XdeskIcons.Stop,
+                            contentDescription = "Ngắt kết nối",
+                            tint = Color(0xFFEF4444)
+                        )
+                    }
+                }
             }
         }
 
@@ -176,6 +217,7 @@ fun RemoteTrackpadSheet(
         when (selectedTab) {
             RemoteTab.TRACKPAD -> {
                 TrackpadTabContent(
+                    isFullscreen = isFullscreen,
                     cursorX = cursorX,
                     cursorY = cursorY,
                     isLeftDown = isLeftDown,
@@ -221,7 +263,8 @@ fun RemoteTrackpadSheet(
 }
 
 @Composable
-private fun TrackpadTabContent(
+private fun ColumnScope.TrackpadTabContent(
+    isFullscreen: Boolean = false,
     cursorX: Float,
     cursorY: Float,
     isLeftDown: Boolean,
@@ -232,11 +275,19 @@ private fun TrackpadTabContent(
     onLeftDownChange: (Boolean) -> Unit,
     onRightDownChange: (Boolean) -> Unit
 ) {
-    Column(
-        modifier = Modifier
+    val containerModifier = if (isFullscreen) {
+        Modifier
+            .fillMaxWidth()
+            .weight(1f)
+            .padding(horizontal = 16.dp)
+    } else {
+        Modifier
             .fillMaxWidth()
             .height(340.dp)
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 16.dp)
+    }
+    Column(
+        modifier = containerModifier,
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         // Trackpad Touch Surface

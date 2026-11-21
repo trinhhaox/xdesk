@@ -82,7 +82,7 @@ internal fun EmptyPairingState(onScan: () -> Unit) = Column(Modifier.fillMaxWidt
 
 /** Mac đã ghép: biểu tượng máy, tên, trạng thái mạng, nhãn "Đã ghép" và menu "…" (Kết nối / Xoá máy này). */
 @Composable
-internal fun PairedHostRow(entry: PairedEntry, onConnect: () -> Unit, onForget: () -> Unit) {
+internal fun PairedHostRow(entry: PairedEntry, onConnect: () -> Unit, onOpenTrackpad: () -> Unit, onForget: () -> Unit) {
     var menu by remember { mutableStateOf(false) }
     val offline = entry.status == HostStatus.NotSeen
     Row(
@@ -95,10 +95,14 @@ internal fun PairedHostRow(entry: PairedEntry, onConnect: () -> Unit, onForget: 
             Text(entry.status.label, fontSize = 15.sp, lineHeight = 20.sp, color = if (entry.status == HostStatus.Ready) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant)
         }
         BadgeText(HostBadge.PAIRED, Modifier.padding(start = 6.dp))
+        IconButton(onOpenTrackpad) {
+            Icon(XdeskIcons.Cursor, contentDescription = "Bàn phím & Chuột ảo cho ${entry.known.name}", Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary)
+        }
         Box {
             IconButton({ menu = true }) { Icon(XdeskIcons.EllipsisCircle, contentDescription = "Tuỳ chọn cho ${entry.known.name}", Modifier.size(26.dp), tint = MaterialTheme.colorScheme.primary) }
             DropdownMenu(menu, { menu = false }) {
-                DropdownMenuItem({ Text("Kết nối") }, { menu = false; onConnect() }, leadingIcon = { Icon(Icons.Filled.PlayArrow, contentDescription = null) })
+                DropdownMenuItem({ Text("Màn hình từ xa") }, { menu = false; onConnect() }, leadingIcon = { Icon(Icons.Filled.PlayArrow, contentDescription = null) })
+                DropdownMenuItem({ Text("Bàn phím & Chuột ảo") }, { menu = false; onOpenTrackpad() }, leadingIcon = { Icon(XdeskIcons.Cursor, contentDescription = null) })
                 DropdownMenuItem(
                     { Text("Xoá máy này", color = MaterialTheme.colorScheme.error) }, { menu = false; onForget() },
                     leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },

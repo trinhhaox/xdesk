@@ -107,6 +107,16 @@ fun StreamScreen(controller: ViewerController, window: Window) {
     }
     LaunchedEffect(controller.input) { viewRef?.resetZoom() }
 
+    if (controller.isTrackpadOnlyMode) {
+        RemoteTrackpadSheet(
+            controller = controller,
+            isFullscreen = true,
+            onSwitchToScreen = { controller.isTrackpadOnlyMode = false },
+            onDismiss = controller::disconnect
+        )
+        return
+    }
+
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         AndroidView(modifier = Modifier.fillMaxSize(), factory = { ctx ->
             StreamViewport(ctx).also { view ->
@@ -133,9 +143,9 @@ fun StreamScreen(controller: ViewerController, window: Window) {
             onKeyboard = { if (imeBottom > 0) viewRef?.surfaceView?.hideKeyboard() else viewRef?.surfaceView?.showKeyboard() },
             onResetZoom = { viewRef?.resetZoom() },
             onSendFile = { filePickerLauncher.launch("*/*") },
-            onRemoteTrackpad = { showRemoteTrackpad = true }
+            onRemoteTrackpad = { controller.isTrackpadOnlyMode = true }
         ) { showPointerSettings = true }
-        val shortcuts = dockShortcuts(controller, onRemoteTrackpad = { showRemoteTrackpad = true })
+        val shortcuts = dockShortcuts(controller, onRemoteTrackpad = { controller.isTrackpadOnlyMode = true })
         if (!controller.awaitingFrame && controller.sasPrompt == null) FloatingControl(floatingStore, controller.stats, actions, shortcuts, Modifier.padding(bottom = with(density) { obscured.toDp() }))
         controller.input?.takeIf { imeBottom > 0 }?.let {
             KeyBar(it, onHide = { viewRef?.surfaceView?.hideKeyboard() }, modifier = Modifier.align(Alignment.BottomCenter).imePadding())

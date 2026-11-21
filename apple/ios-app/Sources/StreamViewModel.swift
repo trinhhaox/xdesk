@@ -15,6 +15,8 @@ final class StreamViewModel {
     var errorMessage: String?
     /// `true` từ lúc bấm kết nối tới khi người dùng thoát hoặc kết nối hỏng → màn hình stream thay danh sách host.
     var inStream = false
+    /// Chế độ Bàn phím ảo & Chuột điều khiển Mac chuyên dụng toàn màn hình.
+    var isTrackpadOnlyMode = false
     /// Bản sao (mặc định, hay dùng để điều khiển Mac) hay mở rộng màn hình Mac; nhớ giữa các lần mở app.
     var screenMode: ScreenMode = ScreenMode(rawValue: UserDefaults.standard.string(forKey: "xdesk.screenMode") ?? "") ?? .mirror {
         didSet {
@@ -150,6 +152,7 @@ final class StreamViewModel {
     /// Thoát về danh sách host, gửi `bye` lịch sự (cũng là nút Huỷ khi đang kết nối).
     func disconnect() async {
         inStream = false
+        isTrackpadOnlyMode = false
         suspended = false
         await session.disconnect()
     }

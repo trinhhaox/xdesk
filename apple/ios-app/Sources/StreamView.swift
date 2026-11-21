@@ -26,6 +26,14 @@ struct StreamView: View {
     }
 
     var body: some View {
+        if model.isTrackpadOnlyMode {
+            RemoteTrackpadView(model: model, onClose: { model.isTrackpadOnlyMode = false })
+        } else {
+            streamContent
+        }
+    }
+
+    private var streamContent: some View {
         GeometryReader { proxy in
             ZStack(alignment: .topLeading) {
                 Color.black
@@ -117,7 +125,7 @@ struct StreamView: View {
             quickDockRow(close)
             Divider().background(Color.white.opacity(0.2)).padding(.vertical, 4)
             item("Ngắt kết nối", "xmark.circle", close) { Task { await model.disconnect() } }
-            item("Chuột & Bàn phím ảo", "computermouse.fill", close) { showRemoteTrackpad = true }
+            item("Chuột & Bàn phím ảo", "computermouse.fill", close) { model.isTrackpadOnlyMode = true }
             item(composer.isActive ? "Ẩn bàn phím" : "Bàn phím", composer.isActive ? "keyboard.fill" : "keyboard", close) { composer.isActive.toggle() }
                 .disabled(model.session.state != .streaming)
             item("Chuột: \(pointer.settings.mode.title)", pointer.settings.mode.symbol, close) { toggleMode() }
@@ -135,7 +143,7 @@ struct StreamView: View {
     private func quickDockRow(_ close: @escaping () -> Void) -> some View {
         HStack(spacing: 8) {
             dockButton(systemName: "computermouse.fill", label: "Chuột & Bàn phím ảo") {
-                showRemoteTrackpad = true
+                model.isTrackpadOnlyMode = true
                 close()
             }
             dockButton(systemName: "magnifyingglass", label: "Spotlight") {

@@ -58,9 +58,16 @@ struct RemoteTrackpadView: View {
                 Haptics.light()
                 onClose()
             } label: {
-                Image(systemName: "chevron.down.circle.fill")
-                    .font(.system(size: 22))
-                    .foregroundStyle(.white.opacity(0.8))
+                HStack(spacing: 4) {
+                    Image(systemName: "display")
+                        .font(.system(size: 16, weight: .semibold))
+                    Text("Màn hình")
+                        .font(.system(size: 13, weight: .medium))
+                }
+                .foregroundStyle(Color.blue)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color.white.opacity(0.1), in: Capsule())
             }
             .buttonStyle(.plain)
 
@@ -72,19 +79,31 @@ struct RemoteTrackpadView: View {
                 }
             }
             .pickerStyle(.segmented)
-            .frame(maxWidth: 320)
+            .frame(maxWidth: 300)
 
             Spacer()
 
-            Button {
-                Haptics.light()
-                Task { await model.session.sendSystemLock() }
-            } label: {
-                Image(systemName: "lock.fill")
-                    .font(.system(size: 16))
-                    .foregroundStyle(.white.opacity(0.8))
+            HStack(spacing: 12) {
+                Button {
+                    Haptics.light()
+                    Task { await model.session.sendSystemLock() }
+                } label: {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 16))
+                        .foregroundStyle(.white.opacity(0.8))
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    Haptics.light()
+                    Task { await model.disconnect() }
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 18))
+                        .foregroundStyle(.red.opacity(0.85))
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)

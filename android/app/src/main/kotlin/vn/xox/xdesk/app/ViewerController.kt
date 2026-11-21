@@ -57,6 +57,8 @@ class ViewerController(internal val container: AppContainer, private val deviceN
     var agentApproval by mutableStateOf<AgentApprovalRequest?>(null)
     /** Yêu cầu hỗ trợ agent AI đang chờ; null khi đã xong. */
     var agentHelp by mutableStateOf<AgentHelpRequest?>(null)
+    /** Chế độ Bàn phím ảo & Chuột điều khiển Mac chuyên dụng toàn màn hình. */
+    var isTrackpadOnlyMode by mutableStateOf(false)
     /** Cỡ khung video thật (px) để aspect-fit và đổi toạ độ chạm; null khi chưa biết (Giống màn hình Mac chờ decoder báo). */
     var videoSize by mutableStateOf<Pair<Int, Int>?>(null)
         private set
