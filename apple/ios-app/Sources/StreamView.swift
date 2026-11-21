@@ -14,6 +14,7 @@ struct StreamView: View {
     @State private var composer: TextComposerController
     @State private var pointer = PointerSettingsStore()
     @State private var showPointerSettings = false
+    @State private var showRemoteTrackpad = false
     @State private var showFileImporter = false
     @State private var modeNotice: String?
     @State private var zoom = VideoZoomState()
@@ -47,6 +48,9 @@ struct StreamView: View {
         .ignoresSafeArea(.keyboard)
         .background(Color.black.ignoresSafeArea())
         .sheet(isPresented: $showPointerSettings) { PointerSettingsSheet(store: pointer) }
+        .sheet(isPresented: $showRemoteTrackpad) {
+            RemoteTrackpadView(model: model, onClose: { showRemoteTrackpad = false })
+        }
         .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.item]) { result in
             if case .success(let url) = result {
                 guard url.startAccessingSecurityScopedResource() else { return }
@@ -113,6 +117,7 @@ struct StreamView: View {
             quickDockRow(close)
             Divider().background(Color.white.opacity(0.2)).padding(.vertical, 4)
             item("Ngắt kết nối", "xmark.circle", close) { Task { await model.disconnect() } }
+            item("Chuột & Bàn phím ảo", "computermouse.fill", close) { showRemoteTrackpad = true }
             item(composer.isActive ? "Ẩn bàn phím" : "Bàn phím", composer.isActive ? "keyboard.fill" : "keyboard", close) { composer.isActive.toggle() }
                 .disabled(model.session.state != .streaming)
             item("Chuột: \(pointer.settings.mode.title)", pointer.settings.mode.symbol, close) { toggleMode() }
@@ -129,6 +134,10 @@ struct StreamView: View {
 
     private func quickDockRow(_ close: @escaping () -> Void) -> some View {
         HStack(spacing: 8) {
+            dockButton(systemName: "computermouse.fill", label: "Chuột & Bàn phím ảo") {
+                showRemoteTrackpad = true
+                close()
+            }
             dockButton(systemName: "magnifyingglass", label: "Spotlight") {
                 sendShortcut(usage: 0x2C, mods: .command)
                 close()

@@ -73,11 +73,13 @@ import vn.xox.xdesk.app.nextFit
  * Khi bàn phím mở, video dịch lên (không thu nhỏ) để vùng vừa chạm nằm trên bàn phím; thanh phím phụ bám trên bàn phím theo animation IME.
  * Nút nổi vẽ SAU khung video trong cùng Box nên luôn nằm trên và nhận chạm trước, ở mọi chế độ chuột, khi zoom và cả khi bàn phím mở.
  */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun StreamScreen(controller: ViewerController, window: Window) {
     val pointerStore = remember { PointerSettingsStore(window.context) }
     val floatingStore = remember { FloatingControlStore(window.context) }
     var showPointerSettings by remember { mutableStateOf(false) }
+    var showRemoteTrackpad by remember { mutableStateOf(false) }
     var viewRef by remember { mutableStateOf<StreamViewport?>(null) }
     var zoomed by remember { mutableStateOf(false) }
     val density = LocalDensity.current
@@ -126,11 +128,28 @@ fun StreamScreen(controller: ViewerController, window: Window) {
         controller.agentHelp?.takeIf { controller.streaming }?.let { help ->
             AgentHelpBanner(help.reason, onResolved = { controller.resolveAgentHelp(help.id) })
         }
-        val actions = floatingActions(controller, pointerStore, zoomed, keyboardShown = imeBottom > 0, onKeyboard = { if (imeBottom > 0) viewRef?.surfaceView?.hideKeyboard() else viewRef?.surfaceView?.showKeyboard() }, onResetZoom = { viewRef?.resetZoom() }, onSendFile = { filePickerLauncher.launch("*/*") }) { showPointerSettings = true }
-        val shortcuts = dockShortcuts(controller)
+        val actions = floatingActions(
+            controller, pointerStore, zoomed, keyboardShown = imeBottom > 0,
+            onKeyboard = { if (imeBottom > 0) viewRef?.surfaceView?.hideKeyboard() else viewRef?.surfaceView?.showKeyboard() },
+            onResetZoom = { viewRef?.resetZoom() },
+            onSendFile = { filePickerLauncher.launch("*/*") },
+            onRemoteTrackpad = { showRemoteTrackpad = true }
+        ) { showPointerSettings = true }
+        val shortcuts = dockShortcuts(controller, onRemoteTrackpad = { showRemoteTrackpad = true })
         if (!controller.awaitingFrame && controller.sasPrompt == null) FloatingControl(floatingStore, controller.stats, actions, shortcuts, Modifier.padding(bottom = with(density) { obscured.toDp() }))
         controller.input?.takeIf { imeBottom > 0 }?.let {
             KeyBar(it, onHide = { viewRef?.surfaceView?.hideKeyboard() }, modifier = Modifier.align(Alignment.BottomCenter).imePadding())
+        }
+    }
+    if (showRemoteTrackpad) {
+        androidx.compose.material3.ModalBottomSheet(
+            onDismissRequest = { showRemoteTrackpad = false },
+            containerColor = Color(0xFF141416)
+        ) {
+            RemoteTrackpadSheet(
+                controller = controller,
+                onDismiss = { showRemoteTrackpad = false }
+            )
         }
     }
     if (showPointerSettings) {
@@ -144,9 +163,10 @@ fun StreamScreen(controller: ViewerController, window: Window) {
 
 private fun floatingActions(
     controller: ViewerController, store: PointerSettingsStore, zoomed: Boolean, keyboardShown: Boolean,
-    onKeyboard: () -> Unit, onResetZoom: () -> Unit, onSendFile: () -> Unit, onPointerSettings: () -> Unit,
+    onKeyboard: () -> Unit, onResetZoom: () -> Unit, onSendFile: () -> Unit, onRemoteTrackpad: () -> Unit, onPointerSettings: () -> Unit,
 ) = buildList {
     add(FloatingAction("Ngắt kết nối", XdeskIcons.Stop, onClick = controller::disconnect))
+    add(FloatingAction("Chuột & Bàn phím ảo", XdeskIcons.Cursor, "Mở bàn di chuột và phím ảo", onClick = onRemoteTrackpad))
     add(FloatingAction(if (keyboardShown) "Ẩn bàn phím" else "Bàn phím", XdeskIcons.Keyboard, onClick = onKeyboard))
     add(FloatingAction("Chuột: ${store.settings.mode.title()}", if (store.settings.mode == PointerMode.DIRECT) XdeskIcons.HandTap else XdeskIcons.Cursor, "Đổi chế độ chuột, đang là ${store.settings.mode.title()}", onClick = store::toggleMode))
     add(FloatingAction("Cài đặt chuột", XdeskIcons.Sliders, "Cài đặt chuột và con trỏ", onClick = onPointerSettings))
@@ -156,7 +176,10 @@ private fun floatingActions(
     add(FloatingAction("Gửi tệp sang Mac", XdeskIcons.FileTransfer, "Gửi tệp sang máy Mac", onClick = onSendFile))
 }
 
-private fun dockShortcuts(controller: ViewerController) = listOf(
+private fun dockShortcuts(controller: ViewerController, onRemoteTrackpad: () -> Unit) = listOf(
+    DockShortcut("Trackpad", XdeskIcons.Cursor, "Bàn phím & Chuột ảo") {
+        onRemoteTrackpad()
+    },
     DockShortcut("Spotlight", XdeskIcons.Search, "Tìm kiếm Spotlight (⌘ Space)") {
         controller.input?.tapKey(0x2C, 8)
     },

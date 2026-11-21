@@ -174,6 +174,10 @@ class ViewerController(internal val container: AppContainer, private val deviceN
 
     fun sendSystemUnlock() { session?.sendSystemUnlock() }
 
+    fun sendText(text: String) { session?.sendText(text) }
+
+    fun sendInput(events: List<vn.xox.xdesk.wire.InputEvent>) { session?.sendInput(events) }
+
     fun sendFile(name: String, bytes: ByteArray) { session?.sendFile(name, bytes) }
 
     fun refreshStats() {
