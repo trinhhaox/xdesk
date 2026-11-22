@@ -7,13 +7,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import vn.xox.xdesk.app.DisplaySettingsStore
 import vn.xox.xdesk.app.PointerSettingsStore
+import vn.xox.xdesk.app.StreamQualityPreset
 import vn.xox.xdesk.app.WorkMode
 import vn.xox.xdesk.app.input.PointerMode
 import vn.xox.xdesk.wire.MirrorFit
 import vn.xox.xdesk.wire.ScreenMode
+import vn.xox.xdesk.wire.VideoCodec
 
 fun MirrorFit.title() = when (this) {
     MirrorFit.NATIVE -> "Giống màn hình Mac"
@@ -67,6 +70,45 @@ internal fun MirrorFitGroup(display: DisplaySettingsStore, pointer: PointerSetti
             Modifier.clickable { pointer.update { it.copy(mode = PointerMode.DIRECT) } }.padding(XdeskDims.rowPad),
             fontSize = 14.sp,
             color = MaterialTheme.colorScheme.primary,
+        )
+    }
+}
+
+/** "Tốc độ khung hình": 30 fps / 60 fps / 120 fps (tự giới hạn theo tần số quét tối đa của thiết bị). */
+@Composable
+internal fun QualityPresetGroup(display: DisplaySettingsStore, maxDeviceFps: Int) = Group(
+    header = "Tốc độ khung hình",
+    footer = display.qualityPreset.footer(maxDeviceFps),
+) {
+    SegmentedPicker(
+        options = StreamQualityPreset.entries.map { it to it.shortLabel },
+        selected = display.qualityPreset,
+        modifier = Modifier.padding(12.dp),
+        onSelect = display::selectQualityPreset,
+    )
+}
+
+/** "Bộ mã hoá video": HEVC (H.265) / H.264, đồng bộ 1:1 với màn Cài đặt iOS. */
+@Composable
+internal fun VideoCodecGroup(display: DisplaySettingsStore) {
+    val footer = buildString {
+        append(
+            if (display.videoCodec == VideoCodec.HEVC) {
+                "HEVC nén tốt hơn ~40%, giảm độ trễ trên Wi-Fi/Tailscale và tiết kiệm pin."
+            } else {
+                "H.264 tương thích rộng nhất với mọi thiết bị."
+            },
+        )
+        if (!display.supportsHevc) {
+            append("\nThiết bị này chưa hỗ trợ giải mã HEVC phần cứng nên sẽ dùng H.264.")
+        }
+    }
+    Group(header = "Bộ mã hoá video", footer = footer) {
+        SegmentedPicker(
+            options = listOf(VideoCodec.HEVC to "HEVC (H.265)", VideoCodec.H264 to "H.264"),
+            selected = display.videoCodec,
+            modifier = Modifier.padding(12.dp),
+            onSelect = display::selectVideoCodec,
         )
     }
 }

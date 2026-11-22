@@ -4,8 +4,11 @@ public enum ControlMessage: Sendable, Equatable {
     case welcome(Welcome)
     case reject(Reject)
     case displayConfig(DisplayConfig)
+    case displayReconfigure(DisplayConfig)
     case displayReady(DisplayReady)
     case keyframeRequest(KeyframeRequest)
+    case videoPause(VideoPause)
+    case videoResume(VideoResume)
     case netReport(NetReport)
     case bitrateSet(BitrateSet)
     case clipOffer(ClipOffer)
@@ -22,8 +25,15 @@ public enum ControlMessage: Sendable, Equatable {
     case agentApprove(AgentApprove)
     case systemLock(SystemLock)
     case systemUnlock(SystemUnlock)
+    case systemUnlockResult(SystemUnlockResult)
+    case mediaKey(MediaKey)
+    case displayList(DisplayList)
     case fileOffer(FileOffer)
     case fileData(FileData)
+    case fileStart(FileStart)
+    case fileChunk(FileChunk)
+    case fileDone(FileDone)
+    case fileCancel(FileCancel)
     case agentHelp(AgentHelp)
     case unknown(type: String)
 
@@ -37,8 +47,11 @@ public enum ControlMessage: Sendable, Equatable {
         case .welcome(let p): ("welcome", p)
         case .reject(let p): ("reject", p)
         case .displayConfig(let p): ("display.config", p)
+        case .displayReconfigure(let p): ("display.reconfigure", p)
         case .displayReady(let p): ("display.ready", p)
         case .keyframeRequest(let p): ("keyframe.request", p)
+        case .videoPause(let p): ("video.pause", p)
+        case .videoResume(let p): ("video.resume", p)
         case .netReport(let p): ("net.report", p)
         case .bitrateSet(let p): ("bitrate.set", p)
         case .clipOffer(let p): ("clip.offer", p)
@@ -55,8 +68,15 @@ public enum ControlMessage: Sendable, Equatable {
         case .agentApprove(let p): ("agent.approve", p)
         case .systemLock(let p): ("system.lock", p)
         case .systemUnlock(let p): ("system.unlock", p)
+        case .systemUnlockResult(let p): ("system.unlock.result", p)
+        case .mediaKey(let p): ("media.key", p)
+        case .displayList(let p): ("display.list", p)
         case .fileOffer(let p): ("file.offer", p)
         case .fileData(let p): ("file.data", p)
+        case .fileStart(let p): ("file.start", p)
+        case .fileChunk(let p): ("file.chunk", p)
+        case .fileDone(let p): ("file.done", p)
+        case .fileCancel(let p): ("file.cancel", p)
         case .agentHelp(let p): ("agent.help", p)
         case .unknown(let type): (type, nil)
         }
@@ -65,7 +85,7 @@ public enum ControlMessage: Sendable, Equatable {
     /// Kiểm tra giới hạn giá trị (kích thước màn hình, cổng, độ dài text...).
     func validate() throws {
         switch self {
-        case .displayConfig(let c):
+        case .displayConfig(let c), .displayReconfigure(let c):
             guard (1...16384).contains(c.w), (1...16384).contains(c.h) else { throw WireError.invalidField("display.config.size") }
             guard (1...240).contains(c.fps) else { throw WireError.invalidField("display.config.fps") }
             guard c.scale.isFinite, c.scale > 0, c.scale <= 8 else { throw WireError.invalidField("display.config.scale") }
@@ -83,6 +103,18 @@ public enum ControlMessage: Sendable, Equatable {
         case .clipData(let d):
             guard d.size > 0, Int(d.size) <= ClipLimits.maxBytes else { throw WireError.invalidField("clip.data.size") }
             guard ClipLimits.isValidHash(d.hash) else { throw WireError.invalidField("clip.data.hash") }
+        case .fileStart(let s):
+            guard !s.id.isEmpty, s.id.utf8.count <= FileTransferLimits.maxIdBytes else { throw WireError.invalidField("file.start.id") }
+            guard !s.name.isEmpty, s.name.utf8.count <= FileTransferLimits.maxNameBytes else { throw WireError.invalidField("file.start.name") }
+            guard s.size <= FileTransferLimits.maxBytes else { throw WireError.invalidField("file.start.size") }
+        case .fileChunk(let c):
+            guard !c.id.isEmpty, c.id.utf8.count <= FileTransferLimits.maxIdBytes else { throw WireError.invalidField("file.chunk.id") }
+            guard c.size >= 1, Int(c.size) <= FileTransferLimits.chunkBytes else { throw WireError.invalidField("file.chunk.size") }
+        case .fileDone(let d):
+            guard !d.id.isEmpty, d.id.utf8.count <= FileTransferLimits.maxIdBytes else { throw WireError.invalidField("file.done.id") }
+            guard ClipLimits.isValidHash(d.hash) else { throw WireError.invalidField("file.done.hash") }
+        case .fileCancel(let c):
+            guard !c.id.isEmpty, c.id.utf8.count <= FileTransferLimits.maxIdBytes else { throw WireError.invalidField("file.cancel.id") }
         default:
             break
         }

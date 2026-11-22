@@ -56,13 +56,34 @@ struct MenuPopoverLive: View {
             secureInput: host.secureInputActive,
             updateVersion: updater.pendingVersion,
             canCheckUpdates: updater.canCheckForUpdates,
-            version: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String)
+            version: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+            activeTransfer: host.activeFileTransfer,
+            receivedFile: host.lastReceivedFile,
+            transferError: host.fileTransferError)
     }
 
     private var actions: PopoverActions {
         PopoverActions(
             toggleSharing: { [host] in Task { host.isHosting ? await host.stop() : await host.start() } },
             disconnect: { [host] id in Task { await host.disconnect(sessionId: id) } },
+            sendFile: { [host] id in
+                dismiss()
+                NSApp.activate(ignoringOtherApps: true)
+                let panel = NSOpenPanel()
+                panel.canChooseFiles = true
+                panel.canChooseDirectories = false
+                panel.allowsMultipleSelection = false
+                panel.prompt = "Gửi tới thiết bị"
+                if panel.runModal() == .OK, let url = panel.url {
+                    Task { await host.sendFile(to: id, url: url) }
+                }
+            },
+            cancelTransfer: { [host] in Task { await host.cancelActiveFileTransfer() } },
+            revealFile: { url in
+                dismiss()
+                NSWorkspace.shared.activateFileViewerSelecting([url])
+            },
+            dismissFileNotice: { [host] in host.dismissFileTransferNotice() },
             openPermission: { kind in
                 switch kind {
                 case .screenRecording: PermissionsCheck.requestScreenRecording()

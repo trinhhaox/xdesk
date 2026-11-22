@@ -15,8 +15,10 @@ struct VirtualDisplaySpec: Sendable, Equatable {
     var pixelHeight: Int
     var refreshRate: Double
     var hiDPI: Bool
-    /// Bản sao: màn hình Mac phản chiếu màn hình ảo (desktop đổi theo kích thước viewer) thay vì mở rộng sang phải.
+    /// Bản sao: màn hình Mac phản chiếu màn hình ảo (desktop đổi theo kích thước viewer) thay vì mở rộng.
     var mirrorsMac = false
+    /// Hướng đặt màn hình ảo khi mở rộng.
+    var extendSide: ExtendSide = .right
 }
 
 /// Màn hình ảo đang sống; huỷ (deinit) = màn hình biến mất.
@@ -47,6 +49,10 @@ final class VirtualDisplayProvider {
     private(set) var activeDisplays: [String: AcquiredDisplay] = [:]
 
     var activeDisplay: AcquiredDisplay? { activeDisplays["default"] }
+    /// ID các màn hình ảo Xdesk đang tạo (loại khỏi danh sách màn hình vật lý cho viewer chọn).
+    var virtualDisplayIDs: Set<CGDirectDisplayID> {
+        Set(activeDisplays.values.filter { $0.mode == .extend }.map(\.displayID))
+    }
 
     init(backend: any VirtualDisplayBackend = CGVirtualDisplayBackend(), mainDisplayID: @escaping () -> CGDirectDisplayID = { CGMainDisplayID() }) {
         self.backend = backend
@@ -79,10 +85,11 @@ final class VirtualDisplayProvider {
         return acquired
     }
 
-    /// Giống màn hình Mac: dùng thẳng màn hình chính, không đụng cấu hình màn hình (không có gì để khôi phục khi kết thúc).
-    func acquireNative() -> AcquiredDisplay {
+    /// Giống màn hình Mac: dùng thẳng màn hình thật (`displayID` hoặc màn hình chính), không đụng cấu hình màn hình.
+    func acquireNative(displayID: CGDirectDisplayID? = nil) -> AcquiredDisplay {
         release(named: "default")
-        let acquired = AcquiredDisplay(displayID: mainDisplayID(), mode: .native, fallbackReason: nil)
+        let targetID = displayID ?? mainDisplayID()
+        let acquired = AcquiredDisplay(displayID: targetID, mode: .native, fallbackReason: nil)
         activeDisplays["default"] = acquired
         return acquired
     }
@@ -119,7 +126,9 @@ struct CGVirtualDisplayBackend: VirtualDisplayBackend {
         if spec.mirrorsMac {
             try DisplayArrangement.mirrorMac(onto: display.displayID)
         } else {
-            try DisplayArrangement.extendRight(newDisplay: display.displayID)
+            let logicalW = Int32(spec.hiDPI ? spec.pixelWidth / 2 : spec.pixelWidth)
+            let logicalH = Int32(spec.hiDPI ? spec.pixelHeight / 2 : spec.pixelHeight)
+            try DisplayArrangement.extend(newDisplay: display.displayID, side: spec.extendSide, logicalSize: (logicalW, logicalH))
         }
         // Sau khi sắp xếp: cấu hình mirror/extend đặt lại mode về 1× nên chọn Retina trước đó bị mất (desktop Mac hiện đủ pixel
         // thay vì điểm = pixel / 2, chữ rất nhỏ trên viewer).

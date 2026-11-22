@@ -3,6 +3,7 @@ import SwiftUI
 import UIKit
 import XdeskInput
 import XdeskMedia
+import XdeskTransport
 import XdeskViewer
 import XdeskWire
 
@@ -17,7 +18,9 @@ struct StreamView: View {
     @State private var showFileImporter = false
     @State private var shortcutsExpanded = false
     @State private var fitExpanded = false
+    @State private var displaysExpanded = false
     @State private var modeNotice: String?
+    @State private var noticeTask: Task<Void, Never>?
     @State private var zoom = VideoZoomState()
     @State private var floating = FloatingControlStore()
 
@@ -50,16 +53,25 @@ struct StreamView: View {
                 FloatingControl(
                     store: floating,
                     container: floatingArea(proxy.size),
-                    onCollapse: { shortcutsExpanded = false; fitExpanded = false }
+                    onCollapse: { shortcutsExpanded = false; fitExpanded = false; displaysExpanded = false }
                 ) { close, keepAlive in
                     menuItems(close, keepAlive: keepAlive)
                 }
                 if !composer.preview.isEmpty { composingPreview }
                 if let help = model.session.pendingAgentHelp { agentHelpBanner(help) }
+                VStack(spacing: 8) {
+                    if let transfer = model.session.activeFileTransfer {
+                        fileTransferBanner(transfer)
+                    }
+                    if let fileURL = model.session.lastReceivedFileURL {
+                        receivedFileBanner(fileURL)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .top)
                 if let notice = modeNotice ?? model.clipboardNotice { toast(notice) }
             }
             .onChange(of: proxy.size, initial: true) { _, size in
-                model.screenChanged(ScreenMetrics(size: size, scale: displayScale))
+                model.screenChanged(ScreenMetrics(size: size, scale: displayScale, maxFps: ScreenMetrics.currentMaxFps()))
             }
         }
         .ignoresSafeArea(.keyboard)
@@ -68,16 +80,28 @@ struct StreamView: View {
         .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.item]) { result in
             if case .success(let url) = result {
                 guard url.startAccessingSecurityScopedResource() else { return }
-                defer { url.stopAccessingSecurityScopedResource() }
                 Task {
+                    defer { url.stopAccessingSecurityScopedResource() }
                     do {
                         try await model.session.sendFile(url: url)
-                        modeNotice = "Đã gửi tệp \(url.lastPathComponent) sang Mac"
+                        showTransientNotice("Đã gửi tệp \(url.lastPathComponent) sang Mac")
+                    } catch is CancellationError {
+                        showTransientNotice("Đã huỷ gửi tệp")
                     } catch {
-                        modeNotice = "Gửi tệp thất bại: \(error.localizedDescription)"
+                        showTransientNotice("Gửi tệp thất bại: \(error.localizedDescription)")
                     }
                 }
             }
+        }
+        .onChange(of: model.session.lastUnlockResult) { _, result in
+            guard let result else { return }
+            showTransientNotice(result.message)
+            model.session.clearLastUnlockResult()
+        }
+        .onChange(of: model.session.lastFileTransferError) { _, err in
+            guard let err else { return }
+            showTransientNotice("Nhận tệp thất bại: \(err)")
+            model.session.clearLastFileTransferError()
         }
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
@@ -112,7 +136,11 @@ struct StreamView: View {
     private var connectingCard: some View {
         VStack(spacing: 16) {
             ProgressView().controlSize(.large).tint(.white)
-            Text("Đang kết nối tới \(model.connectingName ?? "máy Mac")…")
+            Text(
+                model.reconnectAttempt > 0
+                    ? "Đang kết nối lại tới \(model.connectingName ?? "máy Mac") (lần \(model.reconnectAttempt)/3)…"
+                    : "Đang kết nối tới \(model.connectingName ?? "máy Mac")…"
+            )
                 .font(.headline).multilineTextAlignment(.center)
             Button { Task { await model.disconnect() } } label: {
                 Text("Huỷ").frame(minWidth: 120, minHeight: 44)
@@ -131,6 +159,7 @@ struct StreamView: View {
         let dismiss = {
             shortcutsExpanded = false
             fitExpanded = false
+            displaysExpanded = false
             close()
         }
         return VStack(alignment: .leading, spacing: 0) {
@@ -178,23 +207,36 @@ struct StreamView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Cài đặt chuột và con trỏ")
             }
+            if model.session.audioAvailable {
+                item(
+                    model.session.audioMuted ? "Âm thanh: Đã tắt" : "Âm thanh: Bật",
+                    model.session.audioMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
+                    dismiss
+                ) {
+                    model.session.toggleAudioMute()
+                    showTransientNotice(model.session.audioMuted ? "Đã tắt tiếng trên thiết bị" : "Đã bật tiếng")
+                }
+            }
             if model.activeWorkMode == .mirror {
                 MirrorFitMenu(
                     fit: mirrorFit,
                     expanded: $fitExpanded,
                     onToggle: {
                         fitExpanded.toggle()
-                        if fitExpanded { shortcutsExpanded = false }
+                        if fitExpanded { shortcutsExpanded = false; displaysExpanded = false }
                         keepAlive()
                     },
                     onSelectDone: dismiss
                 )
+                if model.session.hostDisplays.count >= 2 {
+                    hostDisplayPickerMenu(dismiss: dismiss, keepAlive: keepAlive)
+                }
             }
             if zoom.isZoomed { item("Vừa khung màn hình", "arrow.down.right.and.arrow.up.left", dismiss) { zoom.reset?() } }
             Button {
                 Haptics.light()
                 shortcutsExpanded.toggle()
-                if shortcutsExpanded { fitExpanded = false }
+                if shortcutsExpanded { fitExpanded = false; displaysExpanded = false }
                 keepAlive()
             } label: {
                 HStack {
@@ -341,9 +383,15 @@ struct StreamView: View {
 
     private func toggleMode() {
         pointer.toggleMode()
-        modeNotice = "Chế độ chuột: \(pointer.settings.mode.title)"
-        Task {
-            try? await Task.sleep(for: .seconds(1.5))
+        showTransientNotice("Chế độ chuột: \(pointer.settings.mode.title)")
+    }
+
+    private func showTransientNotice(_ message: String) {
+        noticeTask?.cancel()
+        modeNotice = message
+        noticeTask = Task {
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled else { return }
             modeNotice = nil
         }
     }
@@ -351,15 +399,152 @@ struct StreamView: View {
     private func unlockMacWithBiometrics() {
         let context = LAContext()
         var error: NSError?
-        if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
-            context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: "Xác thực để mở khóa máy Mac") { success, _ in
+        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) else {
+            showTransientNotice("Cần bật Face ID / mật mã điện thoại để mở khoá Mac")
+            return
+        }
+        context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "Xác thực để mở khóa máy Mac") { success, _ in
+            Task { @MainActor in
                 if success {
-                    Task { await model.session.sendSystemUnlock() }
+                    await model.session.sendSystemUnlock()
+                } else {
+                    showTransientNotice("Đã huỷ xác thực mở khoá Mac")
                 }
             }
-        } else {
-            Task { await model.session.sendSystemUnlock() }
         }
+    }
+
+    @ViewBuilder
+    private func hostDisplayPickerMenu(dismiss: @escaping () -> Void, keepAlive: @escaping () -> Void) -> some View {
+        let activeId = model.selectedDisplayId ?? model.session.hostDisplays.first(where: \.isMain)?.id ?? model.session.hostDisplays.first?.id
+        let activeName = model.session.hostDisplays.first(where: { $0.id == activeId })?.name ?? "Mặc định"
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                Haptics.light()
+                displaysExpanded.toggle()
+                if displaysExpanded { fitExpanded = false; shortcutsExpanded = false }
+                keepAlive()
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "display.2")
+                        .font(.system(size: 16, weight: .medium))
+                        .frame(width: 22, alignment: .center)
+                    Text("Màn hình: \(activeName)")
+                        .font(.system(size: 15, weight: .medium))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                    Spacer(minLength: 4)
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.65))
+                        .rotationEffect(.degrees(displaysExpanded ? 90 : 0))
+                }
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .padding(.horizontal, 10)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if displaysExpanded {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(model.session.hostDisplays) { display in
+                        let selected = display.id == activeId
+                        Button {
+                            Haptics.light()
+                            model.selectedDisplayId = display.id
+                            dismiss()
+                        } label: {
+                            HStack(spacing: 8) {
+                                Text("\(display.name) (\(display.width)×\(display.height))")
+                                    .font(.subheadline.weight(selected ? .semibold : .medium))
+                                    .foregroundStyle(.white)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.85)
+                                Spacer(minLength: 4)
+                                if selected {
+                                    Image(systemName: "checkmark")
+                                        .font(.footnote.weight(.bold))
+                                        .foregroundStyle(BrandPalette.primaryOnOverlay)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+                            .padding(.horizontal, 10)
+                            .background(
+                                selected ? BrandPalette.primaryFill.opacity(0.22) : Color.clear,
+                                in: RoundedRectangle(cornerRadius: 8)
+                            )
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(4)
+                .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
+                .padding(.horizontal, 4)
+                .padding(.bottom, 4)
+            }
+        }
+    }
+
+    private func fileTransferBanner(_ progress: FileTransferProgress) -> some View {
+        let percent = Int((progress.fraction * 100).rounded())
+        return HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(progress.direction == .sending ? "Đang gửi" : "Đang nhận") \(progress.fileName) (\(percent)%)")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                ProgressView(value: progress.fraction)
+                    .tint(BrandPalette.primaryOnOverlay)
+            }
+            Button("Huỷ") {
+                Task { await model.session.cancelFileTransfer() }
+            }
+            .font(.caption.weight(.semibold))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(Color.white.opacity(0.18), in: Capsule())
+            .foregroundStyle(.white)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(BrandPalette.overlaySurface.opacity(0.92), in: RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+    }
+
+    private func receivedFileBanner(_ url: URL) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "doc.fill")
+                .foregroundStyle(BrandPalette.accent)
+            Text("Đã nhận \(url.lastPathComponent)")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+            Spacer()
+            ShareLink(item: url) {
+                Text("Chia sẻ")
+                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(BrandPalette.primaryFill, in: Capsule())
+                    .foregroundStyle(.white)
+            }
+            Button {
+                model.session.clearLastReceivedFile()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.white.opacity(0.8))
+                    .frame(width: 28, height: 28)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(BrandPalette.overlaySurface.opacity(0.92), in: RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
     }
 
     @ViewBuilder

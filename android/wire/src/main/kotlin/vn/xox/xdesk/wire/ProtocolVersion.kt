@@ -29,4 +29,10 @@ object Capabilities {
     const val CLIPBOARD = 1L shl 4
     const val MEDIA_OVER_TCP = 1L shl 5
     const val TOUCH_INPUT = 1L shl 6
+    const val HOT_RECONFIGURE = 1L shl 7
+    const val VIDEO_PAUSE = 1L shl 8
+    const val FILE_TRANSFER = 1L shl 9
+    const val REMOTE_UNLOCK = 1L shl 10
+    const val MEDIA_KEYS = 1L shl 11
+    const val MULTI_DISPLAY = 1L shl 12
 }

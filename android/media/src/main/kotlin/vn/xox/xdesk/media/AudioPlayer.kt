@@ -53,6 +53,7 @@ class AudioPlayer(
     private var hostHoldMs = 0
     private var thread: Thread? = null
     @Volatile private var running = false
+    @Volatile var muted: Boolean = false
 
     val stats: AudioPlayerStats
         get() = synchronized(lock) {
@@ -118,7 +119,7 @@ class AudioPlayer(
     /** Rút [frames] mẫu/kênh từ jitter buffer và ghi ra thiết bị (luồng phát; test gọi trực tiếp). */
     internal fun pump(frames: Int) {
         val pcm = synchronized(lock) { jitter.pull(frames) }
-        output.write(pcm)
+        output.write(if (muted) ShortArray(pcm.size) else pcm)
     }
 
     private fun samples(payload: AudioPayload): ShortArray = when (payload.codec) {

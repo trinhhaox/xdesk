@@ -87,4 +87,18 @@ class AudioPlayerTest {
     fun littleEndianConversion() {
         assertEquals(listOf<Short>(0x0201, -1), AudioPlayer.pcmFromLittleEndian(byteArrayOf(1, 2, -1, -1)).toList())
     }
+
+    @Test
+    fun mutedOutputsSilenceWhileDrainingJitterBuffer() {
+        val output = RecordingOutput()
+        val player = AudioPlayer(output) { FakeAacDecoder() }
+        for (seq in 0L until 8) player.ingest(pcmPacket(seq, 0x0506))
+        player.muted = true
+        player.pump(240)
+        assertTrue(output.written.single().all { it == 0.toShort() })
+        assertEquals(35, player.stats.jitterDepthMs)
+        player.muted = false
+        player.pump(240)
+        assertTrue(output.written.last().all { it == 0x0506.toShort() })
+    }
 }

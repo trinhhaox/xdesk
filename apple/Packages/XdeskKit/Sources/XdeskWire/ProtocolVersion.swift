@@ -35,4 +35,10 @@ public struct Capabilities: OptionSet, Sendable, Hashable {
     public static let clipboard = Capabilities(rawValue: 1 << 4)
     public static let mediaOverTcp = Capabilities(rawValue: 1 << 5)
     public static let touchInput = Capabilities(rawValue: 1 << 6)
+    public static let hotReconfigure = Capabilities(rawValue: 1 << 7)
+    public static let videoPause = Capabilities(rawValue: 1 << 8)
+    public static let fileTransfer = Capabilities(rawValue: 1 << 9)
+    public static let remoteUnlock = Capabilities(rawValue: 1 << 10)
+    public static let mediaKeys = Capabilities(rawValue: 1 << 11)
+    public static let multiDisplay = Capabilities(rawValue: 1 << 12)
 }

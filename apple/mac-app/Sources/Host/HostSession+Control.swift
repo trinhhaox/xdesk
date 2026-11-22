@@ -7,18 +7,23 @@ extension HostSession {
 
     func controlLoop() async throws {
         while let inbound = try await connection.nextInbound() {
-            if case .bulk(let chunk) = inbound { await clipboard?.handleBulk(chunk); continue }
+            if case .bulk(let chunk) = inbound { await handleIncomingBulk(chunk); continue }
             if case .mediaOverTcp(let packet) = inbound { await channel?.ingest(packet); continue }
             guard case .message(let envelope) = inbound else { continue }
             switch envelope.message {
             case .clipOffer, .clipPull, .clipData: await clipboard?.handle(envelope.message)
             case .keyframeRequest: pipeline?.requestKeyframe()
+            case .videoPause: await setVideoPaused(true)
+            case .videoResume: await setVideoPaused(false)
+            case .displayReconfigure(let config): try await reconfigureDisplay(config, requestId: envelope.id)
             case .netReport(let r): try await applyNetReport(r)
             case .ping(let ping):
                 let t1 = ClockSync.wallClockMs()
                 let pong = ClockSync.makePong(for: ping, receivedAtMs: t1, sentAtMs: ClockSync.wallClockMs())
                 _ = try await connection.send(.pong(pong), id: envelope.id)
             case .inputText(let t): await handleInputText(t.text)
+            case .mediaKey(let mk):
+                if permissions.input, AccessibilityPermission.isGranted { MediaKeyInjector.send(mk.key) }
             case .rekeyResync(let resync): await channel?.handleResync(resync)
             case .agentApprove(let answer) where !answer.isRequest:
                 // Chỉ thiết bị có quyền điều khiển mới được duyệt quyền cho agent.
@@ -29,6 +34,14 @@ extension HostSession {
                 await handleSystemLock()
             case .systemUnlock:
                 await handleSystemUnlock()
+            case .fileStart(let start):
+                await handleFileStart(start)
+            case .fileChunk(let header):
+                await handleFileChunk(header)
+            case .fileDone(let done):
+                await handleFileDone(done)
+            case .fileCancel(let cancel):
+                await handleFileCancel(cancel)
             case .fileOffer(let offer):
                 await handleFileOffer(offer)
             case .fileData(let data):

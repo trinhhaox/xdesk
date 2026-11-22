@@ -35,6 +35,7 @@ public final class AudioPlayer: @unchecked Sendable {
         var jitter = AudioJitterBuffer()
         var stats = AudioPlaybackStats()
         var quietPackets = 0
+        var muted = false
     }
 
     private static let onsetPeak = 3_000
@@ -47,6 +48,11 @@ public final class AudioPlayer: @unchecked Sendable {
     private let log = Logger(subsystem: "vn.xox.xdesk", category: "audio-player")
 
     public init() {}
+
+    public var isMuted: Bool {
+        get { state.withLock { $0.muted } }
+        set { state.withLock { $0.muted = newValue } }
+    }
 
     public var stats: AudioPlaybackStats {
         state.withLock { s in
@@ -128,11 +134,18 @@ public final class AudioPlayer: @unchecked Sendable {
     }
 
     private static func render(state: OSAllocatedUnfairLock<State>, frameCount: Int, into list: UnsafeMutablePointer<AudioBufferList>) {
-        let pcm = state.withLock { $0.jitter.pull(frames: frameCount) }
+        let (pcm, muted) = state.withLock { ($0.jitter.pull(frames: frameCount), $0.muted) }
         let buffers = UnsafeMutableAudioBufferListPointer(list)
         guard buffers.count >= 2,
               let left = buffers[0].mData?.assumingMemoryBound(to: Float.self),
               let right = buffers[1].mData?.assumingMemoryBound(to: Float.self) else { return }
+        if muted {
+            for i in 0..<frameCount {
+                left[i] = 0
+                right[i] = 0
+            }
+            return
+        }
         let scale = 1 / Float(Int16.max)
         for i in 0..<frameCount {
             left[i] = Float(pcm[2 * i]) * scale

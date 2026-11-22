@@ -1,5 +1,6 @@
 package vn.xox.xdesk.transport
 
+import java.io.ByteArrayOutputStream
 import java.io.Closeable
 import java.io.IOException
 import java.net.InetSocketAddress
@@ -11,6 +12,7 @@ import vn.xox.xdesk.crypto.SessionKeys
 import vn.xox.xdesk.crypto.StreamFormat
 import vn.xox.xdesk.crypto.StreamReceiver
 import vn.xox.xdesk.crypto.StreamSender
+import vn.xox.xdesk.wire.ClipLimits
 import vn.xox.xdesk.wire.ControlEnvelope
 import vn.xox.xdesk.wire.ControlFrame
 import vn.xox.xdesk.wire.ControlFrameCodec
@@ -18,6 +20,10 @@ import vn.xox.xdesk.wire.ControlFrameDecoder
 import vn.xox.xdesk.wire.ControlFrameKind
 import vn.xox.xdesk.wire.ControlMessage
 import vn.xox.xdesk.wire.ControlMessageCodec
+import vn.xox.xdesk.wire.FileTransferLimits
+import vn.xox.xdesk.wire.MediaPacket
+import vn.xox.xdesk.wire.WireErrorCode
+import vn.xox.xdesk.wire.WireException
 
 /**
  * Kênh điều khiển TCP phía viewer (blocking, thread-safe cho phần gửi).
@@ -62,6 +68,60 @@ class ControlConnection private constructor(private val socket: Socket, private 
 
     fun sendHandshake(frame: HandshakeFrame) {
         sendFrame(ControlFrame(ControlFrameKind.HANDSHAKE, frame.encode()))
+    }
+
+    /** Gửi gói media dự phòng qua kênh TCP đã mã hoá (kind 0x04, đường hầm USB adb reverse). */
+    fun sendMediaOverTcp(packet: MediaPacket) {
+        sendFrame(ControlFrame(ControlFrameKind.MEDIA_OVER_TCP, packet.encode()))
+    }
+
+    /** Gửi một lần truyền clipboard (`clip.data` + các chunk bulk ≤ 64 KiB) trong cùng khoá ghi để không bị xen giữa. */
+    fun sendClipData(header: ControlMessage.ClipData, payload: ByteArray) {
+        if (payload.size.toLong() != header.size || payload.size > ClipLimits.MAX_BYTES) {
+            throw WireException(WireErrorCode.invalidField, "clip.data.size")
+        }
+        synchronized(writeLock) {
+            if (isClosed) transportError(TransportErrorCode.CONNECTION_CLOSED)
+            val useId = nextMessageId++
+            val headerPayload = ControlMessageCodec.encode(ControlEnvelope(useId, header))
+            val out = ByteArrayOutputStream(headerPayload.size + payload.size + 256)
+            out.write(wireBytes(ControlFrame(ControlFrameKind.CONTROL, headerPayload)))
+            var offset = 0
+            while (offset < payload.size) {
+                val end = minOf(offset + ControlFrame.MAX_BULK_PAYLOAD, payload.size)
+                out.write(wireBytes(ControlFrame(ControlFrameKind.BULK, payload.copyOfRange(offset, end))))
+                offset = end
+            }
+            try {
+                socket.getOutputStream().apply { write(out.toByteArray()); flush() }
+            } catch (e: IOException) {
+                close()
+                transportError(TransportErrorCode.CONNECTION_FAILED, e.message, e)
+            }
+        }
+    }
+
+    /** Gửi một mảnh tệp streaming: cặp nguyên tử `[file.chunk, BULK]` trong cùng khoá ghi. */
+    fun sendFileBulkChunk(header: ControlMessage.FileChunk, payload: ByteArray) {
+        if (payload.isEmpty() || payload.size.toLong() != header.size || payload.size > ControlFrame.MAX_BULK_PAYLOAD ||
+            header.size > FileTransferLimits.CHUNK_BYTES
+        ) {
+            throw WireException(WireErrorCode.invalidField, "file.chunk.size")
+        }
+        synchronized(writeLock) {
+            if (isClosed) transportError(TransportErrorCode.CONNECTION_CLOSED)
+            val useId = nextMessageId++
+            val headerPayload = ControlMessageCodec.encode(ControlEnvelope(useId, header))
+            val out = ByteArrayOutputStream(headerPayload.size + payload.size + 64)
+            out.write(wireBytes(ControlFrame(ControlFrameKind.CONTROL, headerPayload)))
+            out.write(wireBytes(ControlFrame(ControlFrameKind.BULK, payload)))
+            try {
+                socket.getOutputStream().apply { write(out.toByteArray()); flush() }
+            } catch (e: IOException) {
+                close()
+                transportError(TransportErrorCode.CONNECTION_FAILED, e.message, e)
+            }
+        }
     }
 
     private fun sendFrame(frame: ControlFrame) {

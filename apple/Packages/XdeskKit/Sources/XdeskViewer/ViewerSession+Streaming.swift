@@ -9,11 +9,27 @@ extension ViewerSession {
     func readControl(_ conn: ControlConnection) async {
         do {
             while let inbound = try await conn.nextInbound() {
-                if case .bulk(let chunk) = inbound { await clipboardSync?.handleBulk(chunk); continue }
+                if case .bulk(let chunk) = inbound {
+                    if await fileReceiver.handleBulk(chunk) { continue }
+                    await clipboardSync?.handleBulk(chunk)
+                    continue
+                }
                 if case .mediaOverTcp(let packet) = inbound { await channel?.ingest(packet); continue }
                 guard case .message(let envelope) = inbound else { continue }
                 switch envelope.message {
                 case .clipOffer, .clipPull, .clipData: await clipboardSync?.handle(envelope.message)
+                case .fileStart(let start): await fileReceiver.handleStart(start)
+                case .fileChunk(let header): await fileReceiver.handleChunkHeader(header)
+                case .fileDone(let done): await fileReceiver.handleDone(done)
+                case .fileCancel(let cancel):
+                    if activeSendingFileId == cancel.id {
+                        fileCancelToken.cancel(cancel.id)
+                    } else {
+                        await fileReceiver.handleCancel(cancel)
+                    }
+                case .displayList(let list): hostDisplays = list.displays
+                case .systemUnlockResult(let result): lastUnlockResult = result
+                case .displayReady: finishReconfigure(id: envelope.id, ok: true)
                 case .pong(let pong): updateClock(ClockSample(pong: pong, receivedAtMs: ClockSync.wallClockMs()))
                 case .bye(let bye): throw TransportError.rejected(reason: "bye", detail: bye.reason)
                 case .reject(let reject) where reject.reason == Reject.reasonRevoked:
@@ -26,9 +42,9 @@ extension ViewerSession {
                 default: break
                 }
             }
-            await fail(String(localized: "Host đã ngắt kết nối", bundle: .module))
+            await fail(String(localized: "Host đã ngắt kết nối", bundle: .module), transient: true)
         } catch {
-            await fail(error.localizedDescription)
+            await fail(error.localizedDescription, transient: Self.isTransientError(error))
         }
     }
 
@@ -52,7 +68,7 @@ extension ViewerSession {
                 handleInputAck(packet)
                 handleAudio(packet)
             case .peerConnected: break
-            case .linkLost: await fail(String(localized: "Mất liên lạc với host (UDP)", bundle: .module))
+            case .linkLost: await fail(String(localized: "Mất liên lạc với host (UDP)", bundle: .module), transient: true)
             }
         }
     }

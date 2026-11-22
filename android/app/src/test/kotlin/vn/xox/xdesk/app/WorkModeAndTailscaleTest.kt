@@ -45,4 +45,14 @@ class WorkModeAndTailscaleTest {
         assertFalse(TailscaleSupport.isTailscaleHost("example.com"))
         assertFalse(TailscaleSupport.isTailscaleHost(""))
     }
+
+    @Test fun streamQualityPresetCapsToDeviceRefreshRate() {
+        assertEquals(30, StreamQualityPreset.SAVER_30.effectiveFps(maxDeviceFps = 120))
+        assertEquals(60, StreamQualityPreset.STANDARD_60.effectiveFps(maxDeviceFps = 120))
+        assertEquals(120, StreamQualityPreset.HIGH_120.effectiveFps(maxDeviceFps = 120))
+        assertEquals(90, StreamQualityPreset.HIGH_120.effectiveFps(maxDeviceFps = 90))
+        assertEquals(60, StreamQualityPreset.HIGH_120.effectiveFps(maxDeviceFps = 60))
+        assertEquals(30, StreamQualityPreset.SAVER_30.effectiveFps(maxDeviceFps = 24))
+        assertTrue(StreamQualityPreset.HIGH_120.footer(maxDeviceFps = 60).contains("60 fps"))
+    }
 }

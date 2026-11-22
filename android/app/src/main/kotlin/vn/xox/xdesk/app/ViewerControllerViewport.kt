@@ -25,22 +25,49 @@ fun ViewerController.prepareForConnect(overrideMode: WorkMode? = null) {
 /** Đổi chế độ làm việc ngay trong khi đang kết nối Mac (nếu đổi giữa Chiếu Mac ↔ Màn phụ thì thương lượng lại `display.config`). */
 fun ViewerController.switchWorkMode(next: WorkMode) {
     if (activeWorkMode == next) return
+    val wasControl = activeWorkMode.isControlMode
     val currentScreen = negotiatedScreenMode ?: container.display.mode
     activeWorkMode = next
-    val neededScreen = next.screenMode ?: return
+    val neededScreen = next.screenMode
+    if (neededScreen == null) {
+        if (!wasControl) session?.setVideoPaused(true)
+        return
+    }
     if (neededScreen != currentScreen) {
         container.display.selectMode(neededScreen)
         val target = session?.connectedTarget ?: lastTarget ?: return
-        restartWith(target)
+        reconfigureOrRestart(target)
+    } else if (wasControl) {
+        session?.setVideoPaused(false)
     }
 }
 
-/** Đổi kiểu Chiếu màn hình rồi kết nối lại (host phải đổi cỡ màn hình nên phải đàm phán lại). */
+/** Đổi kiểu Chiếu màn hình nóng (nếu host hỗ trợ) hoặc kết nối lại. */
 fun ViewerController.switchFit(next: MirrorFit) {
     if (container.display.fit == next) return
     val target = session?.connectedTarget ?: lastTarget ?: return
     container.display.selectFit(next)
-    restartWith(target)
+    reconfigureOrRestart(target)
+}
+
+internal fun ViewerController.reconfigureOrRestart(target: ViewerTarget) {
+    val activeSession = session
+    val built = buildDisplayConfig()
+    if (activeSession != null && built != null && activeSession.supportsHotReconfigure) {
+        val (w, h, config) = built
+        activeSession.reconfigureDisplay(config) { ok ->
+            post {
+                if (session !== activeSession) return@post
+                if (ok) {
+                    applyReconfiguredConfig(w, h, config)
+                } else {
+                    restartWith(target)
+                }
+            }
+        }
+    } else {
+        restartWith(target)
+    }
 }
 
 internal fun ViewerController.restartWith(target: ViewerTarget) {

@@ -9,13 +9,19 @@ public struct AudioConfig: Sendable {
 extension ViewerSession {
     /// Bật trình phát khi host đã thương lượng audio. Lỗi (không có thiết bị ra, phiên audio bị chiếm) chỉ tắt tiếng, không làm hỏng phiên video.
     func startAudio(negotiated: Capabilities) {
-        guard audioConfig != nil, negotiated.contains(.audioPCM) || negotiated.contains(.audioAACELD) else { return }
+        guard audioConfig != nil, negotiated.contains(.audioPCM) || negotiated.contains(.audioAACELD) else {
+            audioAvailable = false
+            return
+        }
         let player = AudioPlayer()
         do {
             try player.start()
+            player.isMuted = audioMuted
             audioPlayer = player
             audioStats = player.stats
+            audioAvailable = true
         } catch {
+            audioAvailable = false
             log.error("không bật được audio: \(error.localizedDescription, privacy: .public)")
         }
     }
@@ -24,6 +30,13 @@ extension ViewerSession {
         audioPlayer?.stop()
         audioPlayer = nil
         audioStats = nil
+        audioAvailable = false
+        audioMuted = false
+    }
+
+    public func toggleAudioMute() {
+        audioMuted.toggle()
+        audioPlayer?.isMuted = audioMuted
     }
 
     func handleAudio(_ packet: MediaPacket) { audioPlayer?.ingest(packet) }

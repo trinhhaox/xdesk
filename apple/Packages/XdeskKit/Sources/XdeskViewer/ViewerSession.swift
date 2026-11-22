@@ -29,6 +29,10 @@ public final class ViewerSession {
     public private(set) var fps = 0
     public private(set) var recvKbps = 0
     public private(set) var rttMs: Int64?
+    public private(set) var negotiatedCaps: Capabilities = []
+    public var supportsHotReconfigure: Bool { negotiatedCaps.contains(.hotReconfigure) }
+    public var supportsVideoPause: Bool { negotiatedCaps.contains(.videoPause) }
+    public private(set) var lastFailureTransient = false
     /// Đích đã kết nối thành công (QR có thể thử nhiều địa chỉ); phiên mở lại dùng đích này.
     public internal(set) var connectedTarget: ViewerTarget?
     /// `ip:cổng` thực của host nhập tay vừa kết nối (tên MagicDNS đã phân giải); nil với host Bonjour.
@@ -54,6 +58,20 @@ public final class ViewerSession {
     public internal(set) var pendingAgentHelp: AgentHelpNotice?
     /// Host đã cấp quyền clipboard cho thiết bị này và phiên đang đồng bộ (iOS dùng để hiện nút "Gửi clipboard sang Mac").
     public internal(set) var clipboardAvailable = false
+    /// Phiên đang phát âm thanh về viewer (bật nút tắt/bật tiếng cục bộ trong menu nổi).
+    public internal(set) var audioAvailable = false
+    /// Tắt tiếng cục bộ trên điện thoại (không tắt tiếng Mac).
+    public internal(set) var audioMuted = false
+    /// Danh sách màn hình vật lý của Mac (host gửi xuống khi kết nối để chọn khi có ≥ 2 màn hình).
+    public internal(set) var hostDisplays: [DisplayInfo] = []
+    /// Tiến trình truyền/nhận tệp hiện tại (nếu có).
+    public internal(set) var activeFileTransfer: FileTransferProgress?
+    /// Đường dẫn tệp vừa nhận xong từ Mac (Documents/Xdesk Downloads).
+    public internal(set) var lastReceivedFileURL: URL?
+    /// Thông báo lỗi truyền tệp gần nhất (nếu có).
+    public internal(set) var lastFileTransferError: String?
+    /// Kết quả đánh thức / mở khoá Mac gần nhất do host gửi về.
+    public internal(set) var lastUnlockResult: SystemUnlockResult?
     /// Số liệu phát audio (nil khi phiên không có audio); cập nhật mỗi 500 ms.
     public internal(set) var audioStats: AudioPlaybackStats?
     /// Ước lượng trễ audio đầu-cuối (ms): host giữ + rtt/2 + jitter buffer + thiết bị phát.
@@ -79,6 +97,26 @@ public final class ViewerSession {
     @ObservationIgnored var inputSequencer = InputSequencer()
     @ObservationIgnored var inputOutbox: AsyncStream<MediaPacket>.Continuation?
     @ObservationIgnored var lastHeartbeatMs: Int64 = 0
+    @ObservationIgnored var reconfigureWaiter: (id: UInt32, cont: CheckedContinuation<Bool, Never>)?
+    @ObservationIgnored var earlyReadyIds: Set<UInt32> = []
+    @ObservationIgnored var activeSendingFileId: String?
+    @ObservationIgnored let fileCancelToken = FileCancelToken()
+    @ObservationIgnored lazy var fileReceiver: FileTransferReceiver = FileTransferReceiver(
+        directory: {
+            let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+                ?? FileManager.default.temporaryDirectory
+            return docs.appendingPathComponent("Xdesk Downloads", isDirectory: true)
+        },
+        onProgress: { [weak self] progress in
+            Task { @MainActor [weak self] in self?.activeFileTransfer = progress }
+        },
+        onCompleted: { [weak self] completion in
+            Task { @MainActor [weak self] in self?.lastReceivedFileURL = completion.url }
+        },
+        onFailed: { [weak self] name, message in
+            Task { @MainActor [weak self] in self?.lastFileTransferError = "\(name): \(message)" }
+        }
+    )
     #if DEBUG
     @ObservationIgnored var windowCount = 0
     #endif
@@ -102,9 +140,14 @@ public final class ViewerSession {
         await connect(candidates: [target], config: config, auth: auth)
     }
 
+    public func connect(candidates: [ViewerTarget], config: DisplayConfig) async {
+        await connect(candidates: candidates, config: config, auth: .automatic)
+    }
+
     func connect(candidates: [ViewerTarget], config: DisplayConfig, auth: ViewerAuth) async {
         guard state == .idle || isFailed else { return }
         state = .connecting
+        lastFailureTransient = false
         refusedHostId = nil
         connectedHostId = nil
         connectedRemoteAddress = nil
@@ -113,6 +156,7 @@ public final class ViewerSession {
             state = .streaming
         } catch {
             log.error("connect failed: \(error.localizedDescription, privacy: .public)")
+            lastFailureTransient = Self.isTransientError(error)
             await teardown()
             state = .failed(error.localizedDescription)
         }
@@ -139,6 +183,7 @@ public final class ViewerSession {
     /// Sau khi kênh đã xác thực: hello/welcome → kênh media (UDP, hoặc MediaOverTcp qua USB) → các vòng lặp của phiên.
     func finishEstablishing(_ conn: ControlConnection, config: DisplayConfig, target: ViewerTarget?) async throws {
         let result = try await conn.performViewerHandshake(name: deviceName, caps: offeredCaps(tunnel: conn.isUsbTunnel), display: config)
+        negotiatedCaps = result.caps
         await startClipboard(on: conn, negotiated: result.caps)
         startAudio(negotiated: result.caps)
         factory = SampleBufferFactory(codec: config.codec)
@@ -183,13 +228,27 @@ public final class ViewerSession {
     }
 
     /// Phiên hỏng giữa chừng (host đóng, thu hồi, mất UDP): báo `failed` rồi dừng mọi vòng lặp; UI gọi `disconnect()` để về `idle`.
-    func fail(_ message: String) async {
+    func fail(_ message: String, transient: Bool = false) async {
         guard state == .streaming else { return }
+        lastFailureTransient = transient
         setState(.failed(message))
         await teardown()
     }
 
     func teardown() async {
+        if let waiter = reconfigureWaiter {
+            reconfigureWaiter = nil
+            waiter.cont.resume(returning: false)
+        }
+        earlyReadyIds.removeAll()
+        hostDisplays = []
+        activeFileTransfer = nil
+        if let sendingId = activeSendingFileId {
+            fileCancelToken.cancel(sendingId)
+            activeSendingFileId = nil
+        }
+        await fileReceiver.cancelAll()
+        negotiatedCaps = []
         pendingAgentApproval = nil
         pendingAgentHelp = nil
         await stopClipboard()
@@ -223,6 +282,58 @@ public final class ViewerSession {
         }
     }
 
+    public func setVideoPaused(_ paused: Bool) async {
+        guard state == .streaming, supportsVideoPause, let connection else { return }
+        let msg: ControlMessage = paused ? .videoPause(VideoPause(streamId: streamId)) : .videoResume(VideoResume(streamId: streamId))
+        _ = try? await connection.send(msg)
+    }
+
+    /// Đổi cấu hình màn hình nóng ngay trong phiên đang mở (trả `false` nếu host cũ hoặc lỗi để tầng UI fallback reconnect).
+    public func reconfigureDisplay(_ config: DisplayConfig) async -> Bool {
+        guard state == .streaming, supportsHotReconfigure, let connection else { return false }
+        guard reconfigureWaiter == nil else { return false }
+        do {
+            let reqId = try await connection.send(.displayReconfigure(config))
+            let ok: Bool
+            if earlyReadyIds.remove(reqId) != nil {
+                ok = true
+            } else {
+                ok = await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
+                    reconfigureWaiter = (reqId, cont)
+                    Task { @MainActor [weak self] in
+                        try? await Task.sleep(for: .seconds(5))
+                        self?.finishReconfigure(id: reqId, ok: false)
+                    }
+                }
+            }
+            guard ok, state == .streaming else { return false }
+            factory = SampleBufferFactory(codec: config.codec)
+            renderer.flush()
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    func finishReconfigure(id: UInt32, ok: Bool) {
+        if let waiter = reconfigureWaiter, waiter.id == id {
+            reconfigureWaiter = nil
+            waiter.cont.resume(returning: ok)
+        } else if ok {
+            earlyReadyIds.insert(id)
+        }
+    }
+
+    static func isTransientError(_ error: any Error) -> Bool {
+        guard let te = error as? TransportError else { return false }
+        switch te {
+        case .connectionFailed, .connectionClosed, .timedOut, .noPeer:
+            return true
+        default:
+            return false
+        }
+    }
+
     public func sendSystemLock() async {
         guard let connection else { return }
         _ = try? await connection.send(.systemLock(SystemLock()))
@@ -233,8 +344,46 @@ public final class ViewerSession {
         _ = try? await connection.send(.systemUnlock(SystemUnlock()))
     }
 
+    public func clearLastUnlockResult() { lastUnlockResult = nil }
+    public func clearLastReceivedFile() { lastReceivedFileURL = nil }
+    public func clearLastFileTransferError() { lastFileTransferError = nil }
+
+    public func sendMediaKey(_ key: MediaKeyKind) async {
+        guard state == .streaming, let connection else { return }
+        _ = try? await connection.send(.mediaKey(MediaKey(key: key)))
+    }
+
+    public func cancelFileTransfer() async {
+        if let sendingId = activeSendingFileId {
+            fileCancelToken.cancel(sendingId)
+            return
+        }
+        if let active = activeFileTransfer, active.direction == .receiving {
+            await fileReceiver.handleCancel(FileCancel(id: active.id, reason: "cancelled"))
+            _ = try? await connection?.send(.fileCancel(FileCancel(id: active.id, reason: "cancelled")))
+        }
+    }
+
     public func sendFile(url: URL) async throws {
         guard let connection else { return }
+        if negotiatedCaps.contains(.fileTransfer) {
+            let transferId = UUID().uuidString
+            activeSendingFileId = transferId
+            defer {
+                activeSendingFileId = nil
+                fileCancelToken.clear(transferId)
+            }
+            try await FileTransferSender.sendFile(
+                id: transferId,
+                url: url,
+                connection: connection,
+                isCancelled: { [fileCancelToken] in fileCancelToken.isCancelled(transferId) },
+                onProgress: { [weak self] progress in
+                    Task { @MainActor [weak self] in self?.activeFileTransfer = progress }
+                }
+            )
+            return
+        }
         let fileName = url.lastPathComponent
         let data = try Data(contentsOf: url)
         let chunkSize = 32 * 1024
@@ -251,4 +400,12 @@ public final class ViewerSession {
             _ = try await connection.send(.fileData(FileData(name: fileName, chunk: base64, isLast: isLast)))
         }
     }
+}
+
+final class FileCancelToken: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancelledIds: Set<String> = []
+    func cancel(_ id: String) { lock.withLock { _ = cancelledIds.insert(id) } }
+    func isCancelled(_ id: String) -> Bool { lock.withLock { cancelledIds.contains(id) } }
+    func clear(_ id: String) { lock.withLock { _ = cancelledIds.remove(id) } }
 }

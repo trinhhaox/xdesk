@@ -34,6 +34,16 @@ final class HostController {
     let windowFit = WindowFitter()
     /// "Tự co giãn cửa sổ ứng dụng cho vừa màn hình" (Bản sao fitDevice/touch): mặc định bật.
     private(set) var fitWindows = WindowFitter.isEnabledByUser
+    /// Vị trí đặt màn hình phụ (Mở rộng) so với màn hình Mac chính: mặc định Bên phải.
+    private(set) var extendSide = ExtendSide(rawValue: UserDefaults.standard.string(forKey: HostController.extendSideKey) ?? "") ?? .right
+    private static let extendSideKey = "xdesk.host.extendSide"
+    /// Cho phép mở khoá Mac thật từ xa (opt-in, mặc định tắt).
+    private(set) var remoteUnlockEnabled = UserDefaults.standard.bool(forKey: HostController.remoteUnlockEnabledKey)
+    private static let remoteUnlockEnabledKey = "xdesk.host.remoteUnlockEnabled"
+    private(set) var hasRemoteUnlockPassword = RemoteUnlockKeychain.shared.hasPassword()
+    private(set) var activeFileTransfer: FileTransferProgress?
+    private(set) var lastReceivedFile: FileTransferCompletion?
+    private(set) var fileTransferError: String?
     let usb = UsbDeviceMonitor()
     var usbMessage: String?
     private let log = Logger(subsystem: "vn.xox.xdesk", category: "host-controller")
@@ -102,6 +112,43 @@ final class HostController {
         if !enabled { windowFit.restoreNow() }
     }
 
+    func setExtendSide(_ side: ExtendSide, persist: Bool = true) {
+        extendSide = side
+        if persist { UserDefaults.standard.set(side.rawValue, forKey: Self.extendSideKey) }
+    }
+
+    func setRemoteUnlockEnabled(_ enabled: Bool, persist: Bool = true) {
+        remoteUnlockEnabled = enabled
+        if persist { UserDefaults.standard.set(enabled, forKey: Self.remoteUnlockEnabledKey) }
+    }
+
+    func saveRemoteUnlockPassword(_ password: String) throws {
+        try RemoteUnlockKeychain.shared.save(password: password)
+        hasRemoteUnlockPassword = RemoteUnlockKeychain.shared.hasPassword()
+        if hasRemoteUnlockPassword { setRemoteUnlockEnabled(true) }
+    }
+
+    func clearRemoteUnlockPassword() {
+        try? RemoteUnlockKeychain.shared.delete()
+        hasRemoteUnlockPassword = RemoteUnlockKeychain.shared.hasPassword()
+        setRemoteUnlockEnabled(false)
+    }
+
+    func sendFile(to sessionId: UUID, url: URL) async {
+        guard let session = sessions[sessionId]?.session else { return }
+        await session.sendFileToViewer(url: url)
+    }
+
+    func cancelActiveFileTransfer() async {
+        for entry in Array(sessions.values) { await entry.session.cancelActiveFileTransfer() }
+        activeFileTransfer = nil
+    }
+
+    func dismissFileTransferNotice() {
+        lastReceivedFile = nil
+        fileTransferError = nil
+    }
+
     /// `persist: false` chỉ dành cho kiểm thử tự động (không ghi vào cài đặt người dùng).
     func setAllowTailscale(_ allowed: Bool, persist: Bool = true) {
         allowTailscale = allowed
@@ -158,7 +205,20 @@ final class HostController {
             onAgentAnswer: { [weak self] requestId, allow in Task { @MainActor in self?.agentAnswerSink?(requestId, allow) } },
             onAgentHelp: { [weak self] requestId, resolved in Task { @MainActor in self?.agentHelpSink?(requestId, resolved) } },
             pasteboard: clipboardPasteboard, audioSettings: audioOptions.settings,
-            permissionLookup: { [weak self] key in await self?.permissions(forViewerKey: key) }
+            permissionLookup: { [weak self] key in await self?.permissions(forViewerKey: key) },
+            extendSideLookup: { [weak self] in await self?.extendSide ?? .right },
+            remoteUnlockEnabled: remoteUnlockEnabled,
+            remoteUnlockLookup: { [weak self] in await self?.canRemoteUnlock ?? false },
+            onTransferProgress: { [weak self] progress in Task { @MainActor in self?.activeFileTransfer = progress } },
+            onFileReceived: { [weak self] completion in
+                Task { @MainActor in
+                    self?.lastReceivedFile = completion
+                    self?.fileTransferError = nil
+                }
+            },
+            onFileFailed: { [weak self] name, msg in
+                Task { @MainActor in self?.fileTransferError = "\(name): \(msg)" }
+            }
         )
         sessions[id] = (session, Task { await session.run() })
     }
@@ -166,6 +226,10 @@ final class HostController {
     /// Quyền hiện hành của viewer đã ghép (đọc lại mỗi lần để đổi quyền giữa phiên có hiệu lực ngay).
     private func permissions(forViewerKey key: [UInt8]) -> DevicePermissions? {
         security.pairedViewers.first { $0.publicKey == key }?.permissions
+    }
+
+    private var canRemoteUnlock: Bool {
+        remoteUnlockEnabled && hasRemoteUnlockPassword
     }
 
     private func update(_ id: UUID, _ state: HostSessionState) {

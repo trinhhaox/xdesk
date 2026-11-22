@@ -10,7 +10,7 @@ actor HostInputService {
     static let watchdogIntervalMs = 250
 
     private let streamId: UInt16
-    private let mapper: CoordinateMapper
+    private var mapper: CoordinateMapper
     private let injector: any EventInjecting
     private let guardian: StuckInputGuard
     private let isTrusted: @Sendable () -> Bool
@@ -43,6 +43,11 @@ actor HostInputService {
                 await self?.tickWatchdog()
             }
         }
+    }
+
+    /// Đổi màn hình ánh xạ con trỏ/chạm tại chỗ khi `display.reconfigure`.
+    func updateDisplay(_ displayID: CGDirectDisplayID) {
+        mapper = CoordinateMapper(displayID: displayID)
     }
 
     /// Nhả mọi nút/phím đang giữ rồi dừng watchdog (phiên kết thúc / viewer ngắt).

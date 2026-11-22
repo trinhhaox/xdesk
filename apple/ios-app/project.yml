@@ -41,23 +41,46 @@ targets:
         UILaunchScreen: {}
         # Only CryptoKit (encryption provided by iOS) is used, which is exempt from export documentation.
         ITSAppUsesNonExemptEncryption: false
-        CFBundleShortVersionString: "1.0"
-        CFBundleVersion: "4"
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
         UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
         NSLocalNetworkUsageDescription: Xdesk dùng mạng nội bộ để tìm và kết nối với máy Mac của bạn.
         NSBonjourServices: [_xdesk._tcp]
         LSApplicationQueriesSchemes: [tailscale]
         NSCameraUsageDescription: Xdesk dùng camera để quét mã QR ghép đôi hiện trên màn hình máy Mac của bạn.
+        NSFaceIDUsageDescription: Xdesk dùng Face ID để xác thực trước khi mở khoá máy Mac từ xa.
     settings:
       base:
         PRODUCT_NAME: Xdesk
         PRODUCT_BUNDLE_IDENTIFIER: vn.xox.xdesk.ios
+        MARKETING_VERSION: 0.2.0-beta
+        CURRENT_PROJECT_VERSION: 10
         TARGETED_DEVICE_FAMILY: "1,2"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: false
+  Xdesk-ios-tests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [Tests]
+    dependencies:
+      - target: Xdesk-ios
+      - package: XdeskKit
+        product: XdeskWire
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: true
+        PRODUCT_BUNDLE_IDENTIFIER: vn.xox.xdesk.ios.tests
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Xdesk.app/Xdesk
+        BUNDLE_LOADER: $(TEST_HOST)
 schemes:
   Xdesk-ios:
     build:
       targets:
         Xdesk-ios: all
+    test:
+      targets: [Xdesk-ios-tests]
+      language: vi
+      region: VN

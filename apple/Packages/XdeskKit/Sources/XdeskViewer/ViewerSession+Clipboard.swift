@@ -6,7 +6,10 @@ extension ViewerSession {
     /// Khả năng viewer đưa ra: `.clipboard` / audio chỉ khi app có cấu hình tương ứng; host chỉ giữ lại nếu thiết bị này được cấp quyền.
     /// `.mediaOverTcp` chỉ khi đi qua đường hầm USB (không có UDP).
     func offeredCaps(tunnel: Bool) -> Capabilities {
-        var caps: Capabilities = [.h264, .hevc]
+        var caps: Capabilities = [
+            .h264, .hevc, .hotReconfigure, .videoPause,
+            .fileTransfer, .remoteUnlock, .mediaKeys, .multiDisplay,
+        ]
         if clipboardConfig != nil { caps.insert(.clipboard) }
         if audioConfig != nil { caps.formUnion([.audioPCM, .audioAACELD]) }
         if tunnel { caps.insert(.mediaOverTcp) }

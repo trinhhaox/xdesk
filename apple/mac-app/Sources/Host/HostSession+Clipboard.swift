@@ -6,10 +6,11 @@ extension HostSession {
     /// Khả năng host đưa ra khi bắt tay: `.clipboard` chỉ khi thiết bị được cấp quyền clipboard (mặc định tắt) và có clipboard để dùng;
     /// audio chỉ khi được cấp quyền âm thanh (mặc định tắt); `.mediaOverTcp` chỉ cho đường hầm USB.
     var negotiableCaps: Capabilities {
-        var caps = hostCaps
+        var caps = hostCaps.union([.hotReconfigure, .videoPause, .fileTransfer, .mediaKeys, .multiDisplay])
         if pasteboard != nil, permissions.clipboard { caps.insert(.clipboard) }
         if permissions.audio { caps.formUnion([.audioPCM, .audioAACELD]) }
-        if connection.isUsbTunnel { caps.insert(.mediaOverTcp) }
+        if permissions.unlock, remoteUnlockSettingSnapshot { caps.insert(.remoteUnlock) }
+        if connection.isUsbTunnel || connection.isLoopback { caps.insert(.mediaOverTcp) }
         return caps
     }
 

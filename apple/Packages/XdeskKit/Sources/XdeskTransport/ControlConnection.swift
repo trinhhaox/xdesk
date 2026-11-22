@@ -129,4 +129,19 @@ public actor ControlConnection {
         if case .hostPort(let host, _) = remoteEndpoint { return host }
         return nil
     }
+
+    /// True khi đối tác đến từ loopback (127.0.0.1 / ::1), ví dụ đường hầm `adb reverse` từ Android.
+    public nonisolated var isLoopback: Bool {
+        guard let host = remoteHost else { return false }
+        switch host {
+        case .ipv4(let a): return [UInt8](a.rawValue).first == 127
+        case .ipv6(let a):
+            let b = [UInt8](a.rawValue)
+            if b[0..<15].allSatisfy({ $0 == 0 }) && b[15] == 1 { return true }
+            if b[0..<10].allSatisfy({ $0 == 0 }) && b[10] == 0xFF && b[11] == 0xFF { return b[12] == 127 }
+            return false
+        case .name(let name, _): return name == "localhost"
+        @unknown default: return false
+        }
+    }
 }

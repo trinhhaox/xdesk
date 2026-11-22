@@ -54,10 +54,11 @@ struct NoticeRow: View {
     }
 }
 
-/// "Thiết bị đang xem": viewer đang xem, mỗi dòng có nút ngắt.
+/// "Thiết bị đang xem": viewer đang xem, mỗi dòng có nút gửi tệp và ngắt kết nối.
 struct SessionsCard: View {
     let sessions: [PopoverState.Session]
     let disconnect: (UUID) -> Void
+    var sendFile: (UUID) -> Void = { _ in }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -78,6 +79,12 @@ struct SessionsCard: View {
                         }
                         .accessibilityElement(children: .combine)
                         Spacer(minLength: 6)
+                        Button { sendFile(session.id) } label: {
+                            Image(systemName: "arrow.up.doc").font(.callout).foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Gửi tệp tới \(session.info.name)…")
+                        .accessibilityLabel("Gửi tệp tới \(session.info.name)")
                         Button { disconnect(session.id) } label: {
                             Image(systemName: "xmark.circle.fill").font(.title3).foregroundStyle(.secondary)
                         }

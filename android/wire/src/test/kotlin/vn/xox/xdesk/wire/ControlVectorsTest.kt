@@ -70,6 +70,19 @@ class ControlVectorsTest {
             ControlMessage.DisplayConfig(1280, 720, 1.5, 60, VideoCodec.HEVC, ScreenMode.MIRROR),
             ControlMessage.DisplayConfig(720, 1560, 2.0, 60, VideoCodec.H264, ScreenMode.MIRROR, MirrorFit.TOUCH),
             ControlMessage.DisplayConfig(2560, 1440, 2.0, 60, VideoCodec.H264, ScreenMode.MIRROR, MirrorFit.NATIVE),
+            ControlMessage.DisplayConfig(1080, 1920, 3.0, 60, VideoCodec.HEVC, ScreenMode.EXTEND, videoPaused = true, displayId = 7L),
+            ControlMessage.DisplayReconfigure(ControlMessage.DisplayConfig(1080, 1920, 3.0, 60, VideoCodec.HEVC, ScreenMode.MIRROR, MirrorFit.TOUCH)),
+            ControlMessage.VideoPause(1),
+            ControlMessage.VideoResume(1),
+            ControlMessage.ClipOffer(ClipKind.TEXT, 12, "a".repeat(64)),
+            ControlMessage.ClipData(ClipKind.IMAGE, 64, "0123456789abcdef".repeat(4)),
+            ControlMessage.SystemUnlockResult(true, "unlocked"),
+            ControlMessage.MediaKey(MediaKeyKind.VOLUME_UP),
+            ControlMessage.DisplayList(listOf(DisplayInfo(1L, "Built-in Retina", 2560L, 1600L, true))),
+            ControlMessage.FileStart("f1", "archive.zip", 1_048_576L),
+            ControlMessage.FileChunk("f1", 65_536L),
+            ControlMessage.FileDone("f1", "b".repeat(64)),
+            ControlMessage.FileCancel("f1", "user cancelled"),
             ControlMessage.Reject(ControlMessage.Reject.REASON_REVOKED),
             ControlMessage.PairResult(true),
             ControlMessage.Rekey,
@@ -95,6 +108,16 @@ class ControlVectorsTest {
     fun inputTextLimitIsEnforced() {
         val big = ControlMessage.InputText("a".repeat(4097))
         assertEquals("invalidField", errorOf { ControlMessageCodec.encode(ControlEnvelope(1, big)) })
+    }
+
+    @Test
+    fun clipOfferAndDataValidateSizeAndHash() {
+        val zeroOffer = ControlMessage.ClipOffer(ClipKind.TEXT, 0, "a".repeat(64))
+        assertEquals("invalidField", errorOf { ControlMessageCodec.encode(ControlEnvelope(1, zeroOffer)) })
+        val oversizedData = ControlMessage.ClipData(ClipKind.IMAGE, ClipLimits.MAX_BYTES.toLong() + 1, "a".repeat(64))
+        assertEquals("invalidField", errorOf { ControlMessageCodec.encode(ControlEnvelope(1, oversizedData)) })
+        val badHash = ControlMessage.ClipData(ClipKind.TEXT, 10, "not-sha256")
+        assertEquals("invalidField", errorOf { ControlMessageCodec.encode(ControlEnvelope(1, badHash)) })
     }
 
     @Test

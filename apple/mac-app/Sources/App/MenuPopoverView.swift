@@ -12,7 +12,39 @@ struct MenuPopoverView: View {
             PopoverHeader(state: state, toggle: actions.toggleSharing)
             if !state.missing.isEmpty { PermissionCard(missing: state.missing, open: actions.openPermission, relaunch: actions.relaunch) }
             if state.secureInput { NoticeRow(symbol: "lock.fill", text: String(localized: "Đang bật nhập liệu bảo mật: chữ gõ từ xa có thể không vào ô mật khẩu.")) }
-            SessionsCard(sessions: state.sessions, disconnect: actions.disconnect)
+            SessionsCard(sessions: state.sessions, disconnect: actions.disconnect, sendFile: actions.sendFile)
+            if let transfer = state.activeTransfer {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(transfer.direction == .sending ? "Đang gửi \(transfer.fileName)…" : "Đang nhận \(transfer.fileName)…")
+                            .font(.caption.weight(.medium)).lineLimit(1)
+                        Spacer()
+                        Button("Huỷ", action: actions.cancelTransfer).controlSize(.mini)
+                    }
+                    ProgressView(value: transfer.fraction)
+                }
+                .padding(.horizontal, 10).padding(.vertical, 8)
+                .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+            } else if let file = state.receivedFile {
+                HStack(spacing: 8) {
+                    Image(systemName: "doc.fill").foregroundStyle(BrandPalette.accent)
+                    Text("Đã nhận \(file.fileName)").font(.caption).lineLimit(1)
+                    Spacer()
+                    Button("Mở Finder") { actions.revealFile(file.url) }.controlSize(.small)
+                    Button { actions.dismissFileNotice() } label: { Image(systemName: "xmark").font(.caption2) }.buttonStyle(.plain)
+                }
+                .padding(.horizontal, 10).padding(.vertical, 8)
+                .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+            } else if let error = state.transferError {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(BrandPalette.warning)
+                    Text(error).font(.caption).lineLimit(2)
+                    Spacer()
+                    Button { actions.dismissFileNotice() } label: { Image(systemName: "xmark").font(.caption2) }.buttonStyle(.plain)
+                }
+                .padding(.horizontal, 10).padding(.vertical, 8)
+                .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+            }
             VStack(spacing: 4) {
                 ActionRow(symbol: "qrcode", title: "Ghép đôi thiết bị mới…", action: actions.pairNewDevice)
                 ActionRow(symbol: "ipad.and.iphone", title: "Thiết bị đã ghép…", action: actions.showPairedDevices)

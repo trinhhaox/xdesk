@@ -18,11 +18,12 @@ struct PairedViewerRow: View {
                 Spacer()
                 Button("Thu hồi", role: .destructive, action: onRevoke)
             }
-            HStack(spacing: 14) {
+            HStack(spacing: 12) {
                 Toggle("Xem", isOn: .constant(true)).disabled(true)
                 toggle("Điều khiển", \.input)
                 toggle("Clipboard", \.clipboard)
                 toggle("Âm thanh", \.audio)
+                toggle("Mở khoá Mac", \.unlock)
             }
             .toggleStyle(.checkbox).font(.callout)
         }

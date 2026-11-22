@@ -53,6 +53,19 @@ final class StreamViewModel {
             displayOptionsChanged()
         }
     }
+    /// Tốc độ khung hình mục tiêu (mặc định 60 fps).
+    var qualityPreset: StreamQualityPreset = StreamQualityPreset(rawValue: UserDefaults.standard.string(forKey: "xdesk.qualityPreset") ?? "") ?? .standard60 {
+        didSet {
+            UserDefaults.standard.set(qualityPreset.rawValue, forKey: "xdesk.qualityPreset")
+            displayOptionsChanged()
+        }
+    }
+    /// ID màn hình Mac đang chọn khi Mac có ≥ 2 màn hình vật lý (nil = màn hình mặc định).
+    var selectedDisplayId: UInt32? = nil {
+        didSet {
+            if oldValue != selectedDisplayId { displayOptionsChanged() }
+        }
+    }
     let session: ViewerSession
     /// Danh tính + host đã ghép của iPhone/iPad; nil khi không mở được Keychain/file (xem `securityError`).
     let security: DeviceSecurityStores?
@@ -86,10 +99,13 @@ final class StreamViewModel {
     @ObservationIgnored private(set) var target: ViewerTarget?
     /// Tên hiển thị của đích gần nhất ("Đang kết nối tới …", thẻ lỗi).
     private(set) var connectingName: String?
+    /// Lần thử tự động kết nối lại (0 = bình thường, 1...3 = đang tự kết nối lại).
+    var reconnectAttempt = 0
     /// Cấu hình màn hình đang dùng; cho lớp nhập liệu biết kích thước màn hình host theo điểm.
     var currentConfig: DisplayConfig?
     @ObservationIgnored private var isRestarting = false
     @ObservationIgnored private var suspended = false
+    @ObservationIgnored private var reconnectTask: Task<Void, Never>?
     @ObservationIgnored private lazy var orientation = OrientationObserver { [weak self] _ in self?.screenSettled() }
 
     init() {
@@ -176,7 +192,12 @@ final class StreamViewModel {
     /// Đổi giữa 5 chế độ làm việc ngay khi đang kết nối Mac.
     func switchWorkMode(to next: WorkMode) {
         guard activeWorkMode != next else { return }
+        let wasControl = activeWorkMode.isControlMode
         activeWorkMode = next
+        if wasControl != next.isControlMode {
+            let paused = next.isControlMode
+            Task { await session.setVideoPaused(paused) }
+        }
         if let neededScreen = next.screenMode, screenMode != neededScreen {
             screenMode = neededScreen
         }
@@ -184,7 +205,11 @@ final class StreamViewModel {
 
     /// Thoát về danh sách host, gửi `bye` lịch sự (cũng là nút Huỷ khi đang kết nối).
     func disconnect() async {
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        reconnectAttempt = 0
         inStream = false
+        selectedDisplayId = nil
         activeWorkMode = defaultWorkMode
         suspended = false
         await session.disconnect()
@@ -196,10 +221,22 @@ final class StreamViewModel {
         failIfNeeded()
     }
 
-    /// Phiên hỏng (host đóng, mạng mất) → về danh sách, giữ thông báo lỗi. An toàn khi gọi lặp.
+    /// Phiên hỏng (host đóng, mạng mất) → thử tự kết nối lại nếu lỗi mạng tạm thời, ngược lại về danh sách. An toàn khi gọi lặp.
     func failIfNeeded() {
-        guard inStream, case .failed(let message) = session.state else { return }
+        guard inStream, reconnectAttempt == 0, case .failed(let message) = session.state else { return }
+        if !suspended, !isPairing, session.lastFailureTransient, let target {
+            startAutoReconnect(initialTarget: target, fallbackMessage: message)
+            return
+        }
+        finishFailedSession(message: message)
+    }
+
+    private func finishFailedSession(message: String) {
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        reconnectAttempt = 0
         inStream = false
+        selectedDisplayId = nil
         activeWorkMode = defaultWorkMode
         errorMessage = message
         // Phiên có thể vừa bị thu hồi (host đã bị xoá khỏi danh sách) → cập nhật nhãn "Đã ghép"/"Chưa ghép".
@@ -207,6 +244,58 @@ final class StreamViewModel {
             await session.disconnect()
             await refreshTrust()
         }
+    }
+
+    private func startAutoReconnect(initialTarget: ViewerTarget, fallbackMessage: String) {
+        reconnectTask?.cancel()
+        reconnectAttempt = 1
+        reconnectTask = Task { [weak self] in
+            guard let self else { return }
+            let delays = [1, 2, 4]
+            var latestMessage = fallbackMessage
+            for (index, delaySeconds) in delays.enumerated() {
+                reconnectAttempt = index + 1
+                do {
+                    try await Task.sleep(for: .seconds(delaySeconds))
+                } catch {
+                    return
+                }
+                guard inStream, !suspended, !Task.isCancelled else { return }
+                let candidates = reconnectCandidates(primary: initialTarget)
+                guard let config = plan(orientation.latest ?? ScreenMetrics.current()) else { break }
+                currentConfig = config
+                await session.connect(candidates: candidates, config: config)
+                guard inStream, !Task.isCancelled else { return }
+                if session.state == .streaming {
+                    reconnectAttempt = 0
+                    reconnectTask = nil
+                    target = session.connectedTarget ?? initialTarget
+                    await refreshTrust()
+                    await recordManualConnection()
+                    return
+                }
+                if case .failed(let msg) = session.state {
+                    latestMessage = msg
+                    if !session.lastFailureTransient { break }
+                } else {
+                    break
+                }
+            }
+            guard inStream, !Task.isCancelled else { return }
+            finishFailedSession(message: latestMessage)
+        }
+    }
+
+    private func reconnectCandidates(primary: ViewerTarget) -> [ViewerTarget] {
+        var list = [primary]
+        guard TailscaleSupport.detect() == .active else { return list }
+        let tailscaleAddresses = knownHosts.compactMap(\.lastAddress).filter(TailscaleSupport.isTailscaleHost)
+        for address in tailscaleAddresses {
+            if let parsed = ViewerTarget.parse(manual: address), !list.contains(parsed) {
+                list.append(parsed)
+            }
+        }
+        return list
     }
 
     // MARK: Vòng đời scene
@@ -240,11 +329,15 @@ final class StreamViewModel {
         Task { await syncDisplayConfig() }
     }
 
-    /// Host chưa đổi mode giữa phiên → đổi cấu hình bằng cách mở lại phiên với `display.config` mới.
+    /// Host chưa đổi mode giữa phiên → ưu tiên đổi cấu hình nóng; fallback mở lại phiên nếu host cũ.
     private func syncDisplayConfig() async {
         isRestarting = true
         defer { isRestarting = false }
         while inStream, !suspended, let target, let config = plan(orientation.latest ?? ScreenMetrics.current()), config != currentConfig {
+            if session.supportsHotReconfigure, await session.reconfigureDisplay(config) {
+                currentConfig = config
+                continue
+            }
             await session.disconnect()
             await start(target, config)
             guard session.state == .streaming else { return }
@@ -253,11 +346,15 @@ final class StreamViewModel {
 
     func plan(_ metrics: ScreenMetrics?) -> DisplayConfig? {
         guard let metrics else { return nil }
-        return DisplayConfigPlanner.config(
+        let targetFps = UInt32(qualityPreset.effectiveFps(maxDeviceFps: metrics.maxFps))
+        guard var config = DisplayConfigPlanner.config(
             pointsWidth: metrics.size.width, pointsHeight: metrics.size.height, scale: metrics.scale,
-            codec: videoCodec,
+            fps: targetFps, codec: videoCodec,
             mode: screenMode, mirrorFit: mirrorFit
-        )
+        ) else { return nil }
+        config.videoPaused = activeWorkMode.isControlMode ? true : nil
+        config.displayId = (screenMode == .mirror ? selectedDisplayId : nil)
+        return config
     }
 }
 

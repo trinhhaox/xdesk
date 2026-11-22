@@ -54,7 +54,10 @@ class AudioSessionTest {
         assertTrue(connect())
         await("hello") { host.received.any { it is ControlMessage.Hello } }
         val caps = host.received.filterIsInstance<ControlMessage.Hello>().single().caps
-        assertEquals(Capabilities.H264 or Capabilities.AUDIO_PCM or Capabilities.AUDIO_AAC_ELD, caps)
+        val expected = Capabilities.H264 or Capabilities.AUDIO_PCM or Capabilities.AUDIO_AAC_ELD or
+            Capabilities.HOT_RECONFIGURE or Capabilities.VIDEO_PAUSE or
+            Capabilities.FILE_TRANSFER or Capabilities.REMOTE_UNLOCK or Capabilities.MEDIA_KEYS or Capabilities.MULTI_DISPLAY
+        assertEquals(expected, caps)
         assertEquals(listOf("start"), sink.events.toList())
         session.disconnect()
         assertEquals(listOf("start", "stop"), sink.events.toList())

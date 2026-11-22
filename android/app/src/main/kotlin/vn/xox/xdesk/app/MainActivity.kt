@@ -4,10 +4,10 @@ import android.os.Build
 import android.os.Bundle
 import android.view.HapticFeedbackConstants
 import android.view.WindowManager
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.fragment.app.FragmentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -29,6 +29,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import kotlin.math.roundToInt
 import vn.xox.xdesk.app.discovery.NsdBrowser
 import vn.xox.xdesk.app.ui.HostListScreen
 import vn.xox.xdesk.app.ui.PairingScreen
@@ -37,15 +38,25 @@ import vn.xox.xdesk.app.ui.StreamScreen
 import vn.xox.xdesk.app.ui.UpdatePrompt
 import vn.xox.xdesk.app.ui.theme.XdeskTheme
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     private val controller: ViewerController by viewModels {
         object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST") // Factory.create buộc trả T; chỉ tạo ViewerController.
             override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                ViewerController((application as XdeskApplication).container, Build.MODEL, ::screenSize) as T
+                ViewerController((application as XdeskApplication).container, Build.MODEL, ::screenSize, ::maxRefreshRateHz) as T
         }
     }
     private lateinit var browser: NsdBrowser
+
+    private fun maxRefreshRateHz(): Int {
+        val rate = if (Build.VERSION.SDK_INT >= 30) {
+            display?.refreshRate
+        } else {
+            @Suppress("DEPRECATION")
+            windowManager.defaultDisplay?.refreshRate
+        }
+        return rate?.roundToInt()?.coerceAtLeast(30) ?: 60
+    }
 
     /**
      * (rộng px, cao px, mật độ) của vùng stream: cửa sổ đã tính chiều xoay, trừ tai thỏ/camera đục lỗ. Thanh hệ thống không trừ vì

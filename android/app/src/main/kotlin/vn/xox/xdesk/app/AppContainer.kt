@@ -11,19 +11,21 @@ import vn.xox.xdesk.app.update.UpdateController
 import vn.xox.xdesk.crypto.DeviceIdentity
 import vn.xox.xdesk.crypto.IdentityStore
 import vn.xox.xdesk.media.FrameRecorder
+import vn.xox.xdesk.transport.ClipboardAccess
 import vn.xox.xdesk.transport.FileKnownHostStore
 import vn.xox.xdesk.transport.KnownHostStore
 import vn.xox.xdesk.transport.ViewerTrust
 
 /** Dựng tay các thành phần dùng chung (không DI framework: app nhỏ). Lưu trong [XdeskApplication]. */
 class AppContainer(context: Context) {
-    private val appContext = context.applicationContext
+    val appContext: Context = context.applicationContext
     val identityStore: IdentityStore = KeystoreIdentityStore(File(context.filesDir, "identity.v1"))
     val knownHosts: KnownHostStore = FileKnownHostStore(File(context.filesDir, "known-hosts.txt"))
 
     val updates = UpdateController(context)
     val display = DisplaySettingsStore(context)
     val appearance = AppearanceStore(context)
+    val clipboard: ClipboardAccess = AndroidClipboardAccess(appContext)
 
     /** `null` kèm [identityError] khi Keystore mất khoá: UI cho người dùng chọn đặt lại danh tính. */
     var identity: DeviceIdentity? = null

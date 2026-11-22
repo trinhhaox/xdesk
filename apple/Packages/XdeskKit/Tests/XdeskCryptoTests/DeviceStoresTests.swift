@@ -140,6 +140,27 @@ struct DeviceStoresTests {
         let leftovers = try FileManager.default.contentsOfDirectory(atPath: storage.url.deletingLastPathComponent().path)
         #expect(leftovers == ["paired.json"])
     }
+
+    @Test func optInUnlockPreservesLegacyHmacCompatibility() async throws {
+        let storage = InMemoryPairedDevicesStorage()
+        let key = [UInt8](repeating: 3, count: 32)
+        let store1 = try PairedDevicesStore(storage: storage, macKey: macKey, now: { [t0] in t0 })
+        let added = try await store1.add(name: "iPhone", publicKey: key, role: .viewer)
+        #expect(!added.permissions.unlock)
+        let json = try fileText(storage)
+        #expect(!json.contains("\"unlock\""))
+
+        let store2 = try PairedDevicesStore(storage: storage, macKey: macKey)
+        let failure2 = await store2.integrityFailure
+        #expect(!failure2)
+        #expect(await store2.devices.first?.permissions.unlock == false)
+
+        try await store2.setPermissions(id: added.id, DevicePermissions(view: true, input: true, clipboard: false, audio: false, unlock: true))
+        let store3 = try PairedDevicesStore(storage: storage, macKey: macKey)
+        let failure3 = await store3.integrityFailure
+        #expect(!failure3)
+        #expect(await store3.devices.first?.permissions.unlock == true)
+    }
 }
 
 func fileText(_ storage: InMemoryPairedDevicesStorage) throws -> String {

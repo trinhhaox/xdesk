@@ -61,6 +61,7 @@ import vn.xox.xdesk.app.ui.theme.XdeskOverlay
 import vn.xox.xdesk.transport.InputButton
 import vn.xox.xdesk.transport.InputEvents
 import vn.xox.xdesk.transport.InputModifiers
+import vn.xox.xdesk.wire.MediaKeyKind
 
 @Composable
 fun RemoteTrackpadSheet(
@@ -192,7 +193,8 @@ fun RemoteTrackpadSheet(
                     onRightDownChange = { down ->
                         isRightDown = down
                         sendPointerButtonState(InputButton.RIGHT, down)
-                    }
+                    },
+                    onThreeFingerShortcut = { usage, mods -> sendKey(usage, mods) },
                 )
             }
             WorkMode.KEYBOARD -> {
@@ -213,6 +215,7 @@ fun RemoteTrackpadSheet(
             WorkMode.NUMPAD_MEDIA -> {
                 NumpadMediaTabContent(
                     onKey = { usage, extraMods -> sendKey(usage, extraMods) },
+                    onMediaKey = { kind -> controller.sendMediaKey(kind) },
                     onSendText = { char -> sendTextDirect(char) }
                 )
             }
@@ -230,7 +233,8 @@ private fun ColumnScope.TrackpadTabContent(
     onClick: (Int) -> Unit,
     onScroll: (Float, Float) -> Unit,
     onLeftDownChange: (Boolean) -> Unit,
-    onRightDownChange: (Boolean) -> Unit
+    onRightDownChange: (Boolean) -> Unit,
+    onThreeFingerShortcut: (Int, Int) -> Unit,
 ) {
     val containerModifier = if (isFullscreen) {
         Modifier
@@ -247,7 +251,9 @@ private fun ColumnScope.TrackpadTabContent(
         modifier = containerModifier,
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // Vùng cảm ứng Trackpad (1 ngón di/chạm trái, 2 ngón chạm phải / vuốt cuộn trang)
+        var lastSingleTapUpMs by remember { mutableStateOf(0L) }
+        var lastSingleTapPos by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+        // Vùng cảm ứng Trackpad (1 ngón di / chạm đúp giữ kéo, 2 ngón phải / cuộn, 3 ngón không gian & cửa sổ)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -257,19 +263,30 @@ private fun ColumnScope.TrackpadTabContent(
                 .border(1.dp, XdeskOverlay.divider, RoundedCornerShape(16.dp))
                 .pointerInput(Unit) {
                     val slopPx = viewConfiguration.touchSlop
+                    val tapSlopRadiusPx = 24f * density
+                    val threeFingerThresholdPx = 42f * density
                     awaitEachGesture {
                         val firstDown = awaitFirstDown(requireUnconsumed = false)
                         val startTime = firstDown.uptimeMillis
                         var maxPointers = 1
                         var totalMoved = 0f
                         var movedBeyondSlop = false
+                        var tapDragArmed = (startTime - lastSingleTapUpMs <= 280L) &&
+                            hypot(firstDown.position.x - lastSingleTapPos.x, firstDown.position.y - lastSingleTapPos.y) <= tapSlopRadiusPx
+                        var tapDragActive = false
+                        var threeFingerDx = 0f
+                        var threeFingerDy = 0f
+                        var threeFingerFired = false
+                        var lastSinglePos = firstDown.position
                         var previousPositions = mapOf(firstDown.id to firstDown.position)
 
                         while (true) {
                             val event = awaitPointerEvent()
                             val pressed = event.changes.filter { it.pressed }
                             maxPointers = maxOf(maxPointers, pressed.size, event.changes.size)
+                            if (maxPointers > 1) tapDragArmed = false
                             if (pressed.isEmpty()) break
+                            if (pressed.size == 1) lastSinglePos = pressed.first().position
 
                             var sumDx = 0f
                             var sumDy = 0f
@@ -288,10 +305,27 @@ private fun ColumnScope.TrackpadTabContent(
                                 if (totalMoved > slopPx) movedBeyondSlop = true
                                 if (movedBeyondSlop && step > 0f) {
                                     pressed.forEach { it.consume() }
-                                    if (pressed.size >= 2 || maxPointers >= 2) {
+                                    if (maxPointers >= 3) {
+                                        if (!threeFingerFired) {
+                                            threeFingerDx += avgDx
+                                            threeFingerDy += avgDy
+                                            if (hypot(threeFingerDx, threeFingerDy) >= threeFingerThresholdPx) {
+                                                threeFingerFired = true
+                                                if (kotlin.math.abs(threeFingerDy) >= kotlin.math.abs(threeFingerDx)) {
+                                                    onThreeFingerShortcut(if (threeFingerDy < 0f) 0x52 else 0x51, InputModifiers.CONTROL)
+                                                } else {
+                                                    onThreeFingerShortcut(if (threeFingerDx < 0f) 0x4F else 0x50, InputModifiers.CONTROL)
+                                                }
+                                            }
+                                        }
+                                    } else if (pressed.size >= 2 || maxPointers >= 2) {
                                         val dpScale = 1.4f / density
                                         onScroll(avgDx * dpScale, avgDy * dpScale)
                                     } else {
+                                        if (tapDragArmed && !tapDragActive) {
+                                            tapDragActive = true
+                                            onLeftDownChange(true)
+                                        }
                                         val sensitivity = 0.0018f
                                         onMove(avgDx * sensitivity, avgDy * sensitivity)
                                     }
@@ -300,11 +334,15 @@ private fun ColumnScope.TrackpadTabContent(
                             previousPositions = pressed.associate { it.id to it.position }
                         }
 
-                        if (!movedBeyondSlop) {
-                            val duration = (eventDurationMs(startTime))
+                        if (tapDragActive) {
+                            onLeftDownChange(false)
+                        } else if (!movedBeyondSlop) {
+                            val duration = eventDurationMs(startTime)
                             if (maxPointers >= 2 && duration <= 350L) {
                                 onClick(InputButton.RIGHT)
                             } else if (maxPointers == 1 && duration <= 300L) {
+                                lastSingleTapUpMs = android.os.SystemClock.uptimeMillis()
+                                lastSingleTapPos = lastSinglePos
                                 onClick(InputButton.LEFT)
                             }
                         }
@@ -328,7 +366,7 @@ private fun ColumnScope.TrackpadTabContent(
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    "1 ngón: Di chuột · Chạm: Chuột trái\n2 ngón chạm: Chuột phải · 2 ngón vuốt: Cuộn trang",
+                    "1 ngón: Di chuột · Chạm đúp giữ: Kéo thả\n2 ngón: Chuột phải / Cuộn · 3 ngón: Không gian & Cửa sổ",
                     color = XdeskOverlay.contentMuted.copy(alpha = 0.7f),
                     fontSize = 11.sp,
                     textAlign = TextAlign.Center,
@@ -508,6 +546,7 @@ private fun KeyboardTabContent(
 @Composable
 private fun NumpadMediaTabContent(
     onKey: (Int, Int) -> Unit,
+    onMediaKey: (MediaKeyKind) -> Unit,
     onSendText: (String) -> Unit
 ) {
     Column(
@@ -543,6 +582,25 @@ private fun NumpadMediaTabContent(
         ) {
             MediaTileButton("Space", XdeskIcons.SpaceBar, Modifier.weight(1f)) { onKey(0x2C, 0) }
             MediaTileButton("Hoàn tác", XdeskIcons.Undo, Modifier.weight(1f)) { onKey(0x1D, InputModifiers.COMMAND) }
+        }
+
+        HorizontalDivider(color = XdeskOverlay.divider)
+
+        Text(
+            "ÂM LƯỢNG & PHÁT NHẠC",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            color = XdeskOverlay.contentMuted,
+        )
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            MediaTileButton("Bài trước", XdeskIcons.SkipPrevious, Modifier.weight(1f)) { onMediaKey(MediaKeyKind.PREVIOUS) }
+            MediaTileButton("Phát / Dừng", XdeskIcons.PlayPause, Modifier.weight(1f)) { onMediaKey(MediaKeyKind.PLAY_PAUSE) }
+            MediaTileButton("Bài kế", XdeskIcons.SkipNext, Modifier.weight(1f)) { onMediaKey(MediaKeyKind.NEXT) }
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            MediaTileButton("Tắt tiếng", XdeskIcons.VolumeOff, Modifier.weight(1f)) { onMediaKey(MediaKeyKind.MUTE) }
+            MediaTileButton("Giảm âm", XdeskIcons.VolumeDown, Modifier.weight(1f)) { onMediaKey(MediaKeyKind.VOLUME_DOWN) }
+            MediaTileButton("Tăng âm", XdeskIcons.VolumeUp, Modifier.weight(1f)) { onMediaKey(MediaKeyKind.VOLUME_UP) }
         }
 
         Spacer(Modifier.height(4.dp))

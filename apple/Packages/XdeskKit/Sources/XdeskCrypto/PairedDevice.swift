@@ -5,15 +5,39 @@ public struct DevicePermissions: Codable, Sendable, Equatable {
     public var input: Bool
     public var clipboard: Bool
     public var audio: Bool
+    /// Cho phép thiết bị gửi lệnh mở khoá máy Mac thật (mặc định TẮT, Fail-Closed).
+    public var unlock: Bool
 
-    /// Thiết bị mới: xem + điều khiển bật; clipboard và âm thanh tắt tới khi người dùng bật.
-    public static let `default` = DevicePermissions(view: true, input: true, clipboard: false, audio: false)
+    /// Thiết bị mới: xem + điều khiển bật; clipboard, âm thanh và mở khoá tắt tới khi người dùng bật.
+    public static let `default` = DevicePermissions(view: true, input: true, clipboard: false, audio: false, unlock: false)
 
-    public init(view: Bool, input: Bool, clipboard: Bool, audio: Bool) {
+    public init(view: Bool, input: Bool, clipboard: Bool, audio: Bool, unlock: Bool = false) {
         self.view = view
         self.input = input
         self.clipboard = clipboard
         self.audio = audio
+        self.unlock = unlock
+    }
+
+    private enum CodingKeys: String, CodingKey { case view, input, clipboard, audio, unlock }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        view = try c.decode(Bool.self, forKey: .view)
+        input = try c.decode(Bool.self, forKey: .input)
+        clipboard = try c.decode(Bool.self, forKey: .clipboard)
+        audio = try c.decode(Bool.self, forKey: .audio)
+        unlock = try c.decodeIfPresent(Bool.self, forKey: .unlock) ?? false
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(view, forKey: .view)
+        try c.encode(input, forKey: .input)
+        try c.encode(clipboard, forKey: .clipboard)
+        try c.encode(audio, forKey: .audio)
+        // Chỉ ghi `unlock` khi true để giữ nguyên HMAC của các file `paired-devices.json` cũ.
+        if unlock { try c.encode(true, forKey: .unlock) }
     }
 }
 

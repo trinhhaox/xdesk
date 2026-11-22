@@ -52,8 +52,16 @@ public struct DisplayConfig: Codable, Sendable, Equatable {
     public var mode: ScreenMode?
     /// Vắng mặt = `fitDevice` (tương thích viewer/host cũ, vốn bỏ qua khoá lạ).
     public var mirrorFit: MirrorFit?
-    public init(w: UInt32, h: UInt32, scale: Double, fps: UInt32, codec: VideoCodec, mode: ScreenMode? = nil, mirrorFit: MirrorFit? = nil) {
-        self.w = w; self.h = h; self.scale = scale; self.fps = fps; self.codec = codec; self.mode = mode; self.mirrorFit = mirrorFit
+    /// Vắng mặt = `false` (đang phát hình); `true` khi kết nối thẳng vào chế độ Chỉ điều khiển.
+    public var videoPaused: Bool?
+    /// Vắng mặt = màn hình mặc định; đặt để chọn một màn hình vật lý cụ thể khi Mac có ≥ 2 màn hình.
+    public var displayId: UInt32?
+    public init(
+        w: UInt32, h: UInt32, scale: Double, fps: UInt32, codec: VideoCodec,
+        mode: ScreenMode? = nil, mirrorFit: MirrorFit? = nil, videoPaused: Bool? = nil, displayId: UInt32? = nil
+    ) {
+        self.w = w; self.h = h; self.scale = scale; self.fps = fps; self.codec = codec
+        self.mode = mode; self.mirrorFit = mirrorFit; self.videoPaused = videoPaused; self.displayId = displayId
     }
 
     public var screenMode: ScreenMode { mode ?? .extend }
@@ -69,6 +77,18 @@ public struct DisplayReady: Codable, Sendable, Equatable {
 }
 
 public struct KeyframeRequest: Codable, Sendable, Equatable {
+    public var streamId: UInt16
+    public init(streamId: UInt16) { self.streamId = streamId }
+}
+
+/// Tạm dừng capture/encode video khi viewer chuyển sang chế độ chỉ điều khiển (vẫn giữ kênh input và âm thanh).
+public struct VideoPause: Codable, Sendable, Equatable {
+    public var streamId: UInt16
+    public init(streamId: UInt16) { self.streamId = streamId }
+}
+
+/// Tiếp tục capture/encode video khi viewer quay lại xem màn hình.
+public struct VideoResume: Codable, Sendable, Equatable {
     public var streamId: UInt16
     public init(streamId: UInt16) { self.streamId = streamId }
 }
@@ -204,6 +224,95 @@ public struct SystemLock: Codable, Sendable, Equatable {
 public struct SystemUnlock: Codable, Sendable, Equatable {
     public var token: String?
     public init(token: String? = nil) { self.token = token }
+}
+
+/// Kết quả đánh thức / mở khoá màn hình Mac từ xa.
+public struct SystemUnlockResult: Codable, Sendable, Equatable {
+    public var ok: Bool
+    public var message: String
+    public init(ok: Bool, message: String) { self.ok = ok; self.message = message }
+}
+
+/// Phím Media / Âm lượng hệ thống gửi từ điện thoại tới macOS.
+public enum MediaKeyKind: String, Codable, Sendable, CaseIterable {
+    case playPause
+    case next
+    case previous
+    case volumeUp
+    case volumeDown
+    case mute
+}
+
+public struct MediaKey: Codable, Sendable, Equatable {
+    public var key: MediaKeyKind
+    public init(key: MediaKeyKind) { self.key = key }
+}
+
+/// Thông tin một màn hình vật lý đang gắn vào Mac.
+public struct DisplayInfo: Codable, Sendable, Equatable, Identifiable {
+    public var id: UInt32
+    public var name: String
+    public var width: UInt32
+    public var height: UInt32
+    public var isMain: Bool
+    public init(id: UInt32, name: String, width: UInt32, height: UInt32, isMain: Bool) {
+        self.id = id; self.name = name; self.width = width; self.height = height; self.isMain = isMain
+    }
+}
+
+/// Danh sách màn hình vật lý của Mac (chỉ gửi cho client chọn khi có ≥ 1 màn hình).
+public struct DisplayList: Codable, Sendable, Equatable {
+    public var displays: [DisplayInfo]
+    public init(displays: [DisplayInfo]) { self.displays = displays }
+}
+
+/// Giới hạn truyền tệp streaming qua frame `BULK` (tối đa 2 GiB, mỗi chunk ≤ 64 KiB).
+public enum FileTransferLimits {
+    public static let maxBytes: UInt64 = 2_147_483_648
+    public static let maxIdBytes = 64
+    public static let maxNameBytes = 255
+    public static let chunkBytes = 65_536
+}
+
+/// Bắt đầu phiên truyền tệp streaming 2 chiều (`BULK`).
+public struct FileStart: Codable, Sendable, Equatable {
+    public var id: String
+    public var name: String
+    public var size: UInt64
+    private enum CodingKeys: String, CodingKey { case id = "transferId", name, size }
+    public init(id: String, name: String, size: UInt64) {
+        self.id = id; self.name = name; self.size = size
+    }
+}
+
+/// Tiêu đề của một mảnh tệp 64 KiB; ngay sau message này là đúng 1 frame `BULK` kích thước `size` byte.
+public struct FileChunk: Codable, Sendable, Equatable {
+    public var id: String
+    public var size: UInt32
+    private enum CodingKeys: String, CodingKey { case id = "transferId", size }
+    public init(id: String, size: UInt32) {
+        self.id = id; self.size = size
+    }
+}
+
+/// Kết thúc truyền tệp streaming kèm SHA-256 hex thường (64 ký tự) của toàn bộ tệp.
+public struct FileDone: Codable, Sendable, Equatable {
+    public var id: String
+    public var hash: String
+    private enum CodingKeys: String, CodingKey { case id = "transferId", hash }
+    public init(id: String, hash: String) {
+        self.id = id; self.hash = hash
+    }
+}
+
+/// Huỷ phiên truyền tệp streaming đang chạy.
+public struct FileCancel: Codable, Sendable, Equatable {
+    public var id: String
+    public var reason: String?
+    private enum CodingKeys: String, CodingKey { case id = "transferId", reason }
+    public init(id: String, reason: String? = nil) {
+        self.id = id; self.reason = reason
+    }
 }
 
 /// Chào tệp tin gửi giữa các máy.

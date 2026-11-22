@@ -1,3 +1,4 @@
+import AppKit
 import CoreGraphics
 import XdeskTransport
 import XdeskWire
@@ -21,8 +22,15 @@ extension HostSession {
     /// Chọn màn hình để capture theo `display.config`: `native` = màn hình chính thật (không đụng cấu hình Mac);
     /// ngược lại = màn hình ảo đúng `w`×`h` (`touch` luôn HiDPI để macOS thấy kích thước logic w/2 × h/2).
     func acquireDisplay(for config: DisplayConfig) async throws -> (display: AcquiredDisplay, width: Int, height: Int) {
-        if config.isNativeMirror {
-            let acquired = await provider.acquireNative()
+        let requestedDisplayID: CGDirectDisplayID? = if config.screenMode == .mirror, let explicitId = config.displayId {
+            Self.onlinePhysicalDisplayIDs(excluding: await provider.virtualDisplayIDs).contains(CGDirectDisplayID(explicitId))
+                ? CGDirectDisplayID(explicitId)
+                : nil
+        } else {
+            nil
+        }
+        if config.isNativeMirror || requestedDisplayID != nil {
+            let acquired = await provider.acquireNative(displayID: requestedDisplayID)
             let size = CGDisplayCopyDisplayMode(acquired.displayID).flatMap {
                 NativeCaptureSize.fit(pixelWidth: $0.pixelWidth, pixelHeight: $0.pixelHeight)
             }
@@ -31,10 +39,12 @@ extension HostSession {
         }
         if config.screenMode == .mirror { await windowFit?.prepare() }
         let width = Int(config.w), height = Int(config.h)
+        let extendSide = await extendSideLookup()
         let spec = VirtualDisplaySpec(
             pixelWidth: width, pixelHeight: height, refreshRate: Double(config.fps),
             hiDPI: config.scale >= 2 || (config.screenMode == .mirror && config.fit == .touch),
-            mirrorsMac: config.screenMode == .mirror
+            mirrorsMac: config.screenMode == .mirror,
+            extendSide: extendSide
         )
         return (await provider.acquire(spec), width, height)
     }
@@ -50,5 +60,45 @@ extension HostSession {
         guard windowFitActive else { return }
         windowFitActive = false
         await windowFit?.end()
+    }
+
+    /// Liệt kê màn hình vật lý đang gắn vào Mac (bỏ màn hình ảo Xdesk), phục vụ chọn màn hình khi có ≥ 2 màn hình.
+    func physicalDisplays() async -> [DisplayInfo] {
+        let excluded = await provider.virtualDisplayIDs
+        let ids = Self.onlinePhysicalDisplayIDs(excluding: excluded)
+        let mainId = CGMainDisplayID()
+        let screenNames: [CGDirectDisplayID: String] = await MainActor.run {
+            var map: [CGDirectDisplayID: String] = [:]
+            for screen in NSScreen.screens {
+                if let num = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber {
+                    map[CGDirectDisplayID(num.uint32Value)] = screen.localizedName
+                }
+            }
+            return map
+        }
+        var secondaryIndex = 1
+        var list: [DisplayInfo] = []
+        for id in ids {
+            let isMain = (id == mainId)
+            let mode = CGDisplayCopyDisplayMode(id)
+            let w = UInt32(max(1, mode?.pixelWidth ?? CGDisplayPixelsWide(id)))
+            let h = UInt32(max(1, mode?.pixelHeight ?? CGDisplayPixelsHigh(id)))
+            let fallbackName = isMain ? "Màn hình chính" : "Màn hình phụ \(secondaryIndex)"
+            if !isMain { secondaryIndex += 1 }
+            let rawName = screenNames[id]?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let name = (rawName?.isEmpty == false ? rawName! : fallbackName)
+            list.append(DisplayInfo(id: id, name: name, width: w, height: h, isMain: isMain))
+        }
+        return list.sorted { lhs, rhs in
+            if lhs.isMain != rhs.isMain { return lhs.isMain }
+            return lhs.id < rhs.id
+        }
+    }
+
+    private static func onlinePhysicalDisplayIDs(excluding excluded: Set<CGDirectDisplayID>) -> [CGDirectDisplayID] {
+        var count: UInt32 = 0
+        var ids = [CGDirectDisplayID](repeating: 0, count: 16)
+        guard CGGetOnlineDisplayList(UInt32(ids.count), &ids, &count) == .success else { return [] }
+        return ids.prefix(Int(count)).filter { !excluded.contains($0) }
     }
 }

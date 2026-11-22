@@ -1,9 +1,19 @@
 package vn.xox.xdesk.app.ui
 
+import android.provider.OpenableColumns
 import android.view.SurfaceHolder
 import android.view.Window
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.foundation.shape.RoundedCornerShape
+import kotlin.math.roundToInt
+import vn.xox.xdesk.transport.FileTransferDirection
+import vn.xox.xdesk.transport.FileTransferProgress
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.rememberScrollState
@@ -86,9 +96,17 @@ fun StreamScreen(controller: ViewerController, window: Window) {
     val context = LocalContext.current
     val filePickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let {
-            val name = uri.lastPathSegment?.substringAfterLast('/') ?: "file"
-            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-            if (bytes != null) controller.sendFile(name, bytes)
+            var displayName = uri.lastPathSegment?.substringAfterLast('/') ?: "file"
+            var fileSize = 0L
+            context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val nameIdx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    val sizeIdx = cursor.getColumnIndex(OpenableColumns.SIZE)
+                    if (nameIdx >= 0) cursor.getString(nameIdx)?.takeIf { s -> s.isNotBlank() }?.let { n -> displayName = n }
+                    if (sizeIdx >= 0 && !cursor.isNull(sizeIdx)) fileSize = cursor.getLong(sizeIdx)
+                }
+            }
+            controller.sendFileStream(displayName, fileSize) { context.contentResolver.openInputStream(uri) }
         }
     }
     val imeBottom = WindowInsets.ime.getBottom(density)
@@ -142,6 +160,9 @@ fun StreamScreen(controller: ViewerController, window: Window) {
         controller.agentHelp?.takeIf { controller.streaming }?.let { help ->
             AgentHelpBanner(help.reason, onResolved = { controller.resolveAgentHelp(help.id) })
         }
+        controller.activeFileTransfer?.let { transfer ->
+            FileTransferBanner(transfer, onCancel = controller::cancelFileTransfer)
+        }
         val actions = floatingActions(
             controller, pointerStore, zoomed,
             onResetZoom = { viewRef?.resetZoom() },
@@ -152,7 +173,7 @@ fun StreamScreen(controller: ViewerController, window: Window) {
             keyboardShown = imeBottom > 0,
             onKeyboard = { if (imeBottom > 0) viewRef?.surfaceView?.hideKeyboard() else viewRef?.surfaceView?.showKeyboard() },
         )
-        val macShortcuts = macQuickShortcuts(controller)
+        val macShortcuts = macQuickShortcuts(controller, context)
         if (!controller.awaitingFrame && controller.sasPrompt == null) {
             FloatingControl(
                 store = floatingStore,
@@ -164,11 +185,17 @@ fun StreamScreen(controller: ViewerController, window: Window) {
                 macShortcuts = macShortcuts,
                 activeMirrorFit = controller.display.fit.takeIf { controller.streaming && controller.activeWorkMode == WorkMode.MIRROR },
                 onSelectMirrorFit = controller::switchFit,
+                hostDisplays = if (controller.streaming && controller.activeWorkMode == WorkMode.MIRROR) controller.hostDisplays else emptyList(),
+                selectedDisplayId = controller.selectedDisplayId,
+                onSelectHostDisplay = controller::selectHostDisplay,
                 modifier = Modifier.padding(bottom = with(density) { obscured.toDp() }),
             )
         }
         controller.input?.takeIf { imeBottom > 0 }?.let {
             KeyBar(it, onHide = { viewRef?.surfaceView?.hideKeyboard() }, modifier = Modifier.align(Alignment.BottomCenter).imePadding())
+        }
+        controller.clipboardNotice?.let { notice ->
+            ClipboardToast(notice, Modifier.align(Alignment.Center).padding(horizontal = 24.dp))
         }
     }
     if (showPointerSettings) {
@@ -195,7 +222,20 @@ private fun floatingActions(
             onClick = store::toggleMode,
         ),
     )
+    if (controller.audioAvailable) {
+        add(
+            FloatingAction(
+                label = if (controller.audioMuted) "Âm thanh: Đã tắt" else "Âm thanh: Bật",
+                icon = if (controller.audioMuted) XdeskIcons.VolumeOff else XdeskIcons.VolumeUp,
+                description = if (controller.audioMuted) "Bật lại tiếng trên điện thoại" else "Tắt tiếng trên điện thoại",
+                onClick = controller::toggleAudioMute,
+            ),
+        )
+    }
     if (zoomed) add(FloatingAction("Vừa khung màn hình", XdeskIcons.FitScreen, "Thu về vừa khung màn hình", onClick = onResetZoom))
+    if (controller.clipboardAvailable) {
+        add(FloatingAction("Gửi clipboard sang Mac", XdeskIcons.Clipboard, "Gửi clipboard sang máy Mac", afterShortcuts = true, onClick = controller::sendClipboardToMac))
+    }
     add(FloatingAction("Gửi tệp sang Mac…", XdeskIcons.FileTransfer, "Gửi tệp sang máy Mac", afterShortcuts = true, onClick = onSendFile))
     add(FloatingAction("Ngắt kết nối", XdeskIcons.Stop, isDestructive = true, onClick = controller::disconnect))
 }
@@ -210,13 +250,95 @@ private fun quickDockShortcuts(
     DockShortcut("Chụp ảnh", XdeskIcons.Camera, "Chụp vùng màn hình Mac (⌘ ⇧ 4)") { controller.input?.tapKey(0x21, 9) },
 )
 
-private fun macQuickShortcuts(controller: ViewerController) = listOf(
+private fun macQuickShortcuts(controller: ViewerController, context: android.content.Context) = listOf(
     DockShortcut("Spotlight (⌘ Space)", XdeskIcons.Search) { controller.input?.tapKey(0x2C, 8) },
     DockShortcut("Mission Control (⌃ ↑)", XdeskIcons.Layers) { controller.input?.tapKey(0x52, 2) },
     DockShortcut("Chuyển app (⌘ Tab)", XdeskIcons.AppWindow) { controller.input?.tapKey(0x2B, 8) },
     DockShortcut("Hoàn tác (⌘ Z)", XdeskIcons.Undo) { controller.input?.tapKey(0x1D, 8) },
-    DockShortcut("Mở khoá Mac", XdeskIcons.Unlock) { controller.sendSystemUnlock() },
+    DockShortcut("Mở khoá Mac", XdeskIcons.Unlock) { unlockMacWithBiometrics(controller, context) },
 )
+
+private fun unlockMacWithBiometrics(controller: ViewerController, context: android.content.Context) {
+    val activity = context as? FragmentActivity ?: run {
+        controller.showToast("Cần xác thực vân tay / khoá màn hình để mở khoá Mac")
+        return
+    }
+    val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or
+        BiometricManager.Authenticators.BIOMETRIC_WEAK or
+        BiometricManager.Authenticators.DEVICE_CREDENTIAL
+    val status = BiometricManager.from(activity).canAuthenticate(authenticators)
+    if (status != BiometricManager.BIOMETRIC_SUCCESS) {
+        controller.showToast("Cần bật vân tay / khoá màn hình trên điện thoại để mở khoá Mac")
+        return
+    }
+    val executor = ContextCompat.getMainExecutor(activity)
+    val prompt = BiometricPrompt(
+        activity,
+        executor,
+        object : BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                controller.sendSystemUnlock()
+            }
+
+            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                controller.showToast("Đã huỷ xác thực mở khoá Mac")
+            }
+        },
+    )
+    val info = BiometricPrompt.PromptInfo.Builder()
+        .setTitle("Mở khoá máy Mac")
+        .setSubtitle("Xác thực sinh trắc học hoặc mã khoá điện thoại để tiếp tục")
+        .setAllowedAuthenticators(authenticators)
+        .build()
+    prompt.authenticate(info)
+}
+
+@Composable
+private fun FileTransferBanner(transfer: FileTransferProgress, onCancel: () -> Unit) {
+    val percent = (transfer.fraction * 100f).roundToInt()
+    Box(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        Row(
+            Modifier.background(XdeskOverlay.bar, shape = RoundedCornerShape(12.dp))
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    "${if (transfer.direction == FileTransferDirection.SENDING) "Đang gửi" else "Đang nhận"} ${transfer.fileName} ($percent%)",
+                    color = XdeskOverlay.content,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                )
+                LinearProgressIndicator(progress = { transfer.fraction }, modifier = Modifier.fillMaxWidth())
+            }
+            TextButton(onClick = onCancel) {
+                Text("Huỷ", color = XdeskOverlay.content, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ClipboardToast(text: String, modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .background(XdeskOverlay.bar, shape = androidx.compose.foundation.shape.RoundedCornerShape(50))
+            .padding(horizontal = 16.dp, vertical = 9.dp),
+    ) {
+        Text(
+            text,
+            color = XdeskOverlay.content,
+            fontSize = 14.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+        )
+    }
+}
 
 @Composable
 private fun AgentHelpBanner(reason: String, onResolved: () -> Unit) {
@@ -253,19 +375,25 @@ private fun Overlay(controller: ViewerController, waitForFrame: Boolean = true) 
     val prompt = controller.sasPrompt
     if (prompt != null) {
         Box(Modifier.fillMaxSize().background(XdeskOverlay.scrim), contentAlignment = Alignment.Center) { SasCodeView(prompt) }
-    } else if (if (waitForFrame) controller.awaitingFrame else controller.connecting) {
-        ConnectingOverlay(controller.progress.targetName, onCancel = controller::disconnect)
+    } else if (controller.reconnectAttempt > 0 || (if (waitForFrame) controller.awaitingFrame else controller.connecting)) {
+        ConnectingOverlay(controller.progress.targetName, controller.reconnectAttempt, onCancel = controller::disconnect)
     }
 }
 
 /** Nền đen đặc để không lộ khung hình dở dang và chặn chạm (không gửi click xuống Mac khi chưa có hình); thẻ giữa giống iOS: vòng quay, tên máy, "Huỷ". */
 @Composable
-private fun ConnectingOverlay(name: String, onCancel: () -> Unit) {
+private fun ConnectingOverlay(name: String, reconnectAttempt: Int, onCancel: () -> Unit) {
+    val message = when {
+        reconnectAttempt > 0 && name.isBlank() -> "Đang kết nối lại (lần $reconnectAttempt/3)…"
+        reconnectAttempt > 0 -> "Đang kết nối lại tới $name (lần $reconnectAttempt/3)…"
+        name.isBlank() -> "Đang kết nối…"
+        else -> "Đang kết nối tới $name…"
+    }
     Box(Modifier.fillMaxSize().background(Color.Black).pointerInput(Unit) { detectTapGestures { } }, contentAlignment = Alignment.Center) {
         OverlayCard {
             CircularProgressIndicator(color = XdeskOverlay.accentLight)
             Text(
-                if (name.isBlank()) "Đang kết nối…" else "Đang kết nối tới $name…", color = XdeskOverlay.content, fontSize = 17.sp, fontWeight = FontWeight.SemiBold,
+                message, color = XdeskOverlay.content, fontSize = 17.sp, fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
             )
             OutlinedButton(

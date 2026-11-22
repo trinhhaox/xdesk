@@ -65,6 +65,7 @@ import vn.xox.xdesk.app.FloatingControlStore
 import vn.xox.xdesk.app.FloatingPlacement
 import vn.xox.xdesk.app.WorkMode
 import vn.xox.xdesk.app.ui.theme.XdeskOverlay
+import vn.xox.xdesk.wire.DisplayInfo
 import vn.xox.xdesk.wire.MirrorFit
 
 private val ButtonSize = 48.dp
@@ -111,6 +112,9 @@ fun FloatingControl(
     macShortcuts: List<DockShortcut> = emptyList(),
     activeMirrorFit: MirrorFit? = null,
     onSelectMirrorFit: (MirrorFit) -> Unit = {},
+    hostDisplays: List<DisplayInfo> = emptyList(),
+    selectedDisplayId: Long? = null,
+    onSelectHostDisplay: (Long) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(modifier.fillMaxSize()) {
@@ -122,6 +126,7 @@ fun FloatingControl(
         var expanded by remember { mutableStateOf(false) }
         var shortcutsOpen by remember { mutableStateOf(false) }
         var fitOpen by remember { mutableStateOf(false) }
+        var displaysOpen by remember { mutableStateOf(false) }
         var drag by remember { mutableStateOf<Offset?>(null) }
         var activity by remember { mutableIntStateOf(0) }
         var idle by remember { mutableStateOf(false) }
@@ -130,6 +135,7 @@ fun FloatingControl(
             if (!expanded) {
                 shortcutsOpen = false
                 fitOpen = false
+                displaysOpen = false
             }
         }
         LaunchedEffect(activity, expanded) {
@@ -217,7 +223,7 @@ fun FloatingControl(
                             .pointerInput(currentFit) {
                                 detectTapGestures(onTap = {
                                     fitOpen = !fitOpen
-                                    if (fitOpen) shortcutsOpen = false
+                                    if (fitOpen) { shortcutsOpen = false; displaysOpen = false }
                                     activity++
                                 })
                             }
@@ -226,7 +232,7 @@ fun FloatingControl(
                                 role = Role.Button
                                 onClick {
                                     fitOpen = !fitOpen
-                                    if (fitOpen) shortcutsOpen = false
+                                    if (fitOpen) { shortcutsOpen = false; displaysOpen = false }
                                     activity++
                                     true
                                 }
@@ -313,6 +319,90 @@ fun FloatingControl(
                             }
                         }
                     }
+                    if (hostDisplays.size >= 2) {
+                        val activeId = selectedDisplayId ?: hostDisplays.firstOrNull { it.isMain }?.id ?: hostDisplays.first().id
+                        val activeName = hostDisplays.firstOrNull { it.id == activeId }?.name ?: "Mặc định"
+                        Row(
+                            Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                                .pointerInput(activeId, hostDisplays) {
+                                    detectTapGestures(onTap = {
+                                        displaysOpen = !displaysOpen
+                                        if (displaysOpen) { fitOpen = false; shortcutsOpen = false }
+                                        activity++
+                                    })
+                                }
+                                .semantics {
+                                    contentDescription = "Màn hình: $activeName"
+                                    role = Role.Button
+                                    onClick {
+                                        displaysOpen = !displaysOpen
+                                        if (displaysOpen) { fitOpen = false; shortcutsOpen = false }
+                                        activity++
+                                        true
+                                    }
+                                }
+                                .padding(horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(XdeskIcons.SecondDisplay, contentDescription = null, Modifier.size(20.dp), tint = XdeskOverlay.content)
+                            Text(
+                                "Màn hình: $activeName",
+                                color = XdeskOverlay.content,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f).padding(start = 10.dp),
+                            )
+                            Icon(
+                                XdeskIcons.Chevron,
+                                contentDescription = if (displaysOpen) "Thu gọn" else "Mở rộng",
+                                Modifier.size(16.dp).rotate(if (displaysOpen) 90f else 0f),
+                                tint = XdeskOverlay.contentMuted,
+                            )
+                        }
+                        if (displaysOpen) {
+                            Column(
+                                Modifier.fillMaxWidth().padding(start = 10.dp, end = 4.dp, bottom = 4.dp)
+                                    .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(10.dp))
+                                    .padding(4.dp),
+                                verticalArrangement = Arrangement.spacedBy(2.dp),
+                            ) {
+                                hostDisplays.forEach { display ->
+                                    val selected = display.id == activeId
+                                    Row(
+                                        Modifier.fillMaxWidth().heightIn(min = 42.dp)
+                                            .background(
+                                                if (selected) XdeskOverlay.accent.copy(alpha = 0.22f) else Color.Transparent,
+                                                RoundedCornerShape(8.dp),
+                                            )
+                                            .pointerInput(display.id, activeId) {
+                                                detectTapGestures(onTap = {
+                                                    if (display.id != activeId) onSelectHostDisplay(display.id)
+                                                    expanded = false
+                                                    activity++
+                                                })
+                                            }
+                                            .padding(horizontal = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Text(
+                                            "${display.name} (${display.width}×${display.height})",
+                                            color = XdeskOverlay.content,
+                                            fontSize = 14.sp,
+                                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f),
+                                        )
+                                        if (selected) {
+                                            Icon(Icons.Filled.Check, contentDescription = "Đang chọn", Modifier.size(16.dp), tint = XdeskOverlay.accentLight)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
                 if (macShortcuts.isNotEmpty()) {
                     Row(
@@ -320,7 +410,7 @@ fun FloatingControl(
                             .pointerInput(Unit) {
                                 detectTapGestures(onTap = {
                                     shortcutsOpen = !shortcutsOpen
-                                    if (shortcutsOpen) fitOpen = false
+                                    if (shortcutsOpen) { fitOpen = false; displaysOpen = false }
                                     activity++
                                 })
                             }
@@ -329,7 +419,7 @@ fun FloatingControl(
                                 role = Role.Button
                                 onClick {
                                     shortcutsOpen = !shortcutsOpen
-                                    if (shortcutsOpen) fitOpen = false
+                                    if (shortcutsOpen) { fitOpen = false; displaysOpen = false }
                                     activity++
                                     true
                                 }

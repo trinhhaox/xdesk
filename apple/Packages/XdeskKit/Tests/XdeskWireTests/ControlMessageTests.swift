@@ -10,12 +10,22 @@ import Testing
     @Test func roundTripEveryType() throws {
         let all: [ControlMessage] = [
             .hello(Hello(ver: "1.0", caps: 3, name: "x")), .welcome(Welcome(ver: "1.0", sessionId: "s", caps: 1)),
-            .reject(Reject(reason: "version")), .displayConfig(DisplayConfig(w: 100, h: 50, scale: 1.5, fps: 30, codec: .hevc)),
+            .reject(Reject(reason: "version")), .displayConfig(DisplayConfig(w: 100, h: 50, scale: 1.5, fps: 30, codec: .hevc, displayId: 42)),
+            .displayReconfigure(DisplayConfig(w: 1080, h: 1920, scale: 3, fps: 60, codec: .hevc, mode: .mirror, mirrorFit: .touch, videoPaused: true)),
             .displayReady(DisplayReady(udpPort: 1, streamId: 2)), .keyframeRequest(KeyframeRequest(streamId: 1)),
+            .videoPause(VideoPause(streamId: 1)), .videoResume(VideoResume(streamId: 1)),
             .netReport(NetReport(rttMs: 1, lossPermille: 1000, jitterMs: 2, recvKbps: 3)), .bitrateSet(BitrateSet(kbps: 5)),
             .clipOffer(ClipOffer(kind: .image, size: 9)), .clipPull(ClipPull(kind: .text)),
             .controlState(ControlState(owner: .human)), .ping(Ping(t0: -1)), .pong(Pong(t0: 1, t1: 2, t2: 3)),
-            .bye(Bye()), .inputText(InputText(text: "Tiếng Việt: ươ, ă, â, đ 😀")), .unknown(type: "later.feature"),
+            .bye(Bye()), .inputText(InputText(text: "Tiếng Việt: ươ, ă, â, đ 😀")),
+            .systemUnlockResult(SystemUnlockResult(ok: true, message: "unlocked")),
+            .mediaKey(MediaKey(key: .playPause)),
+            .displayList(DisplayList(displays: [DisplayInfo(id: 1, name: "Built-in", width: 2560, height: 1600, isMain: true)])),
+            .fileStart(FileStart(id: "f1", name: "archive.zip", size: 123_456)),
+            .fileChunk(FileChunk(id: "f1", size: 65536)),
+            .fileDone(FileDone(id: "f1", hash: String(repeating: "a", count: 64))),
+            .fileCancel(FileCancel(id: "f1", reason: "cancelled")),
+            .unknown(type: "later.feature"),
         ]
         for message in all {
             let env = try roundTrip(message)

@@ -1,5 +1,6 @@
 package vn.xox.xdesk.wire
 
+import vn.xox.xdesk.wire.json.JsonArray
 import vn.xox.xdesk.wire.json.JsonBool
 import vn.xox.xdesk.wire.json.JsonNull
 import vn.xox.xdesk.wire.json.JsonNumber
@@ -44,12 +45,16 @@ object ControlMessageCodec {
         is ControlMessage.Welcome -> "welcome"
         is ControlMessage.Reject -> "reject"
         is ControlMessage.DisplayConfig -> "display.config"
+        is ControlMessage.DisplayReconfigure -> "display.reconfigure"
         is ControlMessage.DisplayReady -> "display.ready"
         is ControlMessage.KeyframeRequest -> "keyframe.request"
+        is ControlMessage.VideoPause -> "video.pause"
+        is ControlMessage.VideoResume -> "video.resume"
         is ControlMessage.NetReport -> "net.report"
         is ControlMessage.BitrateSet -> "bitrate.set"
         is ControlMessage.ClipOffer -> "clip.offer"
         is ControlMessage.ClipPull -> "clip.pull"
+        is ControlMessage.ClipData -> "clip.data"
         is ControlMessage.ControlState -> "control.state"
         is ControlMessage.Ping -> "ping"
         is ControlMessage.Pong -> "pong"
@@ -61,8 +66,15 @@ object ControlMessageCodec {
         is ControlMessage.AgentApprove -> "agent.approve"
         ControlMessage.SystemLock -> "system.lock"
         is ControlMessage.SystemUnlock -> "system.unlock"
+        is ControlMessage.SystemUnlockResult -> "system.unlock.result"
+        is ControlMessage.MediaKey -> "media.key"
+        is ControlMessage.DisplayList -> "display.list"
         is ControlMessage.FileOffer -> "file.offer"
         is ControlMessage.FileData -> "file.data"
+        is ControlMessage.FileStart -> "file.start"
+        is ControlMessage.FileChunk -> "file.chunk"
+        is ControlMessage.FileDone -> "file.done"
+        is ControlMessage.FileCancel -> "file.cancel"
         is ControlMessage.AgentHelp -> "agent.help"
         is ControlMessage.Unknown -> message.type
     }
@@ -95,6 +107,10 @@ internal class FieldReader(private val obj: JsonObject) {
     fun i64(key: String): Long = (obj[key] as? JsonNumber)?.exactLong() ?: bad(key)
 
     fun u32(key: String): Long = i64(key).takeIf { it in 0..0xFFFFFFFFL } ?: bad(key)
+
+    fun optU32(key: String): Long? = if (obj[key] == null || obj[key] == JsonNull) null else u32(key)
+
+    fun array(key: String): List<JsonValue> = (obj[key] as? JsonArray)?.items ?: bad(key)
 
     fun u16(key: String): Int = i64(key).takeIf { it in 0..0xFFFF }?.toInt() ?: bad(key)
 

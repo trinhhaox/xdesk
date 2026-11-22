@@ -82,6 +82,18 @@ struct SettingsView: View {
                 .buttonStyle(.plain)
             }
             Section {
+                Picker("Tốc độ khung hình", selection: $model.qualityPreset) {
+                    ForEach(StreamQualityPreset.allCases) { preset in
+                        Text(preset.shortLabel).tag(preset)
+                    }
+                }
+                .pickerStyle(.segmented)
+            } header: {
+                Text("Tốc độ khung hình")
+            } footer: {
+                Text(model.qualityPreset.footer(maxDeviceFps: ScreenMetrics.currentMaxFps()))
+            }
+            Section {
                 Picker("Bộ mã hoá", selection: $model.videoCodec) {
                     Text("HEVC (H.265)").tag(VideoCodec.hevc)
                     Text("H.264").tag(VideoCodec.h264)

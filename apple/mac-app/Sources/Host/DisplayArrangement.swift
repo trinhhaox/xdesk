@@ -1,8 +1,24 @@
 import CoreGraphics
 import Darwin
 
+/// Phía đặt màn hình phụ (mở rộng) so với màn hình Mac chính.
+enum ExtendSide: String, CaseIterable, Sendable, Identifiable {
+    case right, left, top, bottom
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .right: String(localized: "Bên phải")
+        case .left: String(localized: "Bên trái")
+        case .top: String(localized: "Phía trên")
+        case .bottom: String(localized: "Phía dưới")
+        }
+    }
+}
+
 /// Sắp xếp màn hình ảo vừa tạo: macOS có thể tự đưa nó vào nhóm mirror (màn hình thật bị phản chiếu theo độ phân giải ảo
-/// và còn thành "màn hình chính"). Gỡ mirror, trả màn hình thật về gốc (0,0) và đặt màn hình ảo bên phải → màn hình mở rộng.
+/// và còn thành "màn hình chính"). Gỡ mirror, trả màn hình thật về gốc (0,0) và đặt màn hình ảo theo hướng đã chọn → màn hình mở rộng.
 /// Chỉ áp dụng cho phiên hiện tại (`forSession`): thoát app thì cấu hình tự về như cũ.
 enum DisplayArrangement {
     enum ArrangementError: Error, LocalizedError {
@@ -13,7 +29,28 @@ enum DisplayArrangement {
         }
     }
 
+    static func origin(
+        for side: ExtendSide,
+        baseSize: (width: Int32, height: Int32),
+        newSize: (width: Int32, height: Int32)
+    ) -> (x: Int32, y: Int32) {
+        switch side {
+        case .right: (baseSize.width, 0)
+        case .left: (-newSize.width, 0)
+        case .top: (0, -newSize.height)
+        case .bottom: (0, baseSize.height)
+        }
+    }
+
     static func extendRight(newDisplay: CGDirectDisplayID) throws {
+        try extend(newDisplay: newDisplay, side: .right, logicalSize: (0, 0))
+    }
+
+    static func extend(
+        newDisplay: CGDirectDisplayID,
+        side: ExtendSide,
+        logicalSize: (width: Int32, height: Int32)
+    ) throws {
         let all = onlineDisplays()
         let others = all.filter { $0 != newDisplay }
         guard let base = others.first(where: { CGDisplayIsBuiltin($0) != 0 }) ?? others.first else { return }
@@ -22,8 +59,16 @@ enum DisplayArrangement {
         guard status == .success, let config else { throw ArrangementError.failed(status) }
         for display in all { CGConfigureDisplayMirrorOfDisplay(config, display, kCGNullDirectDisplay) }
         CGConfigureDisplayOrigin(config, base, 0, 0)
-        let baseWidth = CGDisplayCopyDisplayMode(base).map { Int32($0.width) } ?? Int32(CGDisplayBounds(base).width)
-        CGConfigureDisplayOrigin(config, newDisplay, baseWidth, 0)
+        let baseMode = CGDisplayCopyDisplayMode(base)
+        let baseWidth = baseMode.map { Int32($0.width) } ?? Int32(CGDisplayBounds(base).width)
+        let baseHeight = baseMode.map { Int32($0.height) } ?? Int32(CGDisplayBounds(base).height)
+        let fallbackBounds = CGDisplayBounds(newDisplay)
+        let resolvedNewSize = (
+            width: logicalSize.width > 0 ? logicalSize.width : Int32(fallbackBounds.width),
+            height: logicalSize.height > 0 ? logicalSize.height : Int32(fallbackBounds.height)
+        )
+        let pos = origin(for: side, baseSize: (baseWidth, baseHeight), newSize: resolvedNewSize)
+        CGConfigureDisplayOrigin(config, newDisplay, pos.x, pos.y)
         status = CGCompleteDisplayConfiguration(config, .forSession)
         guard status == .success else { throw ArrangementError.failed(status) }
     }

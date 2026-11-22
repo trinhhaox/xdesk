@@ -159,6 +159,14 @@ internal object XdeskIcons {
             moveTo(9f, 11f); lineTo(12f, 8f); lineTo(15f, 11f)
         }
     }
+    val Clipboard = build("Clipboard") {
+        stroke(1.7f) {
+            roundRect(8f, 6f, 12f, 15f, 2f)
+            roundRect(11f, 3.5f, 6f, 3f, 1f)
+            moveTo(8f, 18f); horizontalLineTo(5.5f); arcTo(1.5f, 1.5f, 0f, false, true, 4f, 16.5f)
+            verticalLineTo(5.5f); arcTo(1.5f, 1.5f, 0f, false, true, 5.5f, 4f); horizontalLineTo(9f)
+        }
+    }
     val SecondDisplay = build("SecondDisplay") {
         stroke(1.7f) {
             roundRect(2.5f, 5f, 11f, 12f, 1.8f)
@@ -218,6 +226,50 @@ internal object XdeskIcons {
     val SpaceBar = build("SpaceBar") {
         stroke(1.8f) {
             moveTo(3.5f, 10.5f); verticalLineTo(15.5f); horizontalLineTo(20.5f); verticalLineTo(10.5f)
+        }
+    }
+    val SkipPrevious = build("SkipPrevious") {
+        fill {
+            roundRect(3.5f, 5.5f, 2.2f, 13f, 0.8f)
+            moveTo(13.5f, 6f); lineTo(6.2f, 12f); lineTo(13.5f, 18f); close()
+            moveTo(20.5f, 6f); lineTo(13.2f, 12f); lineTo(20.5f, 18f); close()
+        }
+    }
+    val PlayPause = build("PlayPause") {
+        fill {
+            moveTo(4f, 6f); lineTo(12.2f, 12f); lineTo(4f, 18f); close()
+            roundRect(14f, 6.2f, 2.4f, 11.6f, 0.8f)
+            roundRect(18f, 6.2f, 2.4f, 11.6f, 0.8f)
+        }
+    }
+    val SkipNext = build("SkipNext") {
+        fill {
+            moveTo(3.5f, 6f); lineTo(10.8f, 12f); lineTo(3.5f, 18f); close()
+            moveTo(10.5f, 6f); lineTo(17.8f, 12f); lineTo(10.5f, 18f); close()
+            roundRect(18.3f, 5.5f, 2.2f, 13f, 0.8f)
+        }
+    }
+    val VolumeOff = build("VolumeOff") {
+        fill {
+            moveTo(3.5f, 9.5f); horizontalLineTo(7f); lineTo(12f, 5f); verticalLineTo(19f); lineTo(7f, 14.5f); horizontalLineTo(3.5f); close()
+        }
+        stroke(1.9f) { moveTo(4f, 4f); lineTo(20f, 20f) }
+    }
+    val VolumeDown = build("VolumeDown") {
+        fill {
+            moveTo(4.5f, 9.5f); horizontalLineTo(8f); lineTo(13f, 5f); verticalLineTo(19f); lineTo(8f, 14.5f); horizontalLineTo(4.5f); close()
+        }
+        stroke(1.8f) {
+            moveTo(16.2f, 8.8f); arcToRelative(4.2f, 4.2f, 0f, false, true, 0f, 6.4f)
+        }
+    }
+    val VolumeUp = build("VolumeUp") {
+        fill {
+            moveTo(3.5f, 9.5f); horizontalLineTo(7f); lineTo(12f, 5f); verticalLineTo(19f); lineTo(7f, 14.5f); horizontalLineTo(3.5f); close()
+        }
+        stroke(1.7f) {
+            moveTo(15.2f, 9f); arcToRelative(3.8f, 3.8f, 0f, false, true, 0f, 6f)
+            moveTo(18.2f, 6.5f); arcToRelative(7.2f, 7.2f, 0f, false, true, 0f, 11f)
         }
     }
 }

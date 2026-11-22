@@ -53,7 +53,9 @@ class ViewerSessionTest {
         assertEquals("127.0.0.1:${host.port}", known.lastAddress)
         await("hello+display.config tới host") { host.received.any { it is ControlMessage.DisplayConfig } }
         val hello = host.received.filterIsInstance<ControlMessage.Hello>().single()
-        assertEquals(Capabilities.H264, hello.caps)
+        val expected = Capabilities.H264 or Capabilities.HOT_RECONFIGURE or Capabilities.VIDEO_PAUSE or
+            Capabilities.FILE_TRANSFER or Capabilities.REMOTE_UNLOCK or Capabilities.MEDIA_KEYS or Capabilities.MULTI_DISPLAY
+        assertEquals(expected, hello.caps)
         assertEquals(1280L, host.received.filterIsInstance<ControlMessage.DisplayConfig>().single().w)
     }
 

@@ -53,6 +53,7 @@ final class CaptureService: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
     }
 
     func start() async throws {
+        lock.withLock { stopping = false }
         guard PermissionsCheck.hasScreenRecording else {
             PermissionsCheck.requestScreenRecording()
             throw CaptureError.permissionDenied
@@ -87,7 +88,11 @@ final class CaptureService: NSObject, SCStreamOutput, SCStreamDelegate, @uncheck
             defer { stream = nil }
             return stream
         }
-        do { try await active?.stopCapture() } catch { onStop(error) }
+        do {
+            try await active?.stopCapture()
+        } catch {
+            if !lock.withLock({ stopping }) { onStop(error) }
+        }
     }
 
     /// Màn hình ảo mới tạo có thể chưa xuất hiện trong danh sách SCK ngay → thử lại tối đa ~3 s.

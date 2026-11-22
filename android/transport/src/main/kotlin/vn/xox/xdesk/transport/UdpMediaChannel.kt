@@ -23,17 +23,19 @@ import vn.xox.xdesk.wire.WireException
  */
 class UdpMediaChannel private constructor(
     private val streamId: Int,
-    private val channel: DatagramChannel,
-    keys: UdpKeys,
+    private val channel: DatagramChannel?,
+    keys: UdpKeys?,
     private val listener: UdpMediaListener,
     private val resyncSink: (ControlMessage.RekeyResync) -> Unit,
+    private val tcpSink: ((MediaPacket) -> Unit)?,
     private val nowMs: () -> Long,
 ) : Closeable {
     private val probe = MediaPacket(MediaHeader(MediaPacketType.PROBE, streamId, 0), ByteArray(0))
     private val health = LinkHealth(nowMs)
-    private val cipher = UdpDatagramCipher(keys)
+    private val cipher = keys?.let(::UdpDatagramCipher)
     private val sendLock = Any()
-    private val selector: Selector = Selector.open()
+    private val ingestLock = Any()
+    private val selector: Selector? = if (channel != null) Selector.open() else null
     private val reassembler = Reassembler()
     private val frameGate = FrameOrderGate()
     private val nackTracker = NackTracker()
@@ -44,20 +46,41 @@ class UdpMediaChannel private constructor(
 
     val stats = UdpChannelStats()
 
-    val localPort: Int get() = (channel.localAddress as InetSocketAddress).port
+    val localPort: Int get() = (channel?.localAddress as? InetSocketAddress)?.port ?: 0
 
-    /** Gửi một gói (input...), mã hoá và rekey khi tới hạn. */
+    /** Gửi gói probe để host nhận diện đối tác (đặc biệt cần ngay sau handshake MediaOverTcp). */
+    fun sendProbe() = trySend(probe)
+
+    /** Nạp trực tiếp một [MediaPacket] nhận qua TCP frame 0x04 (`MediaOverTcp`). */
+    fun ingest(packet: MediaPacket) {
+        if (closed) return
+        synchronized(ingestLock) {
+            stats.datagramsReceived++
+            health.markValid()
+            heardFromHost = true
+            handle(packet)
+        }
+    }
+
+    /** Gửi một gói (input...), mã hoá UDP hoặc chuyển thẳng qua TCP khi ở chế độ `overTcp`. */
     fun sendPacket(packet: MediaPacket) {
         if (closed) transportError(TransportErrorCode.NO_PEER)
+        val fallbackSink = tcpSink
+        if (fallbackSink != null) {
+            fallbackSink(packet)
+            return
+        }
+        val activeCipher = cipher ?: transportError(TransportErrorCode.NO_PEER)
+        val activeChannel = channel ?: transportError(TransportErrorCode.NO_PEER)
         val bytes = synchronized(sendLock) {
-            if (cipher.needsRekey) {
-                cipher.rekey()
-                resyncSink(ControlMessage.RekeyResync(cipher.sendEpoch, false))
+            if (activeCipher.needsRekey) {
+                activeCipher.rekey()
+                resyncSink(ControlMessage.RekeyResync(activeCipher.sendEpoch, false))
             }
-            cipher.seal(packet)
+            activeCipher.seal(packet)
         }
         try {
-            channel.write(ByteBuffer.wrap(bytes))
+            activeChannel.write(ByteBuffer.wrap(bytes))
         } catch (e: IOException) {
             transportError(TransportErrorCode.CONNECTION_FAILED, e.message, e)
         }
@@ -65,12 +88,13 @@ class UdpMediaChannel private constructor(
 
     /** `rekey.resync` từ host (đã xác thực qua TCP): `ask` → báo epoch gửi của ta; ngược lại kéo khoá nhận lên epoch của host. */
     fun handleResync(resync: ControlMessage.RekeyResync) {
+        val activeCipher = cipher ?: return
         if (resync.ask) {
-            resyncSink(ControlMessage.RekeyResync(cipher.sendEpoch, false))
+            resyncSink(ControlMessage.RekeyResync(activeCipher.sendEpoch, false))
             return
         }
         try {
-            cipher.resync(resync.epoch)
+            activeCipher.resync(resync.epoch)
             health.unknownEpochCount = 0
         } catch (e: vn.xox.xdesk.crypto.CryptoException) {
             stats.malformedPacketCount++
@@ -78,15 +102,17 @@ class UdpMediaChannel private constructor(
     }
 
     private fun runLoop() {
+        val activeChannel = channel ?: return
+        val activeSelector = selector ?: return
         val buffer = ByteBuffer.allocate(MAX_DATAGRAM)
         while (!closed) {
             try {
-                selector.select(POLL_INTERVAL_MS)
+                activeSelector.select(POLL_INTERVAL_MS)
                 if (closed) return
-                selector.selectedKeys().clear()
+                activeSelector.selectedKeys().clear()
                 while (true) {
                     buffer.clear()
-                    if (channel.receive(buffer) == null) break
+                    if (activeChannel.receive(buffer) == null) break
                     buffer.flip()
                     handleDatagram(ByteArray(buffer.remaining()).also(buffer::get))
                 }
@@ -99,9 +125,10 @@ class UdpMediaChannel private constructor(
     }
 
     private fun handleDatagram(bytes: ByteArray) {
+        val activeCipher = cipher ?: return
         stats.datagramsReceived++
         val packet = try {
-            cipher.open(bytes)
+            activeCipher.open(bytes)
         } catch (e: DatagramRejection) {
             if (e.code == CryptoErrorCode.unknownEpoch) health.unknownEpochCount++
             if (e.countsAsRejected) stats.rejectedDatagramCount++
@@ -151,10 +178,13 @@ class UdpMediaChannel private constructor(
         if (poll.abandoned.isNotEmpty()) listener.onKeyframeNeeded()
     }
 
-    private fun maintain() = health.maintain(
-        heardFromHost, sendProbe = { trySend(probe) },
-        askResync = { resyncSink(ControlMessage.RekeyResync(cipher.receiveEpoch, true)) }, onLinkLost = listener::onLinkLost,
-    )
+    private fun maintain() {
+        val activeCipher = cipher ?: return
+        health.maintain(
+            heardFromHost, sendProbe = { trySend(probe) },
+            askResync = { resyncSink(ControlMessage.RekeyResync(activeCipher.receiveEpoch, true)) }, onLinkLost = listener::onLinkLost,
+        )
+    }
 
     private fun trySend(packet: MediaPacket) {
         try { sendPacket(packet) } catch (e: TransportException) { /* mất gói probe/NACK là bình thường trên UDP; link-timeout lo phần còn lại */ }
@@ -163,10 +193,10 @@ class UdpMediaChannel private constructor(
     override fun close() {
         if (closed) return
         closed = true
-        selector.wakeup()
+        selector?.wakeup()
         if (::thread.isInitialized) thread.join(500)
-        try { channel.close() } catch (e: IOException) { /* đã đóng */ }
-        try { selector.close() } catch (e: IOException) { /* đã đóng */ }
+        try { channel?.close() } catch (e: IOException) { /* đã đóng */ }
+        try { selector?.close() } catch (e: IOException) { /* đã đóng */ }
     }
 
     companion object {
@@ -193,10 +223,26 @@ class UdpMediaChannel private constructor(
             } catch (e: IOException) {
                 transportError(TransportErrorCode.CONNECTION_FAILED, e.message, e)
             }
-            val media = UdpMediaChannel(streamId, channel, keys, listener, resyncSink, nowMs)
-            media.channel.register(media.selector, java.nio.channels.SelectionKey.OP_READ)
+            val media = UdpMediaChannel(streamId, channel, keys, listener, resyncSink, null, nowMs)
+            channel.register(media.selector, java.nio.channels.SelectionKey.OP_READ)
             media.thread = threadFactory(media::runLoop).also { it.isDaemon = true; it.start() }
             return media
         }
+
+        /** Kênh media qua TCP (`MediaOverTcp` frame 0x04), dùng cho đường hầm USB `adb reverse`. */
+        fun overTcp(
+            streamId: Int,
+            listener: UdpMediaListener,
+            sendSink: (MediaPacket) -> Unit,
+            nowMs: () -> Long = ::monotonicMs,
+        ): UdpMediaChannel = UdpMediaChannel(
+            streamId = streamId,
+            channel = null,
+            keys = null,
+            listener = listener,
+            resyncSink = {},
+            tcpSink = sendSink,
+            nowMs = nowMs,
+        )
     }
 }

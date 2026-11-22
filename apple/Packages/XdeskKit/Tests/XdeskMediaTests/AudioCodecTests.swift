@@ -95,4 +95,13 @@ private func sine(frames: Int, startPhase: inout Double) -> [Int16] {
         #expect(!aac.isEmpty)
         #expect(try aac.allSatisfy { try AudioPayload.decode($0.payload).codec == .aacEld })
     }
+
+    @Test func audioPlayerMuteTogglesSafely() {
+        let player = AudioPlayer()
+        #expect(!player.isMuted)
+        player.isMuted = true
+        #expect(player.isMuted)
+        player.isMuted = false
+        #expect(!player.isMuted)
+    }
 }

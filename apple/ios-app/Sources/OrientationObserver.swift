@@ -1,9 +1,23 @@
 import UIKit
 
-/// Kích thước điểm + scale của vùng hiển thị; nhân lên ra điểm ảnh gốc khi tạo `display.config`.
+/// Kích thước điểm + scale + tần số quét tối đa của vùng hiển thị; nhân lên ra điểm ảnh gốc khi tạo `display.config`.
 struct ScreenMetrics: Equatable {
     let size: CGSize
     let scale: CGFloat
+    let maxFps: Int
+
+    init(size: CGSize, scale: CGFloat, maxFps: Int = 60) {
+        self.size = size
+        self.scale = scale
+        self.maxFps = maxFps
+    }
+
+    /// Tần số quét tối đa của màn hình thiết bị hiện tại.
+    @MainActor
+    static func currentMaxFps() -> Int {
+        let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+        return max(30, scene?.screen.maximumFramesPerSecond ?? 60)
+    }
 
     /// Số đo hiện tại của cửa sổ app (lúc chưa có view nào đo được, vd. khởi động / tự kết nối khi debug).
     @MainActor
@@ -13,7 +27,7 @@ struct ScreenMetrics: Equatable {
         // Vùng an toàn (video không nằm dưới tai thỏ/Dynamic Island): phải khớp kích thước SwiftUI đo ở màn stream.
         let window = scene.windows.first
         let size = window.map { $0.bounds.inset(by: $0.safeAreaInsets).size } ?? scene.screen.bounds.size
-        return ScreenMetrics(size: size, scale: scene.screen.scale)
+        return ScreenMetrics(size: size, scale: scene.screen.scale, maxFps: max(30, scene.screen.maximumFramesPerSecond))
     }
 }
 

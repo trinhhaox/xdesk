@@ -77,6 +77,8 @@ fun SecuritySettingsScreen(controller: ViewerController, updates: UpdateControll
                     }
                 }
             }
+            item { QualityPresetGroup(controller.display, controller.deviceMaxRefreshHz) }
+            item { VideoCodecGroup(controller.display) }
             item { AppearanceGroup(LocalAppearance.current) }
             item { Group("Điều khiển") { ValueRow("Chuột và con trỏ", pointerStore.settings.mode.title()) { page = SettingsPage.POINTER } } }
             item { Group("Bảo mật") { ValueRow("Thiết bị và máy đã ghép", "${controller.knownHosts.size} máy") { page = SettingsPage.SECURITY } } }

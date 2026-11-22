@@ -1,12 +1,19 @@
 package vn.xox.xdesk.transport
 
+import java.io.ByteArrayInputStream
+import java.io.File
+import java.io.InputStream
+import java.util.UUID
+import java.util.Collections
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 import vn.xox.xdesk.wire.AssembledFrame
 import vn.xox.xdesk.wire.Capabilities
 import vn.xox.xdesk.wire.ControlMessage
+import vn.xox.xdesk.wire.DisplayInfo
 import vn.xox.xdesk.wire.InputEvent
+import vn.xox.xdesk.wire.MediaKeyKind
 import vn.xox.xdesk.wire.MediaPacket
 import vn.xox.xdesk.wire.MediaPacketType
 
@@ -27,6 +34,14 @@ class ViewerSession(
     onAgentHelp: (AgentHelpRequest?) -> Unit = {},
     private val audioSink: AudioSink? = null,
     val preferHevc: Boolean = false,
+    private val clipboardAccess: ClipboardAccess? = null,
+    private val preferMediaOverTcp: Boolean = false,
+    private val fileTempDir: File = File(System.getProperty("java.io.tmpdir"), "xdesk-transfers"),
+    private val onDisplayList: (List<DisplayInfo>) -> Unit = {},
+    private val onFileProgress: (FileTransferProgress?) -> Unit = {},
+    private val onFileReceived: (FileTransferCompletion) -> Unit = {},
+    private val onFileError: (String, String) -> Unit = { _, _ -> },
+    private val onUnlockResult: (ControlMessage.SystemUnlockResult) -> Unit = {},
 ) {
     private val connector = ViewerConnector(trust, deviceName, nowMs)
     private val lock = Any()
@@ -34,15 +49,32 @@ class ViewerSession(
     private var connection: ControlConnection? = null
     private var channel: UdpMediaChannel? = null
     private var inputPump: InputPump? = null
+    private var clipboardSync: ClipboardSync? = null
+    @Volatile private var activeSendingFileId: String? = null
+    private val cancelledFileIds = Collections.synchronizedSet(HashSet<String>())
+    private val fileReceiver = FileTransferReceiver(fileTempDir, onFileProgress, onFileReceived, onFileError)
     private var streamId = 0
     private val metrics = SessionMetrics()
     private val approvals = AgentApprovalGate(nowMs, { delayMs, task -> io?.schedule(task, delayMs, TimeUnit.MILLISECONDS) }, onAgentApproval)
     private val agentHelps = AgentHelpGate(onAgentHelp)
+    private val reconfigureLock = Any()
+    private var pendingReconfigure: Pair<Long, (Boolean) -> Unit>? = null
+    private val earlyReadyIds = HashSet<Long>()
     private var lastKeyframeRequestMs = 0L
     private var audioActive = false
 
     @Volatile var state: ViewerState = ViewerState.Idle
         private set
+    @Volatile var negotiatedCaps: Long = 0L
+        private set
+    val supportsHotReconfigure: Boolean get() = (negotiatedCaps and Capabilities.HOT_RECONFIGURE) != 0L
+    val supportsVideoPause: Boolean get() = (negotiatedCaps and Capabilities.VIDEO_PAUSE) != 0L
+    val supportsFileTransfer: Boolean get() = (negotiatedCaps and Capabilities.FILE_TRANSFER) != 0L
+    val audioAvailable: Boolean get() = state == ViewerState.Streaming && audioActive
+    val clipboardAvailable: Boolean
+        get() = state == ViewerState.Streaming &&
+            (negotiatedCaps and Capabilities.CLIPBOARD) != 0L &&
+            clipboardSync != null
     @Volatile var connectedHostId: String? = null
         private set
     @Volatile var connectedTarget: ViewerTarget? = null
@@ -122,19 +154,153 @@ class ViewerSession(
         runIo { connection?.send(ControlMessage.SystemUnlock()) }
     }
 
-    fun sendFile(name: String, bytes: ByteArray) {
+    fun sendMediaKey(key: MediaKeyKind) {
+        if (state != ViewerState.Streaming) return
+        runIo { connection?.send(ControlMessage.MediaKey(key)) }
+    }
+
+    fun setVideoPaused(paused: Boolean) {
+        if (state != ViewerState.Streaming || !supportsVideoPause) return
         runIo {
-            val chunkSize = 32 * 1024
-            val totalChunks = ((bytes.size + chunkSize - 1) / chunkSize).coerceAtLeast(1)
-            connection?.send(ControlMessage.FileOffer(name, bytes.size.toLong(), ""))
-            for (seq in 0 until totalChunks) {
-                val start = seq * chunkSize
-                val end = minOf(start + chunkSize, bytes.size)
-                val chunk = bytes.copyOfRange(start, end)
-                val base64 = java.util.Base64.getEncoder().encodeToString(chunk)
-                val isLast = (seq == totalChunks - 1)
-                connection?.send(ControlMessage.FileData(name, base64, isLast))
+            connection?.send(if (paused) ControlMessage.VideoPause(streamId) else ControlMessage.VideoResume(streamId))
+        }
+    }
+
+    /** Đổi cấu hình màn hình nóng trong phiên đang mở; trả `false` qua [onResult] nếu host cũ hoặc lỗi. */
+    fun reconfigureDisplay(config: ControlMessage.DisplayConfig, onResult: (Boolean) -> Unit) {
+        val executor = io
+        if (state != ViewerState.Streaming || !supportsHotReconfigure || executor == null || executor.isShutdown) {
+            onResult(false)
+            return
+        }
+        executor.execute {
+            val conn = connection
+            if (conn == null || state != ViewerState.Streaming) {
+                onResult(false)
+                return@execute
             }
+            try {
+                val reqId = conn.send(ControlMessage.DisplayReconfigure(config))
+                var immediate: Boolean? = null
+                synchronized(reconfigureLock) {
+                    if (earlyReadyIds.remove(reqId)) {
+                        immediate = true
+                    } else {
+                        pendingReconfigure?.second?.invoke(false)
+                        pendingReconfigure = reqId to onResult
+                    }
+                }
+                if (immediate == true) {
+                    onResult(true)
+                } else {
+                    executor.schedule({ finishReconfigure(reqId, false) }, RECONFIGURE_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                }
+            } catch (e: TransportException) {
+                onResult(false)
+            } catch (e: vn.xox.xdesk.wire.WireException) {
+                onResult(false)
+            }
+        }
+    }
+
+    private fun finishReconfigure(id: Long, ok: Boolean) {
+        val callback: ((Boolean) -> Unit)? = synchronized(reconfigureLock) {
+            val pending = pendingReconfigure
+            if (pending != null && pending.first == id) {
+                pendingReconfigure = null
+                pending.second
+            } else {
+                if (ok) earlyReadyIds.add(id)
+                null
+            }
+        }
+        callback?.invoke(ok)
+    }
+
+    fun cancelFileTransfer() {
+        val sendingId = activeSendingFileId
+        if (sendingId != null) {
+            cancelledFileIds.add(sendingId)
+            return
+        }
+        val active = fileReceiver
+        active.cancelAll()
+    }
+
+    fun sendFile(name: String, totalBytes: Long, openStream: () -> InputStream?, onFinished: (Boolean, String?) -> Unit = { _, _ -> }) {
+        val conn = connection ?: return onFinished(false, "Chưa kết nối tới Mac")
+        if (!supportsFileTransfer) {
+            val bytes = try {
+                openStream()?.use { it.readBytes() }
+            } catch (e: Exception) {
+                return onFinished(false, e.message)
+            } ?: return onFinished(false, "Không đọc được tệp")
+            sendFileLegacy(name, bytes, onFinished)
+            return
+        }
+        runIo {
+            val id = UUID.randomUUID().toString()
+            activeSendingFileId = id
+            try {
+                val stream = openStream() ?: throw IllegalStateException("Không mở được luồng tệp")
+                val completed = stream.use { input ->
+                    FileTransferSender.sendFile(
+                        id = id,
+                        fileName = name,
+                        totalBytes = totalBytes,
+                        input = input,
+                        connection = conn,
+                        isCancelled = { id in cancelledFileIds },
+                        onProgress = onFileProgress,
+                    )
+                }
+                onFinished(completed, if (completed) null else "cancelled")
+            } catch (e: Exception) {
+                onFileProgress(null)
+                onFinished(false, e.message)
+            } finally {
+                if (activeSendingFileId == id) activeSendingFileId = null
+                cancelledFileIds.remove(id)
+            }
+        }
+    }
+
+    fun sendFile(name: String, bytes: ByteArray) {
+        sendFile(name, bytes.size.toLong(), { ByteArrayInputStream(bytes) })
+    }
+
+    private fun sendFileLegacy(name: String, bytes: ByteArray, onFinished: (Boolean, String?) -> Unit) {
+        runIo {
+            try {
+                val chunkSize = 32 * 1024
+                val totalChunks = ((bytes.size + chunkSize - 1) / chunkSize).coerceAtLeast(1)
+                connection?.send(ControlMessage.FileOffer(name, bytes.size.toLong(), ""))
+                for (seq in 0 until totalChunks) {
+                    val start = seq * chunkSize
+                    val end = minOf(start + chunkSize, bytes.size)
+                    val chunk = bytes.copyOfRange(start, end)
+                    val base64 = java.util.Base64.getEncoder().encodeToString(chunk)
+                    val isLast = (seq == totalChunks - 1)
+                    connection?.send(ControlMessage.FileData(name, base64, isLast))
+                }
+                onFinished(true, null)
+            } catch (e: Exception) {
+                onFinished(false, e.message)
+            }
+        }
+    }
+
+    /** Chủ động đọc clipboard Android hiện tại và gửi sang Mac (trả về `.Disabled` nếu chưa cấp quyền clipboard). */
+    fun sendClipboard(onResult: (ClipboardSendOutcome) -> Unit) {
+        val sync = clipboardSync
+        val executor = io
+        if (sync == null || !clipboardAvailable || executor == null || executor.isShutdown) {
+            onResult(ClipboardSendOutcome.Disabled)
+            return
+        }
+        executor.execute {
+            val outcome = sync.sendCurrent()
+            onResult(outcome)
         }
     }
 
@@ -148,29 +314,75 @@ class ViewerSession(
         connectedTarget = host.target
         connectedHostId = host.hostId
         val result = ViewerHandshake.run(conn, deviceName, offeredCaps(), config)
+        negotiatedCaps = result.caps
+        if (clipboardAccess != null && (result.caps and Capabilities.CLIPBOARD) != 0L) {
+            val transport = object : ClipboardTransport {
+                override fun sendClip(message: ControlMessage) { conn.send(message) }
+                override fun sendClipData(header: ControlMessage.ClipData, payload: ByteArray) { conn.sendClipData(header, payload) }
+            }
+            clipboardSync = ClipboardSync(transport, clipboardAccess, nowMs = nowMs) { true }
+        } else {
+            clipboardSync = null
+        }
         startAudio(result.caps)
-        val keys = conn.udpKeys ?: transportError(TransportErrorCode.PROTOCOL_VIOLATION, "thiếu khoá UDP")
+        val useMediaOverTcp = (result.caps and Capabilities.MEDIA_OVER_TCP) != 0L
         streamId = result.ready.streamId
         val executor = Executors.newSingleThreadScheduledExecutor { Thread(it, "xdesk-io") }
         io = executor
         inputPump = InputPump(streamId, { channel?.sendPacket(it) }, { })
-        channel = UdpMediaChannel.connect(
-            streamId, conn.remoteAddress, result.ready.udpPort, keys, MediaListener(), { sendResync(it) }, threadFactory,
-        )
+        channel = if (useMediaOverTcp) {
+            UdpMediaChannel.overTcp(streamId, MediaListener(), { conn.sendMediaOverTcp(it) }, nowMs)
+        } else {
+            val keys = conn.udpKeys ?: transportError(TransportErrorCode.PROTOCOL_VIOLATION, "thiếu khoá UDP")
+            UdpMediaChannel.connect(
+                streamId, conn.remoteAddress, result.ready.udpPort, keys, MediaListener(), { sendResync(it) }, threadFactory,
+            )
+        }
         val reader = ControlReader(
             conn, { metrics.updateClock(ClockSample(it, ClockSync.wallClockMs())) }, { channel?.handleResync(it) },
             { approvals.receive(it, hostNowMs()) }, { agentHelps.receive(it) }, { connectedHostId?.let(trust.knownHosts::remove) }, ::fail,
+            onDisplayReady = { id, _ -> finishReconfigure(id, true) },
+            onMediaOverTcp = { channel?.ingest(it) },
+            onBulk = { bytes -> if (!fileReceiver.handleBulk(bytes)) clipboardSync?.handleBulk(bytes) },
+            onClipboard = { clipboardSync?.handle(it) },
+            onFileTransfer = { msg -> handleIncomingFileMessage(msg) },
+            onDisplayList = { list -> onDisplayList(list.displays) },
+            onUnlockResult = onUnlockResult,
         )
         Thread(reader::run, "xdesk-control").apply { isDaemon = true }.start()
+        if (useMediaOverTcp) {
+            executor.execute { guardedIo { channel?.sendProbe() } }
+        }
         executor.scheduleWithFixedDelay({ guardedIo { inputPump?.maintain(nowMs()) } }, 50, InputPump.MAINTENANCE_INTERVAL_MS, TimeUnit.MILLISECONDS)
         executor.scheduleWithFixedDelay({ guardedIo { reportNow() } }, 500, 500, TimeUnit.MILLISECONDS)
         executor.execute { pingLoop(100) }
     }
 
-    /** Khả năng viewer đưa ra: audio chỉ khi app có [audioSink]; host chỉ giữ lại nếu thiết bị này được cấp quyền âm thanh. */
+    private fun handleIncomingFileMessage(message: ControlMessage) {
+        when (message) {
+            is ControlMessage.FileStart -> fileReceiver.handleStart(message)
+            is ControlMessage.FileChunk -> fileReceiver.handleChunkHeader(message)
+            is ControlMessage.FileDone -> fileReceiver.handleDone(message)
+            is ControlMessage.FileCancel -> {
+                if (activeSendingFileId == message.id) {
+                    cancelledFileIds.add(message.id)
+                } else {
+                    fileReceiver.handleCancel(message)
+                }
+            }
+            else -> Unit
+        }
+    }
+
+    /** Khả năng viewer đưa ra: audio chỉ khi app có [audioSink]; clipboard khi có [clipboardAccess]; MediaOverTcp khi đi qua USB/loopback. */
     private fun offeredCaps(): Long {
-        val video = if (preferHevc) Capabilities.H264 or Capabilities.HEVC else Capabilities.H264
-        return if (audioSink == null) video else video or Capabilities.AUDIO_PCM or Capabilities.AUDIO_AAC_ELD
+        var caps = (if (preferHevc) Capabilities.H264 or Capabilities.HEVC else Capabilities.H264) or
+            Capabilities.HOT_RECONFIGURE or Capabilities.VIDEO_PAUSE or
+            Capabilities.FILE_TRANSFER or Capabilities.REMOTE_UNLOCK or Capabilities.MEDIA_KEYS or Capabilities.MULTI_DISPLAY
+        if (audioSink != null) caps = caps or Capabilities.AUDIO_PCM or Capabilities.AUDIO_AAC_ELD
+        if (clipboardAccess != null) caps = caps or Capabilities.CLIPBOARD
+        if (preferMediaOverTcp) caps = caps or Capabilities.MEDIA_OVER_TCP
+        return caps
     }
 
     private fun startAudio(negotiated: Long) {
@@ -227,6 +439,17 @@ class ViewerSession(
     }
 
     private fun teardown() {
+        val pendingCallback = synchronized(reconfigureLock) {
+            earlyReadyIds.clear()
+            pendingReconfigure?.second.also { pendingReconfigure = null }
+        }
+        pendingCallback?.invoke(false)
+        negotiatedCaps = 0L
+        activeSendingFileId?.let { cancelledFileIds.add(it) }
+        activeSendingFileId = null
+        fileReceiver.cancelAll()
+        clipboardSync?.reset()
+        clipboardSync = null
         approvals.clear()
         agentHelps.clear()
         stopAudio()
@@ -260,5 +483,6 @@ class ViewerSession(
 
     companion object {
         const val KEYFRAME_REQUEST_MIN_GAP_MS = 500L
+        const val RECONFIGURE_TIMEOUT_MS = 5_000L
     }
 }
