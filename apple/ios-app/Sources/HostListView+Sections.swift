@@ -4,25 +4,73 @@ import XdeskTransport
 import XdeskViewer
 
 extension HostListView {
+    /// Cảnh báo + nút 1 chạm bật/cài Tailscale khi danh sách có máy kết nối qua tailnet nhưng Tailscale chưa hoạt động.
+    @ViewBuilder var tailscaleBanner: some View {
+        let pairedNeeds = pairedRows.contains { row in
+            row.status != .ready && (
+                row.device.lastAddress.map(TailscaleSupport.isTailscaleHost) == true ||
+                row.savedAddresses.contains(where: TailscaleSupport.isTailscaleHost)
+            )
+        }
+        let savedNeeds = PairedHostListing.unmergedManual(model.manualHosts, rows: pairedRows)
+            .contains { TailscaleSupport.isTailscaleHost($0.address) }
+        let manualNeeds = TailscaleSupport.isTailscaleHost(manualText)
+        if tailscaleState != .active && (pairedNeeds || savedNeeds || manualNeeds) {
+            let installed = tailscaleState == .installedInactive
+            Section {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: "network.badge.shield.half.filled")
+                            .font(.title3)
+                            .foregroundStyle(BrandPalette.warning)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(installed ? "Tailscale đang tắt" : "Chưa cài đặt Tailscale")
+                                .font(.headline)
+                            Text(
+                                installed
+                                    ? "Bật Tailscale để kết nối từ xa tới máy Mac qua mạng Tailscale."
+                                    : "Cài ứng dụng Tailscale để kết nối máy Mac từ xa ngoài mạng Wi-Fi."
+                            )
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        }
+                    }
+                    Button {
+                        if installed { TailscaleSupport.openApp() } else { TailscaleSupport.openInstall() }
+                    } label: {
+                        Text(installed ? "Mở Tailscale" : "Cài đặt Tailscale")
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(BrandPalette.primaryFill)
+                    .buttonBorderShape(.capsule)
+                }
+                .padding(.vertical, 4)
+            }
+        }
+    }
+
     /// "Máy Mac của bạn": mọi Mac đã ghép, kể cả khi không thấy trên mạng.
     var pairedSection: some View {
-        Section("Máy Mac của bạn") {
+        let defaultIsControl = model.defaultWorkMode.isControlMode
+        return Section("Máy Mac của bạn") {
             ForEach(pairedRows) { row in
                 HStack(spacing: 4) {
                     Button {
-                        model.isTrackpadOnlyMode = false
                         tapPaired(row)
                     } label: { PairedHostRowView(row: row) }
                         .buttonStyle(.plain)
                     Button {
-                        tapPairedTrackpad(row)
+                        tapPairedAlternate(row)
                     } label: {
-                        Image(systemName: "computermouse.fill").font(.title3)
+                        Image(systemName: defaultIsControl ? "macbook" : "computermouse.fill")
+                            .font(.title3)
                             .foregroundStyle(BrandPalette.primary)
                             .frame(width: 44, height: 44).contentShape(Rectangle())
                     }
                     .buttonStyle(.borderless)
-                    .accessibilityLabel("Bàn phím & Chuột ảo cho \(row.device.name)")
+                    .accessibilityLabel(defaultIsControl ? "Chiếu màn hình Mac cho \(row.device.name)" : "Chuột cảm ứng cho \(row.device.name)")
                     // Nút "…" hiện rõ để xoá máy: vuốt/nhấn giữ khó phát hiện.
                     Menu {
                         Button("Xoá máy này", systemImage: "trash", role: .destructive) { forgetting = row.device }
@@ -84,9 +132,14 @@ extension HostListView {
     func errorSection(_ failure: ConnectionFailure) -> some View {
         Section {
             ConnectionErrorCard(failure: failure) {
-                if let unreachable { tapPaired(unreachable); return }
+                if let unreachable {
+                    tapPaired(unreachable)
+                    return
+                }
                 switch failure.action {
-                case .retry: Task { await model.retryLast() }
+                case .retry:
+                    model.prepareForConnect()
+                    Task { await model.retryLast() }
                 case .pairAgain: choosing = model.target
                 }
             } onDismiss: {

@@ -45,17 +45,38 @@ struct AppearancePicker: View {
 
     var body: some View {
         Section("Giao diện") {
-            Picker("Giao diện", selection: $raw) {
-                ForEach(AppearanceSetting.allCases, id: \.rawValue) { option in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Label(option.title, systemImage: option.symbol)
-                        Text(option.summary).font(.footnote).foregroundStyle(.secondary)
+            ForEach(AppearanceSetting.allCases, id: \.rawValue) { option in
+                let selected = raw == option.rawValue
+                Button {
+                    Haptics.light()
+                    raw = option.rawValue
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: option.symbol)
+                            .font(.title3)
+                            .foregroundStyle(BrandPalette.primary)
+                            .frame(width: 28)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(option.title)
+                                .foregroundStyle(.primary)
+                            Text(option.summary)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 8)
+                        if selected {
+                            Image(systemName: "checkmark")
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(BrandPalette.primary)
+                        }
                     }
-                    .tag(option.rawValue)
+                    .frame(minHeight: 48)
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selected ? .isSelected : [])
             }
-            .pickerStyle(.inline)
-            .labelsHidden()
         }
     }
 }

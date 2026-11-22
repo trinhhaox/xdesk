@@ -2,28 +2,85 @@ import SwiftUI
 import XdeskViewer
 import XdeskWire
 
-/// Màn Cài đặt (mở từ nút bánh răng trên thanh công cụ): chế độ hiển thị, kiểu bản sao, bộ mã hoá, giao diện, chuột và bảo mật.
+/// Màn Cài đặt (mở từ nút bánh răng trên thanh công cụ): chế độ làm việc mặc định, kiểu chiếu màn hình, bộ mã hoá, giao diện, chuột và bảo mật.
 struct SettingsView: View {
+    @Environment(\.scenePhase) private var scenePhase
     let model: StreamViewModel
     let pointer: PointerSettingsStore
+    @State private var tailscaleState = TailscaleSupport.detect()
 
     var body: some View {
         @Bindable var model = model
         Form {
             Section {
-                Picker("Chế độ", selection: $model.screenMode) {
-                    Text("Bản sao").tag(ScreenMode.mirror)
-                    Text("Mở rộng").tag(ScreenMode.extend)
+                ForEach(WorkMode.allCases) { workMode in
+                    Button {
+                        Haptics.light()
+                        model.defaultWorkMode = workMode
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: workMode.symbol)
+                                .font(.title3)
+                                .foregroundStyle(BrandPalette.primary)
+                                .frame(width: 28)
+                                .accessibilityHidden(true)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(workMode.title)
+                                    .foregroundStyle(.primary)
+                                Text(workMode.summary)
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer(minLength: 8)
+                            if model.defaultWorkMode == workMode {
+                                Image(systemName: "checkmark")
+                                    .font(.body.weight(.semibold))
+                                    .foregroundStyle(BrandPalette.primary)
+                            }
+                        }
+                        .frame(minHeight: 48)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(model.defaultWorkMode == workMode ? .isSelected : [])
                 }
-                .pickerStyle(.segmented)
             } header: {
-                Text("Chế độ hiển thị")
+                Text("Chế độ làm việc mặc định")
             } footer: {
-                Text(model.screenMode == .extend
-                     ? "Điện thoại là màn hình thứ hai bên phải Mac. Kéo cửa sổ sang để dùng."
-                     : "Điện thoại hiện đúng màn hình Mac. Chọn bên dưới Mac giữ nguyên hay đổi theo điện thoại.")
+                Text("Chế độ sẽ tự mở khi bạn chạm vào máy Mac. Bạn vẫn có thể đổi nhanh giữa 5 chế độ ngay khi đang kết nối.")
             }
-            if model.screenMode == .mirror { MirrorFitPicker(fit: $model.mirrorFit, pointer: pointer) }
+            if model.defaultWorkMode == .mirror { MirrorFitPicker(fit: $model.mirrorFit, pointer: pointer) }
+            Section("Kết nối từ xa") {
+                Button {
+                    Haptics.light()
+                    TailscaleSupport.openOrInstall(for: tailscaleState)
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "network.badge.shield.half.filled")
+                            .font(.title3)
+                            .foregroundStyle(tailscaleState == .active ? BrandPalette.accent : BrandPalette.warning)
+                            .frame(width: 28)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Tailscale")
+                                .foregroundStyle(.primary)
+                            Text(tailscaleState.settingsSubtitle)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 8)
+                        Text(tailscaleState.statusBadge)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(tailscaleState == .active ? BrandPalette.accent : BrandPalette.warning)
+                        Image(systemName: "chevron.right")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .frame(minHeight: 48)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
             Section {
                 Picker("Bộ mã hoá", selection: $model.videoCodec) {
                     Text("HEVC (H.265)").tag(VideoCodec.hevc)
@@ -57,6 +114,14 @@ struct SettingsView: View {
         .background(BrandPalette.background)
         .navigationTitle("Cài đặt")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await model.refreshTrust() }
+        .task {
+            tailscaleState = TailscaleSupport.detect()
+            await model.refreshTrust()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                tailscaleState = TailscaleSupport.detect()
+            }
+        }
     }
 }

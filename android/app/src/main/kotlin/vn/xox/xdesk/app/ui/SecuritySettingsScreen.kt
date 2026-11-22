@@ -1,38 +1,82 @@
 package vn.xox.xdesk.app.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import vn.xox.xdesk.app.PointerSettingsStore
 import vn.xox.xdesk.app.Screen
+import vn.xox.xdesk.app.TailscaleState
+import vn.xox.xdesk.app.TailscaleSupport
 import vn.xox.xdesk.app.ViewerController
+import vn.xox.xdesk.app.WorkMode
 import vn.xox.xdesk.app.forgetHost
+import vn.xox.xdesk.app.ui.theme.extras
 import vn.xox.xdesk.app.update.UpdateController
 import vn.xox.xdesk.transport.KnownHost
-import vn.xox.xdesk.wire.ScreenMode
 
 private enum class SettingsPage { ROOT, POINTER, SECURITY }
 
 /**
- * Màn "Cài đặt" theo iOS: Chế độ hiển thị, Kiểu bản sao, Giao diện, Điều khiển › Chuột và con trỏ, Bảo mật › Thiết bị và máy đã ghép
- * (và Cập nhật, chỉ có ở Android). Trang con thay nội dung tại chỗ; nút Quay lại hệ thống đi lùi một cấp.
+ * Màn "Cài đặt" theo iOS: Chế độ làm việc mặc định, Kiểu chiếu màn hình, Kết nối từ xa (Tailscale), Giao diện,
+ * Điều khiển › Chuột và con trỏ, Bảo mật › Thiết bị và máy đã ghép (và Cập nhật).
  */
 @Composable
 fun SecuritySettingsScreen(controller: ViewerController, updates: UpdateController) {
-    val pointerStore = LocalContext.current.let { context -> remember { PointerSettingsStore(context) } }
+    val context = LocalContext.current
+    @Suppress("DEPRECATION")
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val pointerStore = remember(context) { PointerSettingsStore(context) }
+    var tailscaleState by remember { mutableStateOf(TailscaleSupport.detect(context)) }
     var page by rememberSaveable { mutableStateOf(SettingsPage.ROOT) }
     var confirmReset by remember { mutableStateOf(false) }
     var forgetting by remember { mutableStateOf<KnownHost?>(null) }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                tailscaleState = TailscaleSupport.detect(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     BackHandler(enabled = page != SettingsPage.ROOT) { page = SettingsPage.ROOT }
     when (page) {
         SettingsPage.ROOT -> SettingsScaffold("Cài đặt", { controller.screen = Screen.HOSTS }) {
-            item { DisplayModeGroup(controller.display) }
-            if (controller.display.mode == ScreenMode.MIRROR) item { MirrorFitGroup(controller.display, pointerStore) }
+            item { WorkModeSettingsGroup(controller.display) }
+            if (controller.display.defaultWorkMode == WorkMode.MIRROR) item { MirrorFitGroup(controller.display, pointerStore) }
+            item {
+                val tailscaleTint = if (tailscaleState == TailscaleState.ACTIVE) MaterialTheme.colorScheme.tertiary else MaterialTheme.extras.warning
+                Group("Kết nối từ xa") {
+                    GroupRow({ TailscaleSupport.openOrInstall(context, tailscaleState) }) {
+                        RowIcon(XdeskIcons.Tailscale, tint = tailscaleTint)
+                        TitleAndSubtitle("Tailscale", tailscaleState.settingsSubtitle, Modifier.padding(start = XdeskDims.iconGap))
+                        Text(
+                            tailscaleState.statusBadge,
+                            color = tailscaleTint,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(end = 8.dp),
+                        )
+                        ChevronIcon()
+                    }
+                }
+            }
             item { AppearanceGroup(LocalAppearance.current) }
             item { Group("Điều khiển") { ValueRow("Chuột và con trỏ", pointerStore.settings.mode.title()) { page = SettingsPage.POINTER } } }
             item { Group("Bảo mật") { ValueRow("Thiết bị và máy đã ghép", "${controller.knownHosts.size} máy") { page = SettingsPage.SECURITY } } }

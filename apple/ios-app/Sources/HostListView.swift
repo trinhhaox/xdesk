@@ -8,6 +8,7 @@ import XdeskWire
 
 /// Màn chính: Mac đã ghép (mọi máy trong kho tin cậy), Mac khác trên LAN chưa ghép, máy nhập tay/Tailscale.
 struct HostListView: View {
+    @Environment(\.scenePhase) private var scenePhase
     let model: StreamViewModel
     @AppStorage("xdesk.lastManualHost") var manualText = ""
     /// Đích chưa ghép đôi đang chờ người dùng chọn cách ghép.
@@ -18,6 +19,14 @@ struct HostListView: View {
     /// Mac đã ghép nhưng không có đường kết nối nào (không thấy trên LAN, chưa có địa chỉ): hiện thẻ lỗi thay vì im lặng.
     @State var unreachable: PairedHostRow?
     @State var pointer = PointerSettingsStore()
+    @State var tailscaleState = TailscaleSupport.detect()
+    @State var pendingTailscale: PendingTailscale?
+
+    struct PendingTailscale {
+        let address: String
+        let state: TailscaleState
+        let proceed: () -> Void
+    }
 
     struct KeyChange: Identifiable {
         let host: DiscoveredHost
@@ -34,6 +43,7 @@ struct HostListView: View {
             Form {
                 if model.localNetworkDenied { localNetworkGuidance }
                 if let failure = currentFailure { errorSection(failure) }
+                tailscaleBanner
                 if pairedRows.isEmpty {
                     EmptyPairingState { showScanner = true }
                 } else {
@@ -45,16 +55,26 @@ struct HostListView: View {
                     model: model,
                     manualText: $manualText,
                     onScanQr: pairedRows.isEmpty ? nil : { showScanner = true },
+                    tailscaleState: tailscaleState,
+                    onTailscaleAction: { TailscaleSupport.openOrInstall(for: tailscaleState) },
                     onConnect: connectManual
                 )
             }
             .scrollContentBackground(.hidden)
             .background(BrandPalette.background)
             .navigationTitle("Xdesk")
-            .refreshable { model.stopBrowsing(); model.startBrowsing() }
+            .refreshable {
+                tailscaleState = TailscaleSupport.detect()
+                model.stopBrowsing()
+                model.startBrowsing()
+            }
             .toolbar {
                 ToolbarItemGroup {
-                    Button("Tìm lại", systemImage: "arrow.clockwise") { model.stopBrowsing(); model.startBrowsing() }
+                    Button("Tìm lại", systemImage: "arrow.clockwise") {
+                        tailscaleState = TailscaleSupport.detect()
+                        model.stopBrowsing()
+                        model.startBrowsing()
+                    }
                     if !pairedRows.isEmpty {
                         Button("Thêm máy Mac", systemImage: "plus") { showScanner = true }
                     }
@@ -93,12 +113,35 @@ struct HostListView: View {
             } message: { _ in
                 Text("Máy Mac không còn nhận thiết bị này, thường là do đã bấm \"Thu hồi\" trên Mac. Chọn \"Ghép đôi lại\" để quét mã QR hoặc so mã 6 số.")
             }
+            .alert(
+                pendingTailscale?.state == .installedInactive ? "Tailscale đang tắt" : "Chưa cài đặt Tailscale",
+                isPresented: Binding(get: { pendingTailscale != nil }, set: { if !$0 { pendingTailscale = nil } }),
+                presenting: pendingTailscale
+            ) { pending in
+                Button(pending.state == .installedInactive ? "Mở Tailscale" : "Cài đặt Tailscale") {
+                    if pending.state == .installedInactive { TailscaleSupport.openApp() } else { TailscaleSupport.openInstall() }
+                }
+                Button("Vẫn thử kết nối") { pending.proceed() }
+                Button("Đóng", role: .cancel) {}
+            } message: { pending in
+                Text(
+                    pending.state == .installedInactive
+                        ? "Kết nối tới \(pending.address) cần bật Tailscale trên điện thoại trước."
+                        : "Địa chỉ \(pending.address) là địa chỉ Tailscale. Cài đặt và bật Tailscale để kết nối từ xa."
+                )
+            }
         }
         .onAppear {
+            tailscaleState = TailscaleSupport.detect()
             model.startBrowsing()
             Task {
                 await model.loadManualHosts()
                 await model.refreshTrust()
+            }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                tailscaleState = TailscaleSupport.detect()
             }
         }
         .onDisappear { model.stopBrowsing() }

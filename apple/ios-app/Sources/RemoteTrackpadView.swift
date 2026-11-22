@@ -4,12 +4,11 @@ import XdeskInput
 import XdeskViewer
 import XdeskWire
 
-/// Màn hình điều khiển: biến iPhone/iPad thành Trackpad cảm ứng lớn và Bàn phím chuyên nghiệp điều khiển Mac từ xa.
+/// Màn hình điều khiển: biến iPhone/iPad thành Chuột cảm ứng, Bàn phím ảo và Trình chiếu & Phím số điều khiển Mac từ xa,
+/// với thanh chuyển nhanh thống nhất 5 chế độ làm việc ngay ở đầu màn hình.
 struct RemoteTrackpadView: View {
     let model: StreamViewModel
-    let onClose: () -> Void
 
-    @State private var selectedTab: RemoteTab = .trackpad
     @State private var cursorX: Float = 0.5
     @State private var cursorY: Float = 0.5
     @State private var activeMods: InputModifiers = []
@@ -18,60 +17,36 @@ struct RemoteTrackpadView: View {
     @State private var isRightDown = false
     @FocusState private var isInputFocused: Bool
 
-    enum RemoteTab: String, CaseIterable, Identifiable {
-        case trackpad = "Trackpad"
-        case keyboard = "Bàn phím"
-        case numpadMedia = "Số & Media"
-        var id: String { rawValue }
-    }
-
     var body: some View {
         VStack(spacing: 0) {
             headerBar
             Divider().background(Color.white.opacity(0.15))
 
-            switch selectedTab {
+            switch model.activeWorkMode {
             case .trackpad:
                 trackpadArea
             case .keyboard:
                 keyboardArea
             case .numpadMedia:
                 numpadAndMediaArea
+            case .mirror, .extend:
+                EmptyView()
             }
         }
         .background(BrandPalette.overlaySurface.ignoresSafeArea())
         .preferredColorScheme(.dark)
     }
 
-    // MARK: - Header Bar (2 tầng, nút ≥44pt, không cắt chữ tab)
+    // MARK: - Header Bar (Tên máy Mac + Bộ chọn 5 chế độ 2+3 thống nhất)
 
     private var headerBar: some View {
         VStack(spacing: 8) {
             HStack(spacing: 8) {
-                Button {
-                    Haptics.light()
-                    onClose()
-                } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "display")
-                            .font(.system(size: 15, weight: .semibold))
-                        Text("Màn hình")
-                            .font(.system(size: 13, weight: .semibold))
-                    }
-                    .foregroundStyle(BrandPalette.primaryOnOverlay)
-                    .padding(.horizontal, 12)
-                    .frame(minHeight: 40)
-                    .background(BrandPalette.overlayKey, in: Capsule())
-                }
-                .buttonStyle(.plain)
-                .frame(minHeight: 44)
-                .accessibilityLabel("Xem màn hình Mac")
-
                 Text(model.connectingName ?? "Điều khiển Mac")
-                    .font(.subheadline.weight(.semibold))
+                    .font(.headline)
                     .foregroundStyle(.white)
                     .lineLimit(1)
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 HStack(spacing: 2) {
                     Button {
@@ -101,17 +76,13 @@ struct RemoteTrackpadView: View {
                     .accessibilityLabel("Ngắt kết nối")
                 }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 14)
             .padding(.top, 6)
 
-            Picker("", selection: $selectedTab) {
-                ForEach(RemoteTab.allCases) { tab in
-                    Text(tab.rawValue).tag(tab)
-                }
+            WorkModeSwitcher(activeMode: model.activeWorkMode) { mode in
+                model.switchWorkMode(to: mode)
             }
-            .pickerStyle(.segmented)
-            .colorScheme(.dark)
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 12)
             .padding(.bottom, 8)
         }
     }
@@ -129,9 +100,12 @@ struct RemoteTrackpadView: View {
                     )
 
                 VStack(spacing: 6) {
-                    Image(systemName: "hand.draw.fill")
-                        .font(.system(size: 28))
-                        .foregroundStyle(.white.opacity(0.32))
+                    Image(systemName: "computermouse.fill")
+                        .font(.system(size: 32))
+                        .foregroundStyle(.white.opacity(0.38))
+                    Text("Bàn di chuột cảm ứng")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.white.opacity(0.65))
                     Text("1 ngón: Di chuột · Chạm: Chuột trái\n2 ngón chạm: Chuột phải · 2 ngón vuốt: Cuộn trang")
                         .font(.footnote)
                         .multilineTextAlignment(.center)
@@ -156,7 +130,7 @@ struct RemoteTrackpadView: View {
                 } label: {
                     Text("Chuột Trái")
                         .font(.system(size: 16, weight: .semibold))
-                        .frame(maxWidth: .infinity, minHeight: 54)
+                        .frame(maxWidth: .infinity, minHeight: 56)
                         .background(isLeftDown ? BrandPalette.primaryFill : BrandPalette.overlayKey, in: RoundedRectangle(cornerRadius: 14))
                         .foregroundStyle(.white)
                 }
@@ -172,7 +146,7 @@ struct RemoteTrackpadView: View {
                 } label: {
                     Text("Chuột Phải")
                         .font(.system(size: 16, weight: .semibold))
-                        .frame(maxWidth: .infinity, minHeight: 54)
+                        .frame(maxWidth: .infinity, minHeight: 56)
                         .background(isRightDown ? BrandPalette.primaryFill : BrandPalette.overlayKey, in: RoundedRectangle(cornerRadius: 14))
                         .foregroundStyle(.white)
                 }
@@ -236,14 +210,13 @@ struct RemoteTrackpadView: View {
                     .submitLabel(.send)
                     .onSubmit { sendTypedText() }
 
-                    if !inputText.isEmpty {
-                        Button("Gửi") { sendTypedText() }
-                            .font(.system(size: 14, weight: .semibold))
-                            .padding(.horizontal, 14)
-                            .frame(minHeight: 44)
-                            .background(BrandPalette.primaryFill, in: RoundedRectangle(cornerRadius: 10))
-                            .foregroundStyle(.white)
-                    }
+                    Button("Gửi") { sendTypedText() }
+                        .font(.system(size: 14, weight: .semibold))
+                        .padding(.horizontal, 14)
+                        .frame(minHeight: 44)
+                        .background(inputText.isEmpty ? BrandPalette.overlayKey : BrandPalette.primaryFill, in: RoundedRectangle(cornerRadius: 10))
+                        .foregroundStyle(inputText.isEmpty ? .white.opacity(0.45) : .white)
+                        .disabled(inputText.isEmpty)
                 }
                 .padding(.top, 12)
 
@@ -395,7 +368,7 @@ struct RemoteTrackpadView: View {
 
     private var presentationSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("THUYẾT TRÌNH & MEDIA")
+            Text("TRÌNH CHIẾU SLIDE & MEDIA")
                 .font(.caption.weight(.bold))
                 .foregroundStyle(.white.opacity(0.55))
             HStack(spacing: 8) {

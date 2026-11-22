@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -59,9 +60,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
+import vn.xox.xdesk.app.DisplaySettingsStore
 import vn.xox.xdesk.app.FloatingControlStore
 import vn.xox.xdesk.app.FloatingPlacement
+import vn.xox.xdesk.app.WorkMode
 import vn.xox.xdesk.app.ui.theme.XdeskOverlay
+import vn.xox.xdesk.wire.MirrorFit
 
 private val ButtonSize = 48.dp
 private val Panel = XdeskOverlay.panel
@@ -77,6 +81,7 @@ class FloatingAction(
     val description: String = label,
     val enabled: Boolean = true,
     val isDestructive: Boolean = false,
+    val afterShortcuts: Boolean = false,
     val trailingIcon: ImageVector? = null,
     val trailingDescription: String? = null,
     val onTrailingClick: (() -> Unit)? = null,
@@ -99,9 +104,13 @@ class DockShortcut(
 fun FloatingControl(
     store: FloatingControlStore,
     status: String,
+    activeWorkMode: WorkMode,
+    onSelectWorkMode: (WorkMode) -> Unit,
     actions: List<FloatingAction>,
     quickDock: List<DockShortcut> = emptyList(),
     macShortcuts: List<DockShortcut> = emptyList(),
+    activeMirrorFit: MirrorFit? = null,
+    onSelectMirrorFit: (MirrorFit) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(modifier.fillMaxSize()) {
@@ -112,12 +121,16 @@ fun FloatingControl(
         val height = constraints.maxHeight.toFloat()
         var expanded by remember { mutableStateOf(false) }
         var shortcutsOpen by remember { mutableStateOf(false) }
+        var fitOpen by remember { mutableStateOf(false) }
         var drag by remember { mutableStateOf<Offset?>(null) }
         var activity by remember { mutableIntStateOf(0) }
         var idle by remember { mutableStateOf(false) }
         var menuSize by remember { mutableStateOf(IntSize.Zero) }
         LaunchedEffect(expanded) {
-            if (!expanded) shortcutsOpen = false
+            if (!expanded) {
+                shortcutsOpen = false
+                fitOpen = false
+            }
         }
         LaunchedEffect(activity, expanded) {
             idle = false
@@ -132,6 +145,7 @@ fun FloatingControl(
             val menuMargin = with(density) { 12.dp.toPx() }
             val (menuX, menuY) = store.placement.menuOrigin(at.x, at.y, size, menuSize.width.toFloat(), menuSize.height.toFloat(), menuMargin, width, height)
             val (primaryActions, destructiveActions) = actions.partition { !it.isDestructive }
+            val (afterShortcutActions, beforeShortcutActions) = primaryActions.partition { it.afterShortcuts }
             Column(
                 Modifier.offset { IntOffset(menuX.roundToInt(), menuY.roundToInt()) }.width(276.dp).heightIn(max = with(density) { (height - menuMargin * 2).toDp() })
                     .onSizeChanged { menuSize = it }
@@ -145,6 +159,22 @@ fun FloatingControl(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                     )
                 }
+                Text(
+                    "Chế độ làm việc",
+                    color = XdeskOverlay.contentMuted,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                )
+                WorkModeSwitcher(
+                    activeMode = activeWorkMode,
+                    onSelectMode = { mode ->
+                        onSelectWorkMode(mode)
+                        expanded = false
+                        activity++
+                    },
+                    modifier = Modifier.padding(horizontal = 2.dp, vertical = 4.dp),
+                )
                 if (quickDock.isNotEmpty()) {
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 4.dp).background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(10.dp)).padding(vertical = 4.dp, horizontal = 2.dp),
@@ -172,18 +202,138 @@ fun FloatingControl(
                         }
                     }
                     HorizontalDivider(Modifier.padding(vertical = 4.dp), color = XdeskOverlay.divider)
+                } else {
+                    HorizontalDivider(Modifier.padding(vertical = 4.dp), color = XdeskOverlay.divider)
                 }
-                primaryActions.forEach { a ->
+                beforeShortcutActions.forEach { a ->
                     FloatingActionRow(a, XdeskOverlay.content) {
                         expanded = false
                         activity++
                     }
                 }
+                activeMirrorFit?.let { currentFit ->
+                    Row(
+                        Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                            .pointerInput(currentFit) {
+                                detectTapGestures(onTap = {
+                                    fitOpen = !fitOpen
+                                    if (fitOpen) shortcutsOpen = false
+                                    activity++
+                                })
+                            }
+                            .semantics {
+                                contentDescription = "Kiểu chiếu: ${currentFit.title()}"
+                                role = Role.Button
+                                onClick {
+                                    fitOpen = !fitOpen
+                                    if (fitOpen) shortcutsOpen = false
+                                    activity++
+                                    true
+                                }
+                            }
+                            .padding(horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(currentFit.icon(), contentDescription = null, Modifier.size(20.dp), tint = XdeskOverlay.content)
+                        Text(
+                            "Kiểu chiếu: ${currentFit.title()}",
+                            color = XdeskOverlay.content,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f).padding(start = 10.dp),
+                        )
+                        Icon(
+                            XdeskIcons.Chevron,
+                            contentDescription = if (fitOpen) "Thu gọn" else "Mở rộng",
+                            Modifier.size(16.dp).rotate(if (fitOpen) 90f else 0f),
+                            tint = XdeskOverlay.contentMuted,
+                        )
+                    }
+                    if (fitOpen) {
+                        Column(
+                            Modifier.fillMaxWidth().padding(start = 10.dp, end = 4.dp, bottom = 4.dp)
+                                .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(10.dp))
+                                .padding(4.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                        ) {
+                            DisplaySettingsStore.SUPPORTED_FITS.forEach { option ->
+                                val selected = option == currentFit
+                                Row(
+                                    Modifier.fillMaxWidth().heightIn(min = 44.dp)
+                                        .background(
+                                            if (selected) XdeskOverlay.accent.copy(alpha = 0.22f) else Color.Transparent,
+                                            RoundedCornerShape(8.dp),
+                                        )
+                                        .pointerInput(option, currentFit) {
+                                            detectTapGestures(onTap = {
+                                                if (option != currentFit) onSelectMirrorFit(option)
+                                                expanded = false
+                                                activity++
+                                            })
+                                        }
+                                        .semantics {
+                                            contentDescription = option.title()
+                                            role = Role.Button
+                                            onClick {
+                                                if (option != currentFit) onSelectMirrorFit(option)
+                                                expanded = false
+                                                activity++
+                                                true
+                                            }
+                                        }
+                                        .padding(horizontal = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Icon(
+                                        option.icon(),
+                                        contentDescription = null,
+                                        Modifier.size(18.dp),
+                                        tint = if (selected) XdeskOverlay.accentLight else XdeskOverlay.contentMuted,
+                                    )
+                                    Text(
+                                        option.title(),
+                                        color = XdeskOverlay.content,
+                                        fontSize = 14.sp,
+                                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f).padding(start = 10.dp),
+                                    )
+                                    if (selected) {
+                                        Icon(
+                                            Icons.Filled.Check,
+                                            contentDescription = "Đang chọn",
+                                            Modifier.size(16.dp),
+                                            tint = XdeskOverlay.accentLight,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 if (macShortcuts.isNotEmpty()) {
                     Row(
                         Modifier.fillMaxWidth().heightIn(min = 48.dp)
-                            .pointerInput(Unit) { detectTapGestures(onTap = { shortcutsOpen = !shortcutsOpen; activity++ }) }
-                            .semantics { contentDescription = "Phím tắt Mac"; role = Role.Button; onClick { shortcutsOpen = !shortcutsOpen; activity++; true } }
+                            .pointerInput(Unit) {
+                                detectTapGestures(onTap = {
+                                    shortcutsOpen = !shortcutsOpen
+                                    if (shortcutsOpen) fitOpen = false
+                                    activity++
+                                })
+                            }
+                            .semantics {
+                                contentDescription = "Phím tắt Mac"
+                                role = Role.Button
+                                onClick {
+                                    shortcutsOpen = !shortcutsOpen
+                                    if (shortcutsOpen) fitOpen = false
+                                    activity++
+                                    true
+                                }
+                            }
                             .padding(horizontal = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -214,6 +364,12 @@ fun FloatingControl(
                                 }
                             }
                         }
+                    }
+                }
+                afterShortcutActions.forEach { a ->
+                    FloatingActionRow(a, XdeskOverlay.content) {
+                        expanded = false
+                        activity++
                     }
                 }
                 if (destructiveActions.isNotEmpty()) {

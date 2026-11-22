@@ -33,24 +33,39 @@ struct FloatingControl<Menu: View>: View {
     static var surface: Color { BrandPalette.overlaySurface }
     let store: FloatingControlStore
     let container: CGSize
+    var onCollapse: () -> Void = {}
     @ViewBuilder let menu: (_ close: @escaping () -> Void, _ keepAlive: @escaping () -> Void) -> Menu
     @State private var expanded = false
     @State private var dragCenter: CGPoint?
     @State private var idle = false
     @State private var activity = 0
-    @State private var contentHeight: CGFloat = 280
 
     var body: some View {
         let center = dragCenter ?? restingCenter
-        ZStack {
-            if expanded { panel(near: center) }
-            button.position(center)
+        FloatingOverlayLayout(
+            buttonCenter: center,
+            leftOfButton: store.placement.side == .trailing,
+            buttonSize: Self.buttonSize,
+            gap: 8,
+            edgePadding: 8
+        ) {
+            if expanded { panelContent }
+            button
         }
         .frame(width: container.width, height: container.height)
         .coordinateSpace(name: "floating")
-        .task(id: activity) {
+        .onChange(of: expanded) { _, isExpanded in
+            if !isExpanded { onCollapse() }
+        }
+        .task(id: ActivityKey(activity: activity, expanded: expanded, dragging: dragCenter != nil)) {
             idle = false
-            try? await Task.sleep(for: .seconds(expanded ? 8 : 3))
+            guard dragCenter == nil else { return }
+            do {
+                try await Task.sleep(for: .seconds(expanded ? 10 : 3))
+            } catch {
+                return
+            }
+            guard !Task.isCancelled else { return }
             if expanded { expanded = false } else { idle = true }
         }
     }
@@ -71,8 +86,11 @@ struct FloatingControl<Menu: View>: View {
             .animation(.easeInOut(duration: 0.3), value: idle)
             .contentShape(Circle())
             .onTapGesture { Haptics.light(); expanded.toggle(); activity += 1 }
-            .gesture(DragGesture(minimumDistance: 8, coordinateSpace: .named("floating"))
-                .onChanged { dragCenter = $0.location; expanded = false; activity += 1 }
+            .gesture(DragGesture(minimumDistance: 12, coordinateSpace: .named("floating"))
+                .onChanged { value in
+                    dragCenter = value.location
+                    if expanded { expanded = false }
+                }
                 .onEnded { value in
                     store.placement = .snapped(
                         centerX: Float(value.location.x), centerY: Float(value.location.y),
@@ -82,43 +100,78 @@ struct FloatingControl<Menu: View>: View {
                 })
             .accessibilityElement()
             .accessibilityLabel("Điều khiển Xdesk")
-            .accessibilityHint(expanded ? "Đóng menu" : "Mở menu: ngắt kết nối, bàn phím, chuột")
+            .accessibilityHint(expanded ? "Đóng menu" : "Mở menu: chọn chế độ, bàn phím, chuột, ngắt kết nối")
             .accessibilityAddTraits(.isButton)
             .accessibilityAction { expanded.toggle(); activity += 1 }
     }
 
-    private func panel(near center: CGPoint) -> some View {
-        let horizontalPadding: CGFloat = 8
-        let panelWidth = min(276, max(220, container.width - Self.buttonSize - horizontalPadding * 3))
-        let maxPanelHeight = max(160, container.height - horizontalPadding * 2)
-        let visibleHeight = min(contentHeight, maxPanelHeight)
-        let leftOfButton = store.placement.side == .trailing
-        let rawX = leftOfButton
-            ? center.x - Self.buttonSize / 2 - 8 - panelWidth / 2
-            : center.x + Self.buttonSize / 2 + 8 + panelWidth / 2
-        let minX = panelWidth / 2 + horizontalPadding
-        let maxX = max(minX, container.width - panelWidth / 2 - horizontalPadding)
-        let x = min(max(rawX, minX), maxX)
-        let minY = visibleHeight / 2 + horizontalPadding
-        let maxY = max(minY, container.height - visibleHeight / 2 - horizontalPadding)
-        let y = min(max(center.y, minY), maxY)
-        return ScrollView(.vertical, showsIndicators: contentHeight > maxPanelHeight) {
-            menu({ expanded = false; activity += 1 }, { activity += 1 })
-                .padding(6)
-                .frame(width: panelWidth, alignment: .leading)
-                .background(
-                    GeometryReader { proxy in
-                        Color.clear
-                            .onAppear { contentHeight = proxy.size.height }
-                            .onChange(of: proxy.size.height) { _, new in contentHeight = new }
-                    }
-                )
+    private var panelContent: some View {
+        let content = menu({ expanded = false; activity += 1 }, { activity += 1 })
+            .padding(6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        return ViewThatFits(in: .vertical) {
+            content
+                .fixedSize(horizontal: false, vertical: true)
+            ScrollView(.vertical) {
+                content
+            }
+            .scrollBounceBehavior(.basedOnSize)
         }
-        .frame(width: panelWidth, height: max(44, visibleHeight))
         .background(RoundedRectangle(cornerRadius: 14).fill(Self.surface))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(.white.opacity(0.35), lineWidth: 1))
         .shadow(color: .black.opacity(0.45), radius: 8, y: 2)
         .foregroundStyle(.white)
-        .position(x: x, y: y)
+    }
+}
+
+private struct ActivityKey: Equatable {
+    let activity: Int
+    let expanded: Bool
+    let dragging: Bool
+}
+
+/// Bố trí panel menu cạnh nút nổi trong một pass layout duy nhất (không lặp `@State` chiều cao qua `GeometryReader`).
+private struct FloatingOverlayLayout: Layout {
+    let buttonCenter: CGPoint
+    let leftOfButton: Bool
+    let buttonSize: CGFloat
+    let gap: CGFloat
+    let edgePadding: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        proposal.replacingUnspecifiedDimensions()
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard let button = subviews.last else { return }
+        if subviews.count >= 2 {
+            let panel = subviews[0]
+            let availableWidth = max(0, bounds.width - buttonSize - edgePadding * 3)
+            let minWidth = min(220, max(0, bounds.width - edgePadding * 2))
+            let panelWidth = min(276, max(minWidth, availableWidth))
+            let maxPanelHeight = max(120, bounds.height - edgePadding * 2)
+            let measured = panel.sizeThatFits(ProposedViewSize(width: panelWidth, height: maxPanelHeight))
+            let panelHeight = min(max(44, measured.height), maxPanelHeight)
+            let rawX = leftOfButton
+                ? buttonCenter.x - buttonSize / 2 - gap - panelWidth / 2
+                : buttonCenter.x + buttonSize / 2 + gap + panelWidth / 2
+            let minX = panelWidth / 2 + edgePadding
+            let maxX = max(minX, bounds.width - panelWidth / 2 - edgePadding)
+            let x = min(max(rawX, minX), maxX)
+            let minY = panelHeight / 2 + edgePadding
+            let maxY = max(minY, bounds.height - panelHeight / 2 - edgePadding)
+            let y = min(max(buttonCenter.y, minY), maxY)
+            panel.place(
+                at: CGPoint(x: bounds.minX + x, y: bounds.minY + y),
+                anchor: .center,
+                proposal: ProposedViewSize(width: panelWidth, height: panelHeight)
+            )
+        }
+        button.place(
+            at: CGPoint(x: bounds.minX + buttonCenter.x, y: bounds.minY + buttonCenter.y),
+            anchor: .center,
+            proposal: ProposedViewSize(width: buttonSize, height: buttonSize)
+        )
     }
 }

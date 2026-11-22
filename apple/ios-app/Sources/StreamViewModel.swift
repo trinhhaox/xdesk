@@ -15,9 +15,24 @@ final class StreamViewModel {
     var errorMessage: String?
     /// `true` từ lúc bấm kết nối tới khi người dùng thoát hoặc kết nối hỏng → màn hình stream thay danh sách host.
     var inStream = false
-    /// Chế độ Bàn phím ảo & Chuột điều khiển Mac chuyên dụng toàn màn hình.
-    var isTrackpadOnlyMode = false
-    /// Bản sao (mặc định, hay dùng để điều khiển Mac) hay mở rộng màn hình Mac; nhớ giữa các lần mở app.
+    /// Chế độ làm việc mặc định khi kết nối (lưu trong UserDefaults).
+    var defaultWorkMode: WorkMode = WorkMode.fromStorage(
+        UserDefaults.standard.string(forKey: "xdesk.workMode"),
+        fallback: ScreenMode(rawValue: UserDefaults.standard.string(forKey: "xdesk.screenMode") ?? "") ?? .mirror
+    ) {
+        didSet {
+            UserDefaults.standard.set(defaultWorkMode.rawValue, forKey: "xdesk.workMode")
+            if let sm = defaultWorkMode.screenMode, screenMode != sm {
+                screenMode = sm
+            }
+        }
+    }
+    /// Chế độ làm việc hiện tại của phiên (đổi ngay trong lúc kết nối).
+    var activeWorkMode: WorkMode = WorkMode.fromStorage(
+        UserDefaults.standard.string(forKey: "xdesk.workMode"),
+        fallback: ScreenMode(rawValue: UserDefaults.standard.string(forKey: "xdesk.screenMode") ?? "") ?? .mirror
+    )
+    /// Chiếu màn hình Mac (mặc định) hay Màn hình phụ; nhớ giữa các lần mở app.
     var screenMode: ScreenMode = ScreenMode(rawValue: UserDefaults.standard.string(forKey: "xdesk.screenMode") ?? "") ?? .mirror {
         didSet {
             UserDefaults.standard.set(screenMode.rawValue, forKey: "xdesk.screenMode")
@@ -149,10 +164,28 @@ final class StreamViewModel {
         failIfNeeded()
     }
 
+    /// Chuẩn bị chế độ làm việc trước khi kết nối (dùng mặc định hoặc ép chế độ cụ thể).
+    func prepareForConnect(mode: WorkMode? = nil) {
+        let targetMode = mode ?? defaultWorkMode
+        activeWorkMode = targetMode
+        if let neededScreen = targetMode.screenMode, screenMode != neededScreen {
+            screenMode = neededScreen
+        }
+    }
+
+    /// Đổi giữa 5 chế độ làm việc ngay khi đang kết nối Mac.
+    func switchWorkMode(to next: WorkMode) {
+        guard activeWorkMode != next else { return }
+        activeWorkMode = next
+        if let neededScreen = next.screenMode, screenMode != neededScreen {
+            screenMode = neededScreen
+        }
+    }
+
     /// Thoát về danh sách host, gửi `bye` lịch sự (cũng là nút Huỷ khi đang kết nối).
     func disconnect() async {
         inStream = false
-        isTrackpadOnlyMode = false
+        activeWorkMode = defaultWorkMode
         suspended = false
         await session.disconnect()
     }
@@ -167,7 +200,7 @@ final class StreamViewModel {
     func failIfNeeded() {
         guard inStream, case .failed(let message) = session.state else { return }
         inStream = false
-        isTrackpadOnlyMode = false
+        activeWorkMode = defaultWorkMode
         errorMessage = message
         // Phiên có thể vừa bị thu hồi (host đã bị xoá khỏi danh sách) → cập nhật nhãn "Đã ghép"/"Chưa ghép".
         Task {

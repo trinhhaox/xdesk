@@ -26,6 +26,10 @@
 	<string>4</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>tailscale</string>
+	</array>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_xdesk._tcp</string>

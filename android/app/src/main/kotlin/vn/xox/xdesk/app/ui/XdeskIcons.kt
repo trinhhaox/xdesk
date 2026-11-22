@@ -159,4 +159,65 @@ internal object XdeskIcons {
             moveTo(9f, 11f); lineTo(12f, 8f); lineTo(15f, 11f)
         }
     }
+    val SecondDisplay = build("SecondDisplay") {
+        stroke(1.7f) {
+            roundRect(2.5f, 5f, 11f, 12f, 1.8f)
+            roundRect(15.5f, 7f, 6f, 10f, 1.4f)
+            moveTo(5.5f, 19.5f); horizontalLineTo(10.5f)
+        }
+    }
+    val Presentation = build("Presentation") {
+        stroke(1.7f) {
+            roundRect(3f, 4.5f, 18f, 12.5f, 2f)
+            moveTo(12f, 17f); verticalLineTo(20.5f)
+            moveTo(8f, 20.5f); horizontalLineTo(16f)
+        }
+        fill {
+            moveTo(10.2f, 8.2f); lineTo(15.2f, 10.75f); lineTo(10.2f, 13.3f); close()
+        }
+    }
+    val Tailscale = build("Tailscale") {
+        stroke(1.6f) {
+            circle(10f, 10f, 7.5f)
+            moveTo(2.5f, 10f); horizontalLineTo(17.5f)
+            moveTo(10f, 2.5f); arcToRelative(3.6f, 7.5f, 0f, false, false, 0f, 15f)
+            arcToRelative(3.6f, 7.5f, 0f, false, false, 0f, -15f)
+        }
+        fill {
+            moveTo(17.5f, 12.2f); lineTo(22f, 13.8f); verticalLineTo(17f)
+            curveTo(22f, 19.6f, 19.9f, 21.4f, 17.5f, 22.3f)
+            curveTo(15.1f, 21.4f, 13f, 19.6f, 13f, 17f)
+            verticalLineTo(13.8f); close()
+        }
+    }
+    val Mouse = build("Mouse") {
+        stroke(1.7f) {
+            roundRect(6.5f, 2.5f, 11f, 19f, 5.5f)
+            moveTo(12f, 6.2f); verticalLineTo(10f)
+        }
+    }
+    val ExitSlide = build("ExitSlide") {
+        stroke(1.7f) {
+            roundRect(3f, 4.5f, 18f, 15f, 2.2f)
+            moveTo(9.2f, 9.2f); lineTo(14.8f, 14.8f)
+            moveTo(14.8f, 9.2f); lineTo(9.2f, 14.8f)
+        }
+    }
+    val ChevronLeftCircle = build("ChevronLeftCircle") {
+        stroke(1.7f) {
+            circle(12f, 12f, 9.2f)
+            moveTo(13.6f, 8.2f); lineTo(9.8f, 12f); lineTo(13.6f, 15.8f)
+        }
+    }
+    val ChevronRightCircle = build("ChevronRightCircle") {
+        stroke(1.7f) {
+            circle(12f, 12f, 9.2f)
+            moveTo(10.4f, 8.2f); lineTo(14.2f, 12f); lineTo(10.4f, 15.8f)
+        }
+    }
+    val SpaceBar = build("SpaceBar") {
+        stroke(1.8f) {
+            moveTo(3.5f, 10.5f); verticalLineTo(15.5f); horizontalLineTo(20.5f); verticalLineTo(10.5f)
+        }
+    }
 }

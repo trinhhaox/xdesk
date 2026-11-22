@@ -14,7 +14,7 @@ fun ViewerController.connectManual(text: String) {
     val target = ViewerTarget.parse(normalizeManualAddress(text)) ?: return run { failure = ConnectionFailure("Địa chỉ phải có dạng host:port hoặc host", false) }
     val only = knownHosts.singleOrNull()
     val resolved = if (only != null) target.copy(hostId = only.id, name = only.name) else target
-    isTrackpadOnlyMode = false
+    prepareForConnect()
     start(listOf(resolved), ViewerAuth.Automatic)
 }
 
@@ -35,7 +35,7 @@ fun ViewerController.pairWithQr(text: String) {
     }
     // 127.0.0.1 trong QR là chính Mac (chỉ bản Debug), trên điện thoại sẽ trỏ về máy mình nên bỏ qua.
     val targets = uri.addresses.mapNotNull(ViewerTarget::parse).filterNot { it.host == "127.0.0.1" || it.host == "::1" || it.host == "localhost" }
-    isTrackpadOnlyMode = false
+    activeWorkMode = WorkMode.MIRROR
     start(targets, ViewerAuth.Qr(uri), isPairing = true)
 }
 

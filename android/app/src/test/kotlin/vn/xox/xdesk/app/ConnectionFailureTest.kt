@@ -67,7 +67,7 @@ class ConnectionFailureTest {
     }
 
     @Test fun summaryListsModeFitAndPointer() {
-        assertEquals("Bản sao · Vừa với điện thoại · Chạm trực tiếp", settingsSummary(ScreenMode.MIRROR, MirrorFit.FIT_DEVICE, PointerMode.DIRECT))
-        assertEquals("Mở rộng · Con trỏ", settingsSummary(ScreenMode.EXTEND, MirrorFit.FIT_DEVICE, PointerMode.TRACKPAD))
+        assertEquals("Chiếu màn hình Mac · Vừa với điện thoại · Chạm trực tiếp", settingsSummary(ScreenMode.MIRROR, MirrorFit.FIT_DEVICE, PointerMode.DIRECT))
+        assertEquals("Màn hình phụ · Con trỏ", settingsSummary(ScreenMode.EXTEND, MirrorFit.FIT_DEVICE, PointerMode.TRACKPAD))
     }
 }

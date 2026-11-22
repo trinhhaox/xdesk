@@ -63,10 +63,11 @@ import vn.xox.xdesk.app.FloatingControlStore
 import vn.xox.xdesk.app.PointerSettingsStore
 import vn.xox.xdesk.app.input.PointerMode
 import vn.xox.xdesk.app.ViewerController
+import vn.xox.xdesk.app.WorkMode
 import vn.xox.xdesk.app.clearViewport
 import vn.xox.xdesk.app.onViewportChanged
 import vn.xox.xdesk.app.switchFit
-import vn.xox.xdesk.app.nextFit
+import vn.xox.xdesk.app.switchWorkMode
 
 /**
  * Toàn màn hình (immersive): một [StreamViewport] aspect-fit trong vùng đã trừ tai thỏ, đúng vùng đã xin host qua `display.config`.
@@ -106,12 +107,13 @@ fun StreamScreen(controller: ViewerController, window: Window) {
     }
     LaunchedEffect(controller.input) { viewRef?.resetZoom() }
 
-    if (controller.isTrackpadOnlyMode) {
+    if (controller.isControlMode) {
         Box(Modifier.fillMaxSize()) {
             RemoteTrackpadSheet(
                 controller = controller,
+                activeMode = controller.activeWorkMode,
+                onSelectMode = controller::switchWorkMode,
                 isFullscreen = true,
-                onSwitchToScreen = { controller.isTrackpadOnlyMode = false },
                 onDismiss = controller::disconnect
             )
             Overlay(controller, waitForFrame = false)
@@ -149,11 +151,21 @@ fun StreamScreen(controller: ViewerController, window: Window) {
             controller,
             keyboardShown = imeBottom > 0,
             onKeyboard = { if (imeBottom > 0) viewRef?.surfaceView?.hideKeyboard() else viewRef?.surfaceView?.showKeyboard() },
-            onRemoteTrackpad = { controller.isTrackpadOnlyMode = true },
         )
         val macShortcuts = macQuickShortcuts(controller)
         if (!controller.awaitingFrame && controller.sasPrompt == null) {
-            FloatingControl(floatingStore, controller.stats, actions, quickDock, macShortcuts, Modifier.padding(bottom = with(density) { obscured.toDp() }))
+            FloatingControl(
+                store = floatingStore,
+                status = controller.stats,
+                activeWorkMode = controller.activeWorkMode,
+                onSelectWorkMode = controller::switchWorkMode,
+                actions = actions,
+                quickDock = quickDock,
+                macShortcuts = macShortcuts,
+                activeMirrorFit = controller.display.fit.takeIf { controller.streaming && controller.activeWorkMode == WorkMode.MIRROR },
+                onSelectMirrorFit = controller::switchFit,
+                modifier = Modifier.padding(bottom = with(density) { obscured.toDp() }),
+            )
         }
         controller.input?.takeIf { imeBottom > 0 }?.let {
             KeyBar(it, onHide = { viewRef?.surfaceView?.hideKeyboard() }, modifier = Modifier.align(Alignment.BottomCenter).imePadding())
@@ -184,8 +196,7 @@ private fun floatingActions(
         ),
     )
     if (zoomed) add(FloatingAction("Vừa khung màn hình", XdeskIcons.FitScreen, "Thu về vừa khung màn hình", onClick = onResetZoom))
-    controller.nextFit()?.let { next -> add(FloatingAction("Kiểu: ${controller.display.fit.title()}", XdeskIcons.Laptop, "Đổi kiểu Bản sao sang ${next.title()}, kết nối lại") { controller.switchFit(next) }) }
-    add(FloatingAction("Gửi tệp sang Mac", XdeskIcons.FileTransfer, "Gửi tệp sang máy Mac", onClick = onSendFile))
+    add(FloatingAction("Gửi tệp sang Mac…", XdeskIcons.FileTransfer, "Gửi tệp sang máy Mac", afterShortcuts = true, onClick = onSendFile))
     add(FloatingAction("Ngắt kết nối", XdeskIcons.Stop, isDestructive = true, onClick = controller::disconnect))
 }
 
@@ -193,9 +204,7 @@ private fun quickDockShortcuts(
     controller: ViewerController,
     keyboardShown: Boolean,
     onKeyboard: () -> Unit,
-    onRemoteTrackpad: () -> Unit,
 ) = listOf(
-    DockShortcut("Trackpad", XdeskIcons.Cursor, "Chuột & Bàn phím ảo", onClick = onRemoteTrackpad),
     DockShortcut(if (keyboardShown) "Ẩn phím" else "Bàn phím", XdeskIcons.Keyboard, if (keyboardShown) "Ẩn bàn phím" else "Hiện bàn phím", enabled = controller.streaming, onClick = onKeyboard),
     DockShortcut("Khoá Mac", XdeskIcons.Lock, "Khóa máy Mac") { controller.sendSystemLock() },
     DockShortcut("Chụp ảnh", XdeskIcons.Camera, "Chụp vùng màn hình Mac (⌘ ⇧ 4)") { controller.input?.tapKey(0x21, 9) },

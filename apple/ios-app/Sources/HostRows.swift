@@ -56,7 +56,10 @@ struct SavedHostRowView: View {
     var body: some View {
         HStack {
             VStack(alignment: .leading) {
-                Label(saved.name, systemImage: "network")
+                Label(
+                    saved.name,
+                    systemImage: TailscaleSupport.isTailscaleHost(saved.address) ? "network.badge.shield.half.filled" : "globe"
+                )
                 Text(saved.lastAddress.map { "\(saved.address) · IP lần trước \($0)" } ?? saved.address)
                     .font(.caption).foregroundStyle(.secondary)
             }

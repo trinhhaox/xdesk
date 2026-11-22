@@ -16,6 +16,7 @@ struct StreamView: View {
     @State private var showPointerSettings = false
     @State private var showFileImporter = false
     @State private var shortcutsExpanded = false
+    @State private var fitExpanded = false
     @State private var modeNotice: String?
     @State private var zoom = VideoZoomState()
     @State private var floating = FloatingControlStore()
@@ -27,8 +28,8 @@ struct StreamView: View {
 
     var body: some View {
         ZStack {
-            if model.isTrackpadOnlyMode {
-                RemoteTrackpadView(model: model, onClose: { model.isTrackpadOnlyMode = false })
+            if model.activeWorkMode.isControlMode {
+                RemoteTrackpadView(model: model)
             } else {
                 streamContent
             }
@@ -46,7 +47,11 @@ struct StreamView: View {
                     renderer: model.session.renderer, session: model.session, config: model.currentConfig,
                     composer: composer, pointer: pointer.settings, zoom: zoom
                 )
-                FloatingControl(store: floating, container: floatingArea(proxy.size)) { close, keepAlive in
+                FloatingControl(
+                    store: floating,
+                    container: floatingArea(proxy.size),
+                    onCollapse: { shortcutsExpanded = false; fitExpanded = false }
+                ) { close, keepAlive in
                     menuItems(close, keepAlive: keepAlive)
                 }
                 if !composer.preview.isEmpty { composingPreview }
@@ -125,9 +130,21 @@ struct StreamView: View {
     private func menuItems(_ close: @escaping () -> Void, keepAlive: @escaping () -> Void) -> some View {
         let dismiss = {
             shortcutsExpanded = false
+            fitExpanded = false
             close()
         }
         return VStack(alignment: .leading, spacing: 0) {
+            Text("Chế độ làm việc")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.6))
+                .padding(.horizontal, 6)
+                .padding(.bottom, 4)
+            WorkModeSwitcher(activeMode: model.activeWorkMode) { mode in
+                model.switchWorkMode(to: mode)
+                dismiss()
+            }
+            .padding(.horizontal, 2)
+            .padding(.bottom, 6)
             quickDockRow(dismiss)
             Divider().background(Color.white.opacity(0.2)).padding(.vertical, 4)
             HStack(spacing: 4) {
@@ -161,11 +178,23 @@ struct StreamView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Cài đặt chuột và con trỏ")
             }
-            if model.screenMode == .mirror { MirrorFitMenu(fit: mirrorFit) }
+            if model.activeWorkMode == .mirror {
+                MirrorFitMenu(
+                    fit: mirrorFit,
+                    expanded: $fitExpanded,
+                    onToggle: {
+                        fitExpanded.toggle()
+                        if fitExpanded { shortcutsExpanded = false }
+                        keepAlive()
+                    },
+                    onSelectDone: dismiss
+                )
+            }
             if zoom.isZoomed { item("Vừa khung màn hình", "arrow.down.right.and.arrow.up.left", dismiss) { zoom.reset?() } }
             Button {
                 Haptics.light()
                 shortcutsExpanded.toggle()
+                if shortcutsExpanded { fitExpanded = false }
                 keepAlive()
             } label: {
                 HStack {
@@ -202,16 +231,11 @@ struct StreamView: View {
             Divider().background(Color.white.opacity(0.2)).padding(.vertical, 4)
             item("Ngắt kết nối", "xmark.circle", dismiss, tint: BrandPalette.danger) { Task { await model.disconnect() } }
         }
-        .onDisappear { shortcutsExpanded = false }
     }
 
     private func quickDockRow(_ close: @escaping () -> Void) -> some View {
         let keyboardEnabled = model.session.state == .streaming
         return HStack(spacing: 4) {
-            dockTile(systemName: "computermouse.fill", label: "Trackpad", accessibility: "Chuột & Bàn phím ảo") {
-                model.isTrackpadOnlyMode = true
-                close()
-            }
             dockTile(
                 systemName: composer.isActive ? "keyboard.fill" : "keyboard",
                 label: composer.isActive ? "Ẩn phím" : "Bàn phím",

@@ -30,6 +30,7 @@ extension StreamViewModel {
             errorMessage = "Mã QR không có địa chỉ hợp lệ."
             return
         }
+        activeWorkMode = .mirror
         isPairing = true
         await begin(first) { await self.session.pair(with: uri, config: $0) }
         isPairing = false
@@ -38,6 +39,7 @@ extension StreamViewModel {
 
     /// Ghép đôi bằng mã 6 số: `sasPrompt` hiện trên màn hình stream; xong khi cả iPhone lẫn Mac bấm "Khớp".
     func pairWithCode(to target: ViewerTarget) async {
+        activeWorkMode = .mirror
         isPairing = true
         sasPrompt = nil
         await begin(target) { config in

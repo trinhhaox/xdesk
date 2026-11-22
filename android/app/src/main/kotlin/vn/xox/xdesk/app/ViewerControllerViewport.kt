@@ -15,8 +15,29 @@ fun ViewerController.onViewportChanged(width: Int, height: Int) {
 
 fun ViewerController.clearViewport() { viewport.actual = null }
 
-/** Đổi kiểu Bản sao rồi kết nối lại (host phải đổi cỡ màn hình nên phải đàm phán lại). */
+/** Chuẩn bị chế độ làm việc trước khi kết nối (mặc định theo Cài đặt hoặc ép một chế độ khác). */
+fun ViewerController.prepareForConnect(overrideMode: WorkMode? = null) {
+    val targetMode = overrideMode ?: container.display.defaultWorkMode
+    activeWorkMode = targetMode
+    targetMode.screenMode?.let { container.display.selectMode(it) }
+}
+
+/** Đổi chế độ làm việc ngay trong khi đang kết nối Mac (nếu đổi giữa Chiếu Mac ↔ Màn phụ thì thương lượng lại `display.config`). */
+fun ViewerController.switchWorkMode(next: WorkMode) {
+    if (activeWorkMode == next) return
+    val currentScreen = negotiatedScreenMode ?: container.display.mode
+    activeWorkMode = next
+    val neededScreen = next.screenMode ?: return
+    if (neededScreen != currentScreen) {
+        container.display.selectMode(neededScreen)
+        val target = session?.connectedTarget ?: lastTarget ?: return
+        restartWith(target)
+    }
+}
+
+/** Đổi kiểu Chiếu màn hình rồi kết nối lại (host phải đổi cỡ màn hình nên phải đàm phán lại). */
 fun ViewerController.switchFit(next: MirrorFit) {
+    if (container.display.fit == next) return
     val target = session?.connectedTarget ?: lastTarget ?: return
     container.display.selectFit(next)
     restartWith(target)

@@ -1,11 +1,10 @@
 package vn.xox.xdesk.app
 
 import vn.xox.xdesk.wire.MirrorFit
-import vn.xox.xdesk.wire.ScreenMode
 
-/** Kiểu Bản sao kế tiếp để đổi ngay trong phiên; null khi không phải Bản sao hoặc chưa phát. */
+/** Kiểu Chiếu màn hình kế tiếp để đổi ngay trong phiên; null khi không ở chế độ Chiếu màn hình Mac hoặc chưa phát. */
 fun ViewerController.nextFit(): MirrorFit? {
-    if (!streaming || display.mode != ScreenMode.MIRROR) return null
+    if (!streaming || activeWorkMode != WorkMode.MIRROR) return null
     val fits = DisplaySettingsStore.SUPPORTED_FITS
     return fits[(fits.indexOf(display.fit) + 1) % fits.size]
 }

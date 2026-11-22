@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -24,11 +26,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import vn.xox.xdesk.app.TailscaleState
 import vn.xox.xdesk.app.ui.theme.extras
 
-/** "Thêm & kết nối khác" / "Cách kết nối khác": Quét QR (khi đã có máy), "Nhập địa chỉ" và "Cáp USB". */
+/** "Thêm & kết nối khác" / "Cách kết nối khác": Quét QR (khi đã có máy), "Tailscale (Kết nối từ xa)", "Nhập địa chỉ" và "Cáp USB". */
 @Composable
 internal fun OtherConnectionsGroup(
     address: String,
@@ -36,10 +40,15 @@ internal fun OtherConnectionsGroup(
     onConnect: (String) -> Unit,
     canPair: Boolean,
     onPair: () -> Unit,
+    tailscaleState: TailscaleState,
+    onTailscaleAction: () -> Unit,
     onScanQr: (() -> Unit)? = null,
 ) {
+    var tailscaleOpen by rememberSaveable { mutableStateOf(false) }
     var addressOpen by rememberSaveable { mutableStateOf(false) }
     var usbOpen by rememberSaveable { mutableStateOf(false) }
+    val tailscaleTint = if (tailscaleState == TailscaleState.ACTIVE) MaterialTheme.colorScheme.tertiary else MaterialTheme.extras.warning
+
     Group(if (onScanQr != null) "Thêm & kết nối khác" else "Cách kết nối khác") {
         if (onScanQr != null) {
             GroupRow(onScanQr) {
@@ -53,6 +62,55 @@ internal fun OtherConnectionsGroup(
             }
             GroupDivider(XdeskDims.rowPad + XdeskDims.iconBox + XdeskDims.iconGap)
         }
+        GroupRow({ tailscaleOpen = !tailscaleOpen }) {
+            RowIcon(XdeskIcons.Tailscale, tint = tailscaleTint)
+            Text("Tailscale (Kết nối từ xa)", Modifier.weight(1f).padding(start = XdeskDims.iconGap), fontSize = 17.sp)
+            Text(
+                tailscaleState.statusBadge,
+                color = tailscaleTint,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(end = 8.dp),
+            )
+            Icon(
+                XdeskIcons.Chevron,
+                contentDescription = if (tailscaleOpen) "Thu gọn" else "Mở rộng",
+                Modifier.rotate(if (tailscaleOpen) 90f else 0f).padding(2.dp),
+                tint = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+        AnimatedVisibility(tailscaleOpen) {
+            Column(Modifier.padding(horizontal = XdeskDims.rowPad, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    tailscaleState.detailDescription,
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (tailscaleState == TailscaleState.ACTIVE) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Button(
+                            onClick = { addressOpen = true },
+                            modifier = Modifier.weight(1f).heightIn(min = 44.dp),
+                            shape = CircleShape,
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.extras.primaryFill, contentColor = Color.White),
+                        ) { Text("Nhập địa chỉ Tailscale") }
+                        OutlinedButton(
+                            onClick = onTailscaleAction,
+                            modifier = Modifier.heightIn(min = 44.dp),
+                            shape = CircleShape,
+                        ) { Text("Mở Tailscale") }
+                    }
+                } else {
+                    Button(
+                        onClick = onTailscaleAction,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                        shape = CircleShape,
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.extras.primaryFill, contentColor = Color.White),
+                    ) { Text(tailscaleState.actionLabel) }
+                }
+            }
+        }
+        GroupDivider(XdeskDims.rowPad + XdeskDims.iconBox + XdeskDims.iconGap)
         DisclosureRow(XdeskIcons.Globe, "Nhập địa chỉ", addressOpen) { addressOpen = !addressOpen }
         AnimatedVisibility(addressOpen) {
             Column(Modifier.padding(horizontal = XdeskDims.rowPad, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -63,6 +121,20 @@ internal fun OtherConnectionsGroup(
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.extras.primaryFill, contentColor = Color.White),
                     ) { Text("Kết nối") }
                     OutlinedButton(onPair, Modifier.heightIn(min = 48.dp), enabled = canPair) { Text("Ghép đôi") }
+                }
+                if (tailscaleState != TailscaleState.ACTIVE) {
+                    Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Top) {
+                            Icon(XdeskIcons.Tailscale, contentDescription = null, Modifier.padding(top = 2.dp).size(18.dp), tint = MaterialTheme.extras.warning)
+                            Text(tailscaleState.inlineHint, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                        }
+                        Button(
+                            onClick = onTailscaleAction,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp),
+                            shape = CircleShape,
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.extras.primaryFill, contentColor = Color.White),
+                        ) { Text(tailscaleState.actionLabel) }
+                    }
                 }
                 Text(
                     "Qua Tailscale: nhập IP 100.x.y.z hoặc tên máy (MagicDNS) của Mac. Trên Mac phải bật \"Cho phép kết nối qua Tailscale\".",

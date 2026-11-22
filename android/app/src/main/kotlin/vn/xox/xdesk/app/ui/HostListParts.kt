@@ -78,9 +78,15 @@ internal fun EmptyPairingState(onScan: () -> Unit) = Column(Modifier.fillMaxWidt
     )
 }
 
-/** Mac đã ghép: biểu tượng máy, tên, trạng thái mạng, nút chuột/bàn phím ảo và menu "…" (Xoá máy này). */
+/** Mac đã ghép: biểu tượng máy, tên, trạng thái mạng, nút chuyển nhanh Chuột/Màn hình và menu "…" (Xoá máy này). */
 @Composable
-internal fun PairedHostRow(entry: PairedEntry, onConnect: () -> Unit, onOpenTrackpad: () -> Unit, onForget: () -> Unit) {
+internal fun PairedHostRow(
+    entry: PairedEntry,
+    secondaryIsVideo: Boolean,
+    onConnect: () -> Unit,
+    onSecondaryAction: () -> Unit,
+    onForget: () -> Unit,
+) {
     var menu by remember { mutableStateOf(false) }
     val offline = entry.status == HostStatus.NotSeen
     Row(
@@ -95,8 +101,13 @@ internal fun PairedHostRow(entry: PairedEntry, onConnect: () -> Unit, onOpenTrac
                 color = if (entry.status == HostStatus.Ready) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        IconButton(onOpenTrackpad) {
-            Icon(XdeskIcons.Cursor, contentDescription = "Bàn phím & Chuột ảo cho ${entry.known.name}", Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary)
+        IconButton(onSecondaryAction) {
+            Icon(
+                if (secondaryIsVideo) XdeskIcons.Laptop else XdeskIcons.Mouse,
+                contentDescription = if (secondaryIsVideo) "Chiếu màn hình Mac cho ${entry.known.name}" else "Chuột cảm ứng cho ${entry.known.name}",
+                Modifier.size(24.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            )
         }
         Box {
             IconButton({ menu = true }) { Icon(XdeskIcons.EllipsisCircle, contentDescription = "Tuỳ chọn cho ${entry.known.name}", Modifier.size(26.dp), tint = MaterialTheme.colorScheme.primary) }

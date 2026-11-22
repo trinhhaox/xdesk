@@ -29,15 +29,11 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
-import androidx.compose.material3.TabRowDefaults
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -50,6 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -59,26 +56,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.hypot
 import vn.xox.xdesk.app.ViewerController
+import vn.xox.xdesk.app.WorkMode
 import vn.xox.xdesk.app.ui.theme.XdeskOverlay
 import vn.xox.xdesk.transport.InputButton
 import vn.xox.xdesk.transport.InputEvents
 import vn.xox.xdesk.transport.InputModifiers
 
-enum class RemoteTab(val title: String) {
-    TRACKPAD("Trackpad"),
-    KEYBOARD("Bàn phím"),
-    NUMPAD_MEDIA("Số & Media")
-}
-
 @Composable
 fun RemoteTrackpadSheet(
     controller: ViewerController,
+    activeMode: WorkMode,
+    onSelectMode: (WorkMode) -> Unit,
     isFullscreen: Boolean = false,
-    onSwitchToScreen: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     onDismiss: () -> Unit
 ) {
-    var selectedTab by remember { mutableStateOf(RemoteTab.TRACKPAD) }
     var cursorX by remember { mutableFloatStateOf(0.5f) }
     var cursorY by remember { mutableFloatStateOf(0.5f) }
     var activeMods by remember { mutableIntStateOf(0) }
@@ -139,47 +131,20 @@ fun RemoteTrackpadSheet(
                 .padding(top = 8.dp, bottom = 16.dp)
         }
     ) {
-        // Tier 1: Nút Màn hình + Tên máy Mac + Khoá / Ngắt kết nối
+        // Tier 1: Tên máy Mac + Khoá / Ngắt kết nối
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 4.dp),
+                .padding(horizontal = 14.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (isFullscreen && onSwitchToScreen != null) {
-                Surface(
-                    onClick = onSwitchToScreen,
-                    shape = CircleShape,
-                    color = XdeskOverlay.key,
-                    modifier = Modifier.heightIn(min = 44.dp),
-                ) {
-                    Row(
-                        Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Icon(XdeskIcons.Monitor, contentDescription = null, Modifier.size(18.dp), tint = XdeskOverlay.accentLight)
-                        Text("Màn hình", color = XdeskOverlay.accentLight, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, softWrap = false)
-                    }
-                }
-            } else {
-                IconButton(onClick = onDismiss) {
-                    Icon(
-                        imageVector = if (isFullscreen) XdeskIcons.Stop else XdeskIcons.Chevron,
-                        contentDescription = if (isFullscreen) "Ngắt kết nối" else "Đóng",
-                        tint = if (isFullscreen) XdeskOverlay.danger else XdeskOverlay.content,
-                    )
-                }
-            }
-
             Text(
                 controller.progress.targetName.ifBlank { "Điều khiển Mac" },
-                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                modifier = Modifier.weight(1f).padding(end = 8.dp),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
                 color = XdeskOverlay.content,
-                fontSize = 15.sp,
+                fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
             )
 
@@ -191,54 +156,28 @@ fun RemoteTrackpadSheet(
                         tint = XdeskOverlay.content,
                     )
                 }
-                if (isFullscreen) {
-                    IconButton(onClick = onDismiss) {
-                        Icon(
-                            imageVector = XdeskIcons.Stop,
-                            contentDescription = "Ngắt kết nối",
-                            tint = XdeskOverlay.danger,
-                        )
-                    }
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = if (isFullscreen) XdeskIcons.Stop else XdeskIcons.Chevron,
+                        contentDescription = if (isFullscreen) "Ngắt kết nối" else "Đóng",
+                        tint = if (isFullscreen) XdeskOverlay.danger else XdeskOverlay.content,
+                    )
                 }
             }
         }
 
-        // Tier 2: Thanh 3 tab rộng hết bề ngang, không rớt dòng
-        TabRow(
-            selectedTabIndex = selectedTab.ordinal,
-            containerColor = Color.Transparent,
-            contentColor = XdeskOverlay.content,
-            divider = { androidx.compose.material3.HorizontalDivider(color = XdeskOverlay.divider) },
-            indicator = { tabPositions ->
-                TabRowDefaults.SecondaryIndicator(
-                    Modifier.tabIndicatorOffset(tabPositions[selectedTab.ordinal]),
-                    color = XdeskOverlay.accentLight,
-                )
-            },
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            RemoteTab.entries.forEach { tab ->
-                Tab(
-                    selected = selectedTab == tab,
-                    onClick = { selectedTab = tab },
-                    text = {
-                        Text(
-                            tab.title,
-                            fontSize = 13.sp,
-                            fontWeight = if (selectedTab == tab) FontWeight.Bold else FontWeight.Medium,
-                            color = if (selectedTab == tab) XdeskOverlay.content else XdeskOverlay.contentMuted,
-                            maxLines = 1,
-                            softWrap = false,
-                        )
-                    }
-                )
-            }
-        }
+        // Tier 2: Bộ chọn 5 chế độ làm việc thống nhất (2+3)
+        WorkModeSwitcher(
+            activeMode = activeMode,
+            onSelectMode = onSelectMode,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+        )
+        HorizontalDivider(color = XdeskOverlay.divider)
 
         Spacer(Modifier.height(10.dp))
 
-        when (selectedTab) {
-            RemoteTab.TRACKPAD -> {
+        when (activeMode) {
+            WorkMode.TRACKPAD -> {
                 TrackpadTabContent(
                     isFullscreen = isFullscreen,
                     isLeftDown = isLeftDown,
@@ -256,7 +195,7 @@ fun RemoteTrackpadSheet(
                     }
                 )
             }
-            RemoteTab.KEYBOARD -> {
+            WorkMode.KEYBOARD -> {
                 KeyboardTabContent(
                     activeMods = activeMods,
                     inputText = inputText,
@@ -271,12 +210,13 @@ fun RemoteTrackpadSheet(
                     onKey = { usage, extraMods -> sendKey(usage, extraMods) }
                 )
             }
-            RemoteTab.NUMPAD_MEDIA -> {
+            WorkMode.NUMPAD_MEDIA -> {
                 NumpadMediaTabContent(
-                    onKey = { usage -> sendKey(usage) },
+                    onKey = { usage, extraMods -> sendKey(usage, extraMods) },
                     onSendText = { char -> sendTextDirect(char) }
                 )
             }
+            WorkMode.MIRROR, WorkMode.EXTEND -> Unit
         }
     }
 }
@@ -374,9 +314,9 @@ private fun ColumnScope.TrackpadTabContent(
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(horizontal = 16.dp)) {
                 Icon(
-                    imageVector = XdeskIcons.Cursor,
+                    imageVector = XdeskIcons.Mouse,
                     contentDescription = null,
-                    tint = XdeskOverlay.contentMuted.copy(alpha = 0.5f),
+                    tint = XdeskOverlay.contentMuted.copy(alpha = 0.55f),
                     modifier = Modifier.size(34.dp)
                 )
                 Spacer(Modifier.height(6.dp))
@@ -397,17 +337,17 @@ private fun ColumnScope.TrackpadTabContent(
             }
         }
 
-        // Hai nút chuột vật lý dưới đáy (fillMaxHeight thay vì fillMaxSize trong Row)
+        // Hai nút chuột vật lý dưới đáy (cân bằng 50/50 như iOS)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(58.dp),
+                .height(56.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Button(
                 onClick = { onClick(InputButton.LEFT) },
                 modifier = Modifier
-                    .weight(1.5f)
+                    .weight(1f)
                     .fillMaxHeight(),
                 shape = RoundedCornerShape(14.dp),
                 contentPadding = PaddingValues(horizontal = 8.dp),
@@ -494,10 +434,16 @@ private fun KeyboardTabContent(
 
             Button(
                 onClick = onSendText,
+                enabled = inputText.isNotEmpty(),
                 modifier = Modifier.heightIn(min = 48.dp),
                 shape = RoundedCornerShape(10.dp),
                 contentPadding = PaddingValues(horizontal = 14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = XdeskOverlay.accent, contentColor = XdeskOverlay.content)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = XdeskOverlay.accent,
+                    contentColor = XdeskOverlay.content,
+                    disabledContainerColor = XdeskOverlay.key,
+                    disabledContentColor = XdeskOverlay.contentDisabled,
+                )
             ) {
                 Text("Gửi", fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
             }
@@ -531,34 +477,37 @@ private fun KeyboardTabContent(
             KeyCapButton("Tab", Modifier.weight(1f)) { onKey(0x2B, 0) }
             KeyCapButton("Space", Modifier.weight(1.4f)) { onKey(0x2C, 0) }
             KeyCapButton("⌫ Del", Modifier.weight(1f)) { onKey(0x2A, 0) }
-            KeyCapButton("⏎ Enter", Modifier.weight(1.2f)) { onKey(0x28, 0) }
+            KeyCapButton("↩ Enter", Modifier.weight(1.2f)) { onKey(0x28, 0) }
         }
 
-        // Phím tắt nhanh ⌘C/⌘V/⌘A + cụm phím mũi tên
+        // Phím tắt nhanh ⌘C/⌘V/⌘A + cụm phím mũi tên (tách 2 hàng gọn gàng như iOS)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
         ) {
             KeyCapButton("⌘ C", Modifier.weight(1f)) { onKey(0x06, InputModifiers.COMMAND) }
             KeyCapButton("⌘ V", Modifier.weight(1f)) { onKey(0x19, InputModifiers.COMMAND) }
             KeyCapButton("⌘ A", Modifier.weight(1f)) { onKey(0x04, InputModifiers.COMMAND) }
+        }
 
-            Spacer(Modifier.width(4.dp))
-
-            KeyCapButton("←", Modifier.weight(0.9f)) { onKey(0x50, 0) }
-            Column(Modifier.weight(0.9f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                KeyCapButton("↑", Modifier.fillMaxWidth()) { onKey(0x52, 0) }
-                KeyCapButton("↓", Modifier.fillMaxWidth()) { onKey(0x51, 0) }
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            KeyCapButton("↑", Modifier.width(68.dp).heightIn(min = 46.dp)) { onKey(0x52, 0) }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                KeyCapButton("←", Modifier.width(68.dp).heightIn(min = 46.dp)) { onKey(0x50, 0) }
+                KeyCapButton("↓", Modifier.width(68.dp).heightIn(min = 46.dp)) { onKey(0x51, 0) }
+                KeyCapButton("→", Modifier.width(68.dp).heightIn(min = 46.dp)) { onKey(0x4F, 0) }
             }
-            KeyCapButton("→", Modifier.weight(0.9f)) { onKey(0x4F, 0) }
         }
     }
 }
 
 @Composable
 private fun NumpadMediaTabContent(
-    onKey: (Int) -> Unit,
+    onKey: (Int, Int) -> Unit,
     onSendText: (String) -> Unit
 ) {
     Column(
@@ -569,7 +518,7 @@ private fun NumpadMediaTabContent(
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Text(
-            "ĐIỀU KHIỂN TRÌNH CHIẾU SLIDE",
+            "TRÌNH CHIẾU SLIDE & MEDIA",
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             color = XdeskOverlay.contentMuted
@@ -578,10 +527,22 @@ private fun NumpadMediaTabContent(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            KeyCapButton("▶ F5", Modifier.weight(1f)) { onKey(0x3E) }
-            KeyCapButton("Esc", Modifier.weight(1f)) { onKey(0x29) }
-            KeyCapButton("◀ Trước", Modifier.weight(1.2f)) { onKey(0x4B) }
-            KeyCapButton("Sau ▶", Modifier.weight(1.2f)) { onKey(0x4E) }
+            MediaTileButton("Trình chiếu (F5)", XdeskIcons.Presentation, Modifier.weight(1f)) { onKey(0x3E, 0) }
+            MediaTileButton("Thoát (Esc)", XdeskIcons.ExitSlide, Modifier.weight(1f)) { onKey(0x29, 0) }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            MediaTileButton("Slide trước", XdeskIcons.ChevronLeftCircle, Modifier.weight(1f)) { onKey(0x4B, 0) }
+            MediaTileButton("Slide kế", XdeskIcons.ChevronRightCircle, Modifier.weight(1f)) { onKey(0x4E, 0) }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            MediaTileButton("Space", XdeskIcons.SpaceBar, Modifier.weight(1f)) { onKey(0x2C, 0) }
+            MediaTileButton("Hoàn tác", XdeskIcons.Undo, Modifier.weight(1f)) { onKey(0x1D, InputModifiers.COMMAND) }
         }
 
         Spacer(Modifier.height(4.dp))
@@ -658,5 +619,36 @@ private fun KeyCapButton(
         )
     ) {
         Text(title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, maxLines = 1, softWrap = false)
+    }
+}
+
+@Composable
+private fun MediaTileButton(
+    label: String,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.heightIn(min = 54.dp),
+        shape = RoundedCornerShape(10.dp),
+        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = XdeskOverlay.key,
+            contentColor = XdeskOverlay.content,
+        ),
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(19.dp))
+            Text(
+                label,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }

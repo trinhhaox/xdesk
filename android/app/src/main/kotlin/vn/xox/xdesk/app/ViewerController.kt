@@ -24,6 +24,7 @@ import vn.xox.xdesk.transport.ViewerTarget
 import vn.xox.xdesk.transport.ViewerTrust
 import vn.xox.xdesk.wire.ControlMessage
 import vn.xox.xdesk.wire.MirrorFit
+import vn.xox.xdesk.wire.ScreenMode
 import vn.xox.xdesk.wire.VideoCodec
 
 /** Trạng thái UI + luồng kết nối. Việc mạng chạy trên một thread nền; trạng thái Compose chỉ ghi từ main thread. */
@@ -57,8 +58,11 @@ class ViewerController(internal val container: AppContainer, private val deviceN
     var agentApproval by mutableStateOf<AgentApprovalRequest?>(null)
     /** Yêu cầu hỗ trợ agent AI đang chờ; null khi đã xong. */
     var agentHelp by mutableStateOf<AgentHelpRequest?>(null)
-    /** Chế độ Bàn phím ảo & Chuột điều khiển Mac chuyên dụng toàn màn hình. */
-    var isTrackpadOnlyMode by mutableStateOf(false)
+    /** Chế độ làm việc hiện tại của phiên (đổi ngay trong lúc kết nối). */
+    var activeWorkMode by mutableStateOf(container.display.defaultWorkMode)
+    /** Chế độ hiển thị đã thương lượng với Mac trong phiên hiện tại. */
+    internal var negotiatedScreenMode: ScreenMode? = null
+    val isControlMode: Boolean get() = activeWorkMode.isControlMode
     /** Cỡ khung video thật (px) để aspect-fit và đổi toạ độ chạm; null khi chưa biết (Giống màn hình Mac chờ decoder báo). */
     var videoSize by mutableStateOf<Pair<Int, Int>?>(null)
         private set
@@ -78,7 +82,7 @@ class ViewerController(internal val container: AppContainer, private val deviceN
     fun connect(target: ViewerTarget) = start(listOf(target), ViewerAuth.Automatic)
 
     fun pairWithSas(target: ViewerTarget) {
-        isTrackpadOnlyMode = false
+        activeWorkMode = WorkMode.MIRROR
         start(listOf(target), ViewerAuth.Sas { prompt -> post { if (prompt.isPending) sasPrompt = prompt } }, isPairing = true)
     }
 
@@ -87,11 +91,13 @@ class ViewerController(internal val container: AppContainer, private val deviceN
         val (w, h, density) = viewport.actual?.let { Triple(it.first, it.second, screenSize().third) } ?: screenSize()
         val hasHevc = AndroidCodecList.hasHardwareHevc()
         val requestedCodec = if (hasHevc) VideoCodec.HEVC else VideoCodec.H264
+        val activeScreenMode = container.display.mode
         val config = DisplayConfigPlanner.config(
             w.toDouble(), h.toDouble(), density.toDouble(),
             codec = requestedCodec,
-            mode = container.display.mode, mirrorFit = container.display.fit,
+            mode = activeScreenMode, mirrorFit = container.display.fit,
         ) ?: return
+        negotiatedScreenMode = activeScreenMode
         failure = null
         sasPrompt = null
         connecting = true
@@ -121,7 +127,9 @@ class ViewerController(internal val container: AppContainer, private val deviceN
             ViewerState.Connecting -> connecting = true
             ViewerState.Idle -> { connecting = false; streaming = false }
             is ViewerState.Failed -> {
-                connecting = false; streaming = false; sasPrompt = null; agentApproval = null; isTrackpadOnlyMode = false
+                connecting = false; streaming = false; sasPrompt = null; agentApproval = null
+                activeWorkMode = container.display.defaultWorkMode
+                negotiatedScreenMode = null
                 decoder.stop()
                 failure = ConnectionFailure(state.message, state.code in REPAIRABLE_CODES, state.code, progress.targetName)
                 progress.finish(false)
@@ -162,7 +170,8 @@ class ViewerController(internal val container: AppContainer, private val deviceN
         // Huỷ lúc đang so mã: trả lời "không khớp" để đóng kết nối và nhả luồng đang chờ ngay.
         sasPrompt?.answer(false)
         sasPrompt = null
-        isTrackpadOnlyMode = false
+        activeWorkMode = container.display.defaultWorkMode
+        negotiatedScreenMode = null
         val ending = session ?: return
         endSession()
         session = null
