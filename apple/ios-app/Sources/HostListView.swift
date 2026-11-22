@@ -34,12 +34,19 @@ struct HostListView: View {
             Form {
                 if model.localNetworkDenied { localNetworkGuidance }
                 if let failure = currentFailure { errorSection(failure) }
-                if pairedRows.isEmpty { EmptyPairingState { showScanner = true } } else { ScanQrRow { showScanner = true } }
-                if !pairedRows.isEmpty { pairedSection }
+                if pairedRows.isEmpty {
+                    EmptyPairingState { showScanner = true }
+                } else {
+                    pairedSection
+                }
                 unpairedSection
                 savedSection
-                Section { SettingsSummaryRow(model: model, pointer: pointer) }
-                OtherConnectionsSection(model: model, manualText: $manualText, onConnect: connectManual)
+                OtherConnectionsSection(
+                    model: model,
+                    manualText: $manualText,
+                    onScanQr: pairedRows.isEmpty ? nil : { showScanner = true },
+                    onConnect: connectManual
+                )
             }
             .scrollContentBackground(.hidden)
             .background(BrandPalette.background)
@@ -48,6 +55,9 @@ struct HostListView: View {
             .toolbar {
                 ToolbarItemGroup {
                     Button("Tìm lại", systemImage: "arrow.clockwise") { model.stopBrowsing(); model.startBrowsing() }
+                    if !pairedRows.isEmpty {
+                        Button("Thêm máy Mac", systemImage: "plus") { showScanner = true }
+                    }
                     NavigationLink {
                         SettingsView(model: model, pointer: pointer)
                     } label: {

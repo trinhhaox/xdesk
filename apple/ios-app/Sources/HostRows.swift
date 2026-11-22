@@ -9,7 +9,7 @@ private struct Chevron: View {
     }
 }
 
-/// Mac đã ghép: tên, trạng thái mạng ("Sẵn sàng" / "Qua địa chỉ …" / "Không thấy trên mạng") và nhãn "Đã ghép".
+/// Mac đã ghép: tên và trạng thái mạng ("Sẵn sàng" / "Qua địa chỉ …" / "Không thấy trên mạng").
 struct PairedHostRowView: View {
     let row: PairedHostRow
 
@@ -21,11 +21,10 @@ struct PairedHostRowView: View {
                 .frame(width: 28)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text(row.device.name).foregroundStyle(.primary)
-                Text(row.status.text).font(.subheadline).foregroundStyle(row.status == .ready ? BrandPalette.accent : Color.secondary)
+                Text(row.device.name).foregroundStyle(.primary).lineLimit(2)
+                Text(row.status.text).font(.subheadline).foregroundStyle(row.status == .ready ? BrandPalette.accent : Color.secondary).lineLimit(2)
             }
-            Spacer(minLength: 8)
-            Text(HostBadge.paired.title).font(.caption.bold()).foregroundStyle(BrandPalette.accent)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(minHeight: 44)
         .contentShape(Rectangle())

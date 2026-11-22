@@ -2,7 +2,7 @@ import SwiftUI
 import XdeskViewer
 import XdeskWire
 
-/// Màn Cài đặt (đẩy từ nút bánh răng hoặc dòng tóm tắt ở danh sách): chế độ hiển thị, kiểu bản sao, chuột và bảo mật.
+/// Màn Cài đặt (mở từ nút bánh răng trên thanh công cụ): chế độ hiển thị, kiểu bản sao, bộ mã hoá, giao diện, chuột và bảo mật.
 struct SettingsView: View {
     let model: StreamViewModel
     let pointer: PointerSettingsStore
@@ -58,34 +58,5 @@ struct SettingsView: View {
         .navigationTitle("Cài đặt")
         .navigationBarTitleDisplayMode(.inline)
         .task { await model.refreshTrust() }
-    }
-}
-
-/// Dòng tóm tắt một dòng ở danh sách máy, ví dụ "Bản sao · Vừa với điện thoại · Chạm trực tiếp"; chạm để mở Cài đặt.
-struct SettingsSummaryRow: View {
-    let model: StreamViewModel
-    let pointer: PointerSettingsStore
-
-    var body: some View {
-        NavigationLink {
-            SettingsView(model: model, pointer: pointer)
-        } label: {
-            Label {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Cài đặt")
-                    Text(summary).font(.subheadline).foregroundStyle(.secondary)
-                }
-            } icon: {
-                Image(systemName: "gearshape")
-            }
-        }
-        .accessibilityHint("Mở cài đặt chế độ hiển thị, chuột và bảo mật")
-    }
-
-    private var summary: String {
-        let parts = model.screenMode == .mirror
-            ? ["Bản sao", model.mirrorFit.title, pointer.settings.mode.title]
-            : ["Mở rộng", pointer.settings.mode.title]
-        return parts.joined(separator: " · ")
     }
 }

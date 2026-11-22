@@ -84,6 +84,9 @@ object XdeskOverlay {
     val accent = PrimaryFill
     /** Vòng xoay tiến trình trên nền đen: cần sáng hơn #2F6BFF để đủ tương phản (cùng primaryOnOverlay của iOS). */
     val accentLight = DarkScheme.primary
+    val danger = DarkScheme.error
+    val warning = DarkExtras.warning
+    val good = DarkScheme.tertiary
     val scrim = Color(0xE6000000)
 }
 

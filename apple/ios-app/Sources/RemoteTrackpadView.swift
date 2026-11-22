@@ -23,14 +23,6 @@ struct RemoteTrackpadView: View {
         case keyboard = "Bàn phím"
         case numpadMedia = "Số & Media"
         var id: String { rawValue }
-
-        var iconName: String {
-            switch self {
-            case .trackpad: return "computermouse.fill"
-            case .keyboard: return "keyboard.fill"
-            case .numpadMedia: return "play.tv.fill"
-            }
-        }
     }
 
     var body: some View {
@@ -47,121 +39,125 @@ struct RemoteTrackpadView: View {
                 numpadAndMediaArea
             }
         }
-        .background(Color(red: 0.1, green: 0.1, blue: 0.12).ignoresSafeArea())
+        .background(BrandPalette.overlaySurface.ignoresSafeArea())
+        .preferredColorScheme(.dark)
     }
 
-    // MARK: - Header Bar
+    // MARK: - Header Bar (2 tầng, nút ≥44pt, không cắt chữ tab)
 
     private var headerBar: some View {
-        HStack {
-            Button {
-                Haptics.light()
-                onClose()
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "display")
-                        .font(.system(size: 16, weight: .semibold))
-                    Text("Màn hình")
-                        .font(.system(size: 13, weight: .medium))
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                Button {
+                    Haptics.light()
+                    onClose()
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "display")
+                            .font(.system(size: 15, weight: .semibold))
+                        Text("Màn hình")
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    .foregroundStyle(BrandPalette.primaryOnOverlay)
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 40)
+                    .background(BrandPalette.overlayKey, in: Capsule())
                 }
-                .foregroundStyle(Color.blue)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(Color.white.opacity(0.1), in: Capsule())
-            }
-            .buttonStyle(.plain)
+                .buttonStyle(.plain)
+                .frame(minHeight: 44)
+                .accessibilityLabel("Xem màn hình Mac")
 
-            Spacer()
+                Text(model.connectingName ?? "Điều khiển Mac")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity)
+
+                HStack(spacing: 2) {
+                    Button {
+                        Haptics.light()
+                        Task { await model.session.sendSystemLock() }
+                    } label: {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 17))
+                            .foregroundStyle(.white.opacity(0.9))
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Khóa Mac")
+
+                    Button {
+                        Haptics.light()
+                        Task { await model.disconnect() }
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 19))
+                            .foregroundStyle(BrandPalette.danger)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Ngắt kết nối")
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 6)
 
             Picker("", selection: $selectedTab) {
                 ForEach(RemoteTab.allCases) { tab in
-                    Label(tab.rawValue, systemImage: tab.iconName).tag(tab)
+                    Text(tab.rawValue).tag(tab)
                 }
             }
             .pickerStyle(.segmented)
-            .frame(maxWidth: 300)
-
-            Spacer()
-
-            HStack(spacing: 12) {
-                Button {
-                    Haptics.light()
-                    Task { await model.session.sendSystemLock() }
-                } label: {
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 16))
-                        .foregroundStyle(.white.opacity(0.8))
-                }
-                .buttonStyle(.plain)
-
-                Button {
-                    Haptics.light()
-                    Task { await model.disconnect() }
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 18))
-                        .foregroundStyle(.red.opacity(0.85))
-                }
-                .buttonStyle(.plain)
-            }
+            .colorScheme(.dark)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 8)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
     }
 
     // MARK: - 1. Trackpad Area
 
     private var trackpadArea: some View {
-        VStack(spacing: 8) {
-            // Vùng cảm ứng Trackpad
-            GeometryReader { geo in
-                ZStack {
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(Color(white: 0.15))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                        )
+        VStack(spacing: 10) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(BrandPalette.overlayCard)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                    )
 
-                    VStack(spacing: 6) {
-                        Image(systemName: "hand.draw.fill")
-                            .font(.system(size: 28))
-                            .foregroundStyle(.white.opacity(0.3))
-                        Text("Di 1 ngón: Di chuột · 1 chạm: Chuột trái\n2 ngón chạm: Chuột phải · 2 ngón vuốt: Cuộn trang")
-                            .font(.footnote)
-                            .multilineTextAlignment(.center)
-                            .foregroundStyle(.white.opacity(0.4))
-                    }
-                    .allowsHitTesting(false)
+                VStack(spacing: 6) {
+                    Image(systemName: "hand.draw.fill")
+                        .font(.system(size: 28))
+                        .foregroundStyle(.white.opacity(0.32))
+                    Text("1 ngón: Di chuột · Chạm: Chuột trái\n2 ngón chạm: Chuột phải · 2 ngón vuốt: Cuộn trang")
+                        .font(.footnote)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.white.opacity(0.45))
                 }
-                .contentShape(Rectangle())
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { value in
-                            handleTrackpadDrag(translation: value.translation, in: geo.size)
-                        }
-                        .onEnded { _ in
-                            lastDragTranslation = .zero
-                        }
-                )
-                .simultaneousGesture(
-                    TapGesture().onEnded {
-                        sendLeftClick()
-                    }
+                .padding(.horizontal, 16)
+                .allowsHitTesting(false)
+
+                TrackpadTouchSurface(
+                    onMove: { dx, dy in moveCursor(dx: dx, dy: dy) },
+                    onLeftClick: { sendLeftClick() },
+                    onRightClick: { sendRightClick() },
+                    onScroll: { dx, dy in sendScroll(dx: dx, dy: dy) }
                 )
             }
             .padding(.horizontal, 16)
-            .padding(.top, 8)
+            .padding(.top, 10)
 
-            // Nút chuột vật lý dưới đáy
             HStack(spacing: 12) {
                 Button {
                     sendLeftClick()
                 } label: {
                     Text("Chuột Trái")
                         .font(.system(size: 16, weight: .semibold))
-                        .frame(maxWidth: .infinity, minHeight: 52)
-                        .background(Color.white.opacity(isLeftDown ? 0.3 : 0.15), in: RoundedRectangle(cornerRadius: 12))
+                        .frame(maxWidth: .infinity, minHeight: 54)
+                        .background(isLeftDown ? BrandPalette.primaryFill : BrandPalette.overlayKey, in: RoundedRectangle(cornerRadius: 14))
                         .foregroundStyle(.white)
                 }
                 .buttonStyle(.plain)
@@ -176,8 +172,8 @@ struct RemoteTrackpadView: View {
                 } label: {
                     Text("Chuột Phải")
                         .font(.system(size: 16, weight: .semibold))
-                        .frame(maxWidth: .infinity, minHeight: 52)
-                        .background(Color.white.opacity(isRightDown ? 0.3 : 0.15), in: RoundedRectangle(cornerRadius: 12))
+                        .frame(maxWidth: .infinity, minHeight: 54)
+                        .background(isRightDown ? BrandPalette.primaryFill : BrandPalette.overlayKey, in: RoundedRectangle(cornerRadius: 14))
                         .foregroundStyle(.white)
                 }
                 .buttonStyle(.plain)
@@ -192,18 +188,14 @@ struct RemoteTrackpadView: View {
         }
     }
 
-    @State private var lastDragTranslation: CGSize = .zero
-
-    private func handleTrackpadDrag(translation: CGSize, in size: CGSize) {
-        guard size.width > 0, size.height > 0 else { return }
-        let dx = Float((translation.width - lastDragTranslation.width) / size.width) * 1.8
-        let dy = Float((translation.height - lastDragTranslation.height) / size.height) * 1.8
-        lastDragTranslation = translation
-
-        cursorX = min(1, max(0, cursorX + dx))
-        cursorY = min(1, max(0, cursorY + dy))
-
+    private func moveCursor(dx: Float, dy: Float) {
+        cursorX = min(0.999, max(0.001, cursorX + dx))
+        cursorY = min(0.999, max(0.001, cursorY + dy))
         model.session.sendInput([.move(x: cursorX, y: cursorY, mods: activeMods)])
+    }
+
+    private func sendScroll(dx: Float, dy: Float) {
+        model.session.sendInput([.scroll(dx: dx, dy: dy, mods: activeMods)])
     }
 
     private func sendLeftClick() {
@@ -225,69 +217,72 @@ struct RemoteTrackpadView: View {
     // MARK: - 2. Keyboard Area
 
     private var keyboardArea: some View {
-        VStack(spacing: 12) {
-            // Khung gõ text tiếng Việt gửi sang Mac
-            HStack(spacing: 8) {
-                TextField("Nhập văn bản gửi sang Mac…", text: $inputText)
+        ScrollView {
+            VStack(spacing: 12) {
+                // Khung gõ text tiếng Việt gửi sang Mac
+                HStack(spacing: 8) {
+                    TextField(
+                        "Nhập tiếng Việt / văn bản sang Mac…",
+                        text: $inputText,
+                        prompt: Text("Nhập tiếng Việt / văn bản sang Mac…").foregroundStyle(.white.opacity(0.45))
+                    )
                     .textFieldStyle(.plain)
-                    .padding(10)
-                    .background(Color.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 44)
+                    .background(BrandPalette.overlayCard, in: RoundedRectangle(cornerRadius: 10))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.15), lineWidth: 1))
                     .foregroundStyle(.white)
                     .focused($isInputFocused)
                     .submitLabel(.send)
-                    .onSubmit {
-                        sendTypedText()
-                    }
+                    .onSubmit { sendTypedText() }
 
-                if !inputText.isEmpty {
-                    Button("Gửi") {
-                        sendTypedText()
+                    if !inputText.isEmpty {
+                        Button("Gửi") { sendTypedText() }
+                            .font(.system(size: 14, weight: .semibold))
+                            .padding(.horizontal, 14)
+                            .frame(minHeight: 44)
+                            .background(BrandPalette.primaryFill, in: RoundedRectangle(cornerRadius: 10))
+                            .foregroundStyle(.white)
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(Color.blue, in: RoundedRectangle(cornerRadius: 10))
-                    .foregroundStyle(.white)
-                    .font(.system(size: 15, weight: .semibold))
                 }
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
+                .padding(.top, 12)
 
-            // Thanh phím bổ trợ Modifier (⌘ ⌥ ⌃ ⇧)
-            HStack(spacing: 8) {
-                modToggle("⌘ Cmd", .command)
-                modToggle("⌥ Option", .option)
-                modToggle("⌃ Control", .control)
-                modToggle("⇧ Shift", .shift)
-            }
-            .padding(.horizontal, 16)
+                // Thanh phím bổ trợ Modifier (⌘ ⌥ ⌃ ⇧)
+                HStack(spacing: 8) {
+                    modToggle("⌘ Cmd", .command)
+                    modToggle("⌥ Opt", .option)
+                    modToggle("⌃ Ctrl", .control)
+                    modToggle("⇧ Shift", .shift)
+                }
 
-            // Hàng phím tiện ích
-            HStack(spacing: 8) {
-                keyButton("Esc", usage: 0x29)
-                keyButton("Tab", usage: 0x2B)
-                keyButton("Space", usage: 0x2C)
-                keyButton("⌫ Del", usage: 0x2A)
-                keyButton("↩ Enter", usage: 0x28)
-            }
-            .padding(.horizontal, 16)
+                // Hàng phím tiện ích
+                HStack(spacing: 8) {
+                    keyButton("Esc", usage: 0x29)
+                    keyButton("Tab", usage: 0x2B)
+                    keyButton("Space", usage: 0x2C)
+                    keyButton("⌫ Del", usage: 0x2A)
+                    keyButton("↩ Enter", usage: 0x28)
+                }
 
-            // Cụm phím điều hướng mũi tên
-            HStack(spacing: 16) {
-                Spacer()
+                // Phím tắt hay dùng + Cụm phím mũi tên
+                HStack(spacing: 8) {
+                    keyButton("⌘ C", usage: 0x06, extraMods: .command)
+                    keyButton("⌘ V", usage: 0x19, extraMods: .command)
+                    keyButton("⌘ A", usage: 0x04, extraMods: .command)
+                }
+
                 VStack(spacing: 8) {
-                    keyButton("↑", usage: 0x52)
+                    keyButton("↑", usage: 0x52, fillWidth: false)
                     HStack(spacing: 8) {
-                        keyButton("←", usage: 0x50)
-                        keyButton("↓", usage: 0x51)
-                        keyButton("→", usage: 0x4F)
+                        keyButton("←", usage: 0x50, fillWidth: false)
+                        keyButton("↓", usage: 0x51, fillWidth: false)
+                        keyButton("→", usage: 0x4F, fillWidth: false)
                     }
                 }
-                Spacer()
+                .padding(.top, 4)
             }
-            .padding(.vertical, 8)
-
-            Spacer()
+            .padding(.horizontal, 16)
+            .padding(.bottom, 16)
         }
     }
 
@@ -311,85 +306,112 @@ struct RemoteTrackpadView: View {
             }
         } label: {
             Text(label)
-                .font(.system(size: 14, weight: .semibold))
-                .frame(maxWidth: .infinity, minHeight: 40)
-                .background(active ? Color.blue : Color.white.opacity(0.15), in: RoundedRectangle(cornerRadius: 8))
+                .font(.system(size: 13, weight: .semibold))
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(active ? BrandPalette.primaryFill : BrandPalette.overlayKey, in: RoundedRectangle(cornerRadius: 10))
                 .foregroundStyle(.white)
         }
         .buttonStyle(.plain)
     }
 
-    private func keyButton(_ label: String, usage: UInt16) -> some View {
-        Button {
+    private func keyButton(_ label: String, usage: UInt16, extraMods: InputModifiers = [], fillWidth: Bool = true) -> some View {
+        let mods = activeMods.union(extraMods)
+        return Button {
             Haptics.light()
             model.session.sendInput([
-                .key(usage: usage, down: true, mods: activeMods),
-                .key(usage: usage, down: false, mods: activeMods)
+                .key(usage: usage, down: true, mods: mods),
+                .key(usage: usage, down: false, mods: mods)
             ])
         } label: {
             Text(label)
-                .font(.system(size: 15, weight: .semibold))
-                .frame(minWidth: 48, minHeight: 44)
-                .padding(.horizontal, 8)
-                .background(Color.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                .font(.system(size: 14, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+                .padding(.horizontal, 6)
+                .frame(minWidth: 52, maxWidth: fillWidth ? .infinity : nil, minHeight: 46)
+                .background(BrandPalette.overlayKey, in: RoundedRectangle(cornerRadius: 10))
                 .foregroundStyle(.white)
         }
         .buttonStyle(.plain)
     }
 
-    // MARK: - 3. Numpad & Media Area
+    // MARK: - 3. Numpad & Media Area (Dọc trên iPhone, Ngang khi đủ rộng)
 
     private var numpadAndMediaArea: some View {
-        HStack(alignment: .top, spacing: 16) {
-            // Numpad 4x4
-            VStack(spacing: 8) {
-                Text("Bàn phím số").font(.caption).foregroundStyle(.white.opacity(0.5))
-                HStack(spacing: 8) {
-                    keyButton("7", usage: 0x5F)
-                    keyButton("8", usage: 0x60)
-                    keyButton("9", usage: 0x61)
-                    keyButton("/", usage: 0x54)
-                }
-                HStack(spacing: 8) {
-                    keyButton("4", usage: 0x5C)
-                    keyButton("5", usage: 0x5D)
-                    keyButton("6", usage: 0x5E)
-                    keyButton("*", usage: 0x55)
-                }
-                HStack(spacing: 8) {
-                    keyButton("1", usage: 0x59)
-                    keyButton("2", usage: 0x5A)
-                    keyButton("3", usage: 0x5B)
-                    keyButton("-", usage: 0x56)
-                }
-                HStack(spacing: 8) {
-                    keyButton("0", usage: 0x62)
-                    keyButton(".", usage: 0x63)
-                    keyButton("=", usage: 0x58)
-                    keyButton("+", usage: 0x57)
-                }
-            }
-
-            Divider().background(Color.white.opacity(0.15)).frame(height: 240)
-
-            // Điều khiển Media & Presentation
-            VStack(spacing: 12) {
-                Text("Thuyết trình & Media").font(.caption).foregroundStyle(.white.opacity(0.5))
-                HStack(spacing: 8) {
-                    mediaButton("Trình chiếu (F5)", systemName: "play.rectangle.fill", usage: 0x3E)
-                    mediaButton("Thoát (Esc)", systemName: "xmark.rectangle", usage: 0x29)
-                }
-                HStack(spacing: 8) {
-                    mediaButton("Slide trước", systemName: "chevron.left.circle.fill", usage: 0x4B) // Page Up
-                    mediaButton("Slide kế", systemName: "chevron.right.circle.fill", usage: 0x4E) // Page Down
-                }
-                HStack(spacing: 8) {
-                    mediaButton("Space", systemName: "space", usage: 0x2C)
-                    mediaButton("Hoàn tác", systemName: "arrow.uturn.backward", usage: 0x1D, mods: .command)
+        GeometryReader { geo in
+            ScrollView {
+                if geo.size.width < 560 {
+                    VStack(spacing: 20) {
+                        presentationSection
+                        Divider().background(Color.white.opacity(0.15))
+                        numpadSection
+                    }
+                    .padding(16)
+                } else {
+                    HStack(alignment: .top, spacing: 20) {
+                        numpadSection
+                        Divider().background(Color.white.opacity(0.15)).frame(minHeight: 240)
+                        presentationSection
+                    }
+                    .padding(16)
                 }
             }
         }
-        .padding(16)
+    }
+
+    private var numpadSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("BÀN PHÍM SỐ NUMPAD")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.white.opacity(0.55))
+            HStack(spacing: 8) {
+                keyButton("7", usage: 0x5F)
+                keyButton("8", usage: 0x60)
+                keyButton("9", usage: 0x61)
+                keyButton("/", usage: 0x54)
+            }
+            HStack(spacing: 8) {
+                keyButton("4", usage: 0x5C)
+                keyButton("5", usage: 0x5D)
+                keyButton("6", usage: 0x5E)
+                keyButton("*", usage: 0x55)
+            }
+            HStack(spacing: 8) {
+                keyButton("1", usage: 0x59)
+                keyButton("2", usage: 0x5A)
+                keyButton("3", usage: 0x5B)
+                keyButton("-", usage: 0x56)
+            }
+            HStack(spacing: 8) {
+                keyButton("0", usage: 0x62)
+                keyButton(".", usage: 0x63)
+                keyButton("=", usage: 0x58)
+                keyButton("+", usage: 0x57)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var presentationSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("THUYẾT TRÌNH & MEDIA")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.white.opacity(0.55))
+            HStack(spacing: 8) {
+                mediaButton("Trình chiếu (F5)", systemName: "play.rectangle.fill", usage: 0x3E)
+                mediaButton("Thoát (Esc)", systemName: "xmark.rectangle", usage: 0x29)
+            }
+            HStack(spacing: 8) {
+                mediaButton("Slide trước", systemName: "chevron.left.circle.fill", usage: 0x4B)
+                mediaButton("Slide kế", systemName: "chevron.right.circle.fill", usage: 0x4E)
+            }
+            HStack(spacing: 8) {
+                mediaButton("Space", systemName: "space", usage: 0x2C)
+                mediaButton("Hoàn tác", systemName: "arrow.uturn.backward", usage: 0x1D, mods: .command)
+            }
+        }
+        .frame(maxWidth: .infinity)
     }
 
     private func mediaButton(_ label: String, systemName: String, usage: UInt16, mods: InputModifiers = []) -> some View {
@@ -402,14 +424,121 @@ struct RemoteTrackpadView: View {
         } label: {
             VStack(spacing: 4) {
                 Image(systemName: systemName)
-                    .font(.system(size: 20))
+                    .font(.system(size: 19))
                 Text(label)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 12, weight: .medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
             }
-            .frame(maxWidth: .infinity, minHeight: 52)
-            .background(Color.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+            .padding(.horizontal, 6)
+            .frame(maxWidth: .infinity, minHeight: 54)
+            .background(BrandPalette.overlayKey, in: RoundedRectangle(cornerRadius: 10))
             .foregroundStyle(.white)
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// Bề mặt đa chạm UIKit: 1 ngón di chuyển / chạm chuột trái; 2 ngón chạm chuột phải / vuốt cuộn trang.
+private struct TrackpadTouchSurface: UIViewRepresentable {
+    let onMove: (Float, Float) -> Void
+    let onLeftClick: () -> Void
+    let onRightClick: () -> Void
+    let onScroll: (Float, Float) -> Void
+
+    func makeUIView(context: Context) -> TouchPadUIView {
+        let view = TouchPadUIView()
+        updateCallbacks(view)
+        return view
+    }
+
+    func updateUIView(_ uiView: TouchPadUIView, context: Context) {
+        updateCallbacks(uiView)
+    }
+
+    private func updateCallbacks(_ view: TouchPadUIView) {
+        view.onMove = onMove
+        view.onLeftClick = onLeftClick
+        view.onRightClick = onRightClick
+        view.onScroll = onScroll
+    }
+}
+
+@MainActor
+private final class TouchPadUIView: UIView {
+    var onMove: (Float, Float) -> Void = { _, _ in }
+    var onLeftClick: () -> Void = {}
+    var onRightClick: () -> Void = {}
+    var onScroll: (Float, Float) -> Void = { _, _ in }
+
+    private var tracked: [ObjectIdentifier: CGPoint] = [:]
+    private var maxFingers = 0
+    private var gestureStartTime: CFTimeInterval = 0
+    private var movedBeyondSlop = false
+    private var totalDistance: CGFloat = 0
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        isMultipleTouchEnabled = true
+        backgroundColor = .clear
+    }
+
+    @available(*, unavailable) required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        if tracked.isEmpty {
+            maxFingers = 0
+            movedBeyondSlop = false
+            totalDistance = 0
+            gestureStartTime = CACurrentMediaTime()
+        }
+        for touch in touches {
+            tracked[ObjectIdentifier(touch)] = touch.location(in: self)
+        }
+        maxFingers = max(maxFingers, tracked.count)
+    }
+
+    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+        var sumDx: CGFloat = 0
+        var sumDy: CGFloat = 0
+        var count = 0
+        for touch in touches {
+            let key = ObjectIdentifier(touch)
+            guard let prev = tracked[key] else { continue }
+            let loc = touch.location(in: self)
+            sumDx += loc.x - prev.x
+            sumDy += loc.y - prev.y
+            tracked[key] = loc
+            count += 1
+        }
+        guard count > 0 else { return }
+        let avgDx = sumDx / CGFloat(count)
+        let avgDy = sumDy / CGFloat(count)
+        totalDistance += hypot(avgDx, avgDy)
+        if totalDistance > 8 { movedBeyondSlop = true }
+        guard movedBeyondSlop, avgDx != 0 || avgDy != 0 else { return }
+
+        if tracked.count >= 2 || maxFingers >= 2 {
+            onScroll(Float(avgDx * 1.5), Float(avgDy * 1.5))
+        } else {
+            let w = max(1, bounds.width)
+            let h = max(1, bounds.height)
+            onMove(Float(avgDx / w * 1.8), Float(avgDy / h * 1.8))
+        }
+    }
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        for touch in touches { tracked.removeValue(forKey: ObjectIdentifier(touch)) }
+        guard tracked.isEmpty, !movedBeyondSlop else { return }
+        let elapsed = CACurrentMediaTime() - gestureStartTime
+        if maxFingers >= 2 && elapsed <= 0.35 {
+            onRightClick()
+        } else if maxFingers == 1 && elapsed <= 0.30 {
+            onLeftClick()
+        }
+    }
+
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+        for touch in touches { tracked.removeValue(forKey: ObjectIdentifier(touch)) }
     }
 }

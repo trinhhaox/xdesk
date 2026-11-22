@@ -14,8 +14,8 @@ struct StreamView: View {
     @State private var composer: TextComposerController
     @State private var pointer = PointerSettingsStore()
     @State private var showPointerSettings = false
-    @State private var showRemoteTrackpad = false
     @State private var showFileImporter = false
+    @State private var shortcutsExpanded = false
     @State private var modeNotice: String?
     @State private var zoom = VideoZoomState()
     @State private var floating = FloatingControlStore()
@@ -46,7 +46,9 @@ struct StreamView: View {
                     renderer: model.session.renderer, session: model.session, config: model.currentConfig,
                     composer: composer, pointer: pointer.settings, zoom: zoom
                 )
-                FloatingControl(store: floating, container: floatingArea(proxy.size)) { close in menuItems(close) }
+                FloatingControl(store: floating, container: floatingArea(proxy.size)) { close, keepAlive in
+                    menuItems(close, keepAlive: keepAlive)
+                }
                 if !composer.preview.isEmpty { composingPreview }
                 if let help = model.session.pendingAgentHelp { agentHelpBanner(help) }
                 if let notice = modeNotice ?? model.clipboardNotice { toast(notice) }
@@ -58,9 +60,6 @@ struct StreamView: View {
         .ignoresSafeArea(.keyboard)
         .background(Color.black.ignoresSafeArea())
         .sheet(isPresented: $showPointerSettings) { PointerSettingsSheet(store: pointer) }
-        .sheet(isPresented: $showRemoteTrackpad) {
-            RemoteTrackpadView(model: model, onClose: { showRemoteTrackpad = false })
-        }
         .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.item]) { result in
             if case .success(let url) = result {
                 guard url.startAccessingSecurityScopedResource() else { return }
@@ -123,76 +122,141 @@ struct StreamView: View {
         .accessibilityElement(children: .contain)
     }
 
-    private func menuItems(_ close: @escaping () -> Void) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            quickDockRow(close)
-            Divider().background(Color.white.opacity(0.2)).padding(.vertical, 4)
-            item("Ngắt kết nối", "xmark.circle", close) { Task { await model.disconnect() } }
-            item("Chuột & Bàn phím ảo", "computermouse.fill", close) { model.isTrackpadOnlyMode = true }
-            item(composer.isActive ? "Ẩn bàn phím" : "Bàn phím", composer.isActive ? "keyboard.fill" : "keyboard", close) { composer.isActive.toggle() }
-                .disabled(model.session.state != .streaming)
-            item("Chuột: \(pointer.settings.mode.title)", pointer.settings.mode.symbol, close) { toggleMode() }
-            item("Cài đặt chuột", "slider.horizontal.3", close) { showPointerSettings = true }
-            if model.session.clipboardAvailable {
-                item("Gửi clipboard sang Mac", "doc.on.clipboard", close) { Task { await model.sendClipboardToMac() } }
-            }
-            item("Gửi tệp sang Mac…", "arrow.up.doc", close) { showFileImporter = true }
-            if model.screenMode == .mirror { MirrorFitMenu(fit: mirrorFit) }
-            if zoom.isZoomed { item("Vừa khung màn hình", "arrow.down.right.and.arrow.up.left", close) { zoom.reset?() } }
-            item("Chụp ảnh màn hình Mac", "camera.viewfinder", close) { sendShortcut(usage: 0x21, mods: [.command, .shift]) }
+    private func menuItems(_ close: @escaping () -> Void, keepAlive: @escaping () -> Void) -> some View {
+        let dismiss = {
+            shortcutsExpanded = false
+            close()
         }
+        return VStack(alignment: .leading, spacing: 0) {
+            quickDockRow(dismiss)
+            Divider().background(Color.white.opacity(0.2)).padding(.vertical, 4)
+            HStack(spacing: 4) {
+                Button {
+                    Haptics.light()
+                    toggleMode()
+                    dismiss()
+                } label: {
+                    Label("Chuột: \(pointer.settings.mode.title)", systemImage: pointer.settings.mode.symbol)
+                        .font(.system(size: 15, weight: .medium))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.9)
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        .padding(.leading, 10)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    Haptics.light()
+                    showPointerSettings = true
+                    dismiss()
+                } label: {
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.8))
+                        .frame(width: 44, height: 44)
+                        .background(Circle().fill(Color.white.opacity(0.08)))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Cài đặt chuột và con trỏ")
+            }
+            if model.screenMode == .mirror { MirrorFitMenu(fit: mirrorFit) }
+            if zoom.isZoomed { item("Vừa khung màn hình", "arrow.down.right.and.arrow.up.left", dismiss) { zoom.reset?() } }
+            Button {
+                Haptics.light()
+                shortcutsExpanded.toggle()
+                keepAlive()
+            } label: {
+                HStack {
+                    Label("Phím tắt Mac", systemImage: "square.2.layers.3d.top.filled")
+                        .font(.system(size: 15, weight: .medium))
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.65))
+                        .rotationEffect(.degrees(shortcutsExpanded ? 90 : 0))
+                }
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .padding(.horizontal, 10)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            if shortcutsExpanded {
+                VStack(alignment: .leading, spacing: 0) {
+                    shortcutItem("Spotlight (⌘ Space)", "magnifyingglass", dismiss) { sendShortcut(usage: 0x2C, mods: .command) }
+                    shortcutItem("Mission Control (⌃ ↑)", "square.2.layers.3d.top.filled", dismiss) { sendShortcut(usage: 0x52, mods: .control) }
+                    shortcutItem("Chuyển app (⌘ Tab)", "app.dashed", dismiss) { sendShortcut(usage: 0x2B, mods: .command) }
+                    shortcutItem("Hoàn tác (⌘ Z)", "arrow.uturn.backward", dismiss) { sendShortcut(usage: 0x1D, mods: .command) }
+                    shortcutItem("Mở khoá Mac", "faceid", dismiss) { unlockMacWithBiometrics() }
+                }
+                .padding(.leading, 10)
+                .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
+                .padding(.horizontal, 4)
+                .padding(.bottom, 4)
+            }
+            if model.session.clipboardAvailable {
+                item("Gửi clipboard sang Mac", "doc.on.clipboard", dismiss) { Task { await model.sendClipboardToMac() } }
+            }
+            item("Gửi tệp sang Mac…", "arrow.up.doc", dismiss) { showFileImporter = true }
+            Divider().background(Color.white.opacity(0.2)).padding(.vertical, 4)
+            item("Ngắt kết nối", "xmark.circle", dismiss, tint: BrandPalette.danger) { Task { await model.disconnect() } }
+        }
+        .onDisappear { shortcutsExpanded = false }
     }
 
     private func quickDockRow(_ close: @escaping () -> Void) -> some View {
-        HStack(spacing: 8) {
-            dockButton(systemName: "computermouse.fill", label: "Chuột & Bàn phím ảo") {
+        let keyboardEnabled = model.session.state == .streaming
+        return HStack(spacing: 4) {
+            dockTile(systemName: "computermouse.fill", label: "Trackpad", accessibility: "Chuột & Bàn phím ảo") {
                 model.isTrackpadOnlyMode = true
                 close()
             }
-            dockButton(systemName: "magnifyingglass", label: "Spotlight") {
-                sendShortcut(usage: 0x2C, mods: .command)
+            dockTile(
+                systemName: composer.isActive ? "keyboard.fill" : "keyboard",
+                label: composer.isActive ? "Ẩn phím" : "Bàn phím",
+                accessibility: composer.isActive ? "Ẩn bàn phím" : "Hiện bàn phím",
+                enabled: keyboardEnabled
+            ) {
+                composer.isActive.toggle()
                 close()
             }
-            dockButton(systemName: "square.2.layers.3d.top.filled", label: "Mission Control") {
-                sendShortcut(usage: 0x52, mods: .control)
-                close()
-            }
-            dockButton(systemName: "app.dashed", label: "App Switcher") {
-                sendShortcut(usage: 0x2B, mods: .command)
-                close()
-            }
-            dockButton(systemName: "arrow.uturn.backward", label: "Hoàn tác") {
-                sendShortcut(usage: 0x1D, mods: .command)
-                close()
-            }
-            dockButton(systemName: "lock", label: "Khóa Mac") {
+            dockTile(systemName: "lock.fill", label: "Khoá Mac", accessibility: "Khóa máy Mac") {
                 Task { await model.session.sendSystemLock() }
                 close()
             }
-            dockButton(systemName: "faceid", label: "Mở khóa") {
-                unlockMacWithBiometrics()
+            dockTile(systemName: "camera.viewfinder", label: "Chụp ảnh", accessibility: "Chụp ảnh màn hình Mac") {
+                sendShortcut(usage: 0x21, mods: [.command, .shift])
                 close()
             }
         }
-        .padding(.horizontal, 6)
+        .padding(.horizontal, 4)
         .padding(.vertical, 4)
         .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
         .padding(.vertical, 2)
     }
 
-    private func dockButton(systemName: String, label: String, action: @escaping () -> Void) -> some View {
+    private func dockTile(systemName: String, label: String, accessibility: String, enabled: Bool = true, action: @escaping () -> Void) -> some View {
         Button {
             Haptics.light()
             action()
         } label: {
-            Image(systemName: systemName)
-                .font(.system(size: 15, weight: .semibold))
-                .frame(width: 34, height: 34)
-                .background(Circle().fill(Color.white.opacity(0.12)))
-                .foregroundStyle(.white)
+            VStack(spacing: 3) {
+                Image(systemName: systemName)
+                    .font(.system(size: 16, weight: .semibold))
+                    .frame(width: 34, height: 34)
+                    .background(Circle().fill(Color.white.opacity(enabled ? 0.12 : 0.05)))
+                Text(label)
+                    .font(.system(size: 11, weight: .medium))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(enabled ? Color.white : Color.white.opacity(0.45))
+            .frame(maxWidth: .infinity, minHeight: 56)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(label)
+        .disabled(!enabled)
+        .accessibilityLabel(accessibility)
     }
 
     private func sendShortcut(usage: UInt16, mods: InputModifiers) {
@@ -202,10 +266,22 @@ struct StreamView: View {
         ])
     }
 
-    private func item(_ title: String, _ symbol: String, _ close: @escaping () -> Void, action: @escaping () -> Void) -> some View {
+    private func item(_ title: String, _ symbol: String, _ close: @escaping () -> Void, tint: Color = .white, action: @escaping () -> Void) -> some View {
         Button { Haptics.light(); action(); close() } label: {
             Label(title, systemImage: symbol)
-                .font(.body.weight(.medium))
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(tint)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).padding(.horizontal, 10)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func shortcutItem(_ title: String, _ symbol: String, _ close: @escaping () -> Void, action: @escaping () -> Void) -> some View {
+        Button { Haptics.light(); action(); close() } label: {
+            Label(title, systemImage: symbol)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.white.opacity(0.92))
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).padding(.horizontal, 10)
                 .contentShape(Rectangle())
         }
@@ -267,7 +343,7 @@ struct StreamView: View {
         VStack {
             HStack(spacing: 12) {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.yellow)
+                    .foregroundStyle(BrandPalette.warning)
                     .font(.system(size: 20))
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Agent AI cần trợ giúp:")
@@ -285,12 +361,12 @@ struct StreamView: View {
                 .font(.system(size: 13, weight: .semibold))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(Color.green)
+                .background(BrandPalette.accent)
                 .foregroundStyle(.white)
                 .clipShape(Capsule())
             }
             .padding(12)
-            .background(Color.black.opacity(0.85))
+            .background(BrandPalette.overlaySurface.opacity(0.92))
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .padding(.horizontal, 16)
             .padding(.top, 8)

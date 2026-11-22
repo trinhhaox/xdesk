@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -82,10 +83,14 @@ private fun KnownHostRow(host: KnownHost, onForget: () -> Unit) {
 }
 
 @Composable
-internal fun ConfirmDialog(title: String, text: String, confirm: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+internal fun ConfirmDialog(title: String, text: String, confirm: String, onConfirm: () -> Unit, destructive: Boolean = true, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss, title = { Text(title) }, text = { Text(text) },
-        confirmButton = { TextButton(onClick = onConfirm) { Text(confirm) } },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(confirm, color = if (destructive) MaterialTheme.colorScheme.error else Color.Unspecified)
+            }
+        },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Huỷ") } },
     )
 }

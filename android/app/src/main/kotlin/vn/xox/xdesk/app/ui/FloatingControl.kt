@@ -5,10 +5,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -22,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -47,6 +51,8 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -65,17 +71,39 @@ private const val IDLE_ALPHA = 0.7f
 private const val IDLE_MS = 3000L
 private const val EXPANDED_MS = 8000L
 
-class FloatingAction(val label: String, val icon: ImageVector, val description: String = label, val enabled: Boolean = true, val onClick: () -> Unit)
+class FloatingAction(
+    val label: String,
+    val icon: ImageVector,
+    val description: String = label,
+    val enabled: Boolean = true,
+    val isDestructive: Boolean = false,
+    val trailingIcon: ImageVector? = null,
+    val trailingDescription: String? = null,
+    val onTrailingClick: (() -> Unit)? = null,
+    val onClick: () -> Unit,
+)
 
-class DockShortcut(val label: String, val icon: ImageVector, val description: String = label, val onClick: () -> Unit)
+class DockShortcut(
+    val label: String,
+    val icon: ImageVector,
+    val description: String = label,
+    val enabled: Boolean = true,
+    val onClick: () -> Unit,
+)
 
 /**
  * Một nút nổi 48 dp thay thanh công cụ cố định (thanh cũ che biểu tượng trạng thái trên menu bar Mac): đĩa đặc tối, chữ trắng, viền sáng
- * và bóng nên đọc được trên mọi nền Mac. Chạm mở menu đặc; kéo rồi thả thì dính mép trái/phải gần nhất (vị trí được lưu); sau 3 s không chạm
- * chỉ nhạt còn 70%. Phần tử này vẽ trên khung video nên nhận chạm trước; ngoài nút và menu không có pointerInput nên chạm xuyên xuống video.
+ * và bóng nên đọc được trên mọi nền Mac. Chạm mở menu 3 tầng (thao tác nhanh 4 nút, điều khiển/phím tắt Mac, ngắt kết nối dưới đáy).
  */
 @Composable
-fun FloatingControl(store: FloatingControlStore, status: String, actions: List<FloatingAction>, shortcuts: List<DockShortcut> = emptyList(), modifier: Modifier = Modifier) {
+fun FloatingControl(
+    store: FloatingControlStore,
+    status: String,
+    actions: List<FloatingAction>,
+    quickDock: List<DockShortcut> = emptyList(),
+    macShortcuts: List<DockShortcut> = emptyList(),
+    modifier: Modifier = Modifier,
+) {
     BoxWithConstraints(modifier.fillMaxSize()) {
         val density = LocalDensity.current
         val size = with(density) { ButtonSize.toPx() }
@@ -83,10 +111,14 @@ fun FloatingControl(store: FloatingControlStore, status: String, actions: List<F
         val width = constraints.maxWidth.toFloat()
         val height = constraints.maxHeight.toFloat()
         var expanded by remember { mutableStateOf(false) }
+        var shortcutsOpen by remember { mutableStateOf(false) }
         var drag by remember { mutableStateOf<Offset?>(null) }
         var activity by remember { mutableIntStateOf(0) }
         var idle by remember { mutableStateOf(false) }
         var menuSize by remember { mutableStateOf(IntSize.Zero) }
+        LaunchedEffect(expanded) {
+            if (!expanded) shortcutsOpen = false
+        }
         LaunchedEffect(activity, expanded) {
             idle = false
             delay(if (expanded) EXPANDED_MS else IDLE_MS)
@@ -97,43 +129,99 @@ fun FloatingControl(store: FloatingControlStore, status: String, actions: List<F
         val alpha by animateFloatAsState(if (idle && !expanded) IDLE_ALPHA else 1f, label = "floating-fade")
 
         if (expanded) {
-            val (menuX, menuY) = store.placement.menuOrigin(at.x, at.y, size, menuSize.width.toFloat(), menuSize.height.toFloat(), margin * 2, width, height)
+            val menuMargin = with(density) { 12.dp.toPx() }
+            val (menuX, menuY) = store.placement.menuOrigin(at.x, at.y, size, menuSize.width.toFloat(), menuSize.height.toFloat(), menuMargin, width, height)
+            val (primaryActions, destructiveActions) = actions.partition { !it.isDestructive }
             Column(
-                Modifier.offset { IntOffset(menuX.roundToInt(), menuY.roundToInt()) }.width(240.dp).heightIn(max = with(density) { (height - margin * 4).toDp() })
+                Modifier.offset { IntOffset(menuX.roundToInt(), menuY.roundToInt()) }.width(276.dp).heightIn(max = with(density) { (height - menuMargin * 2).toDp() })
                     .onSizeChanged { menuSize = it }
                     .shadow(8.dp, RoundedCornerShape(14.dp)).background(Panel, RoundedCornerShape(14.dp)).border(1.dp, PanelOutline, RoundedCornerShape(14.dp))
                     .verticalScroll(rememberScrollState()).padding(6.dp),
             ) {
-                if (status.isNotBlank()) Text(status, color = XdeskOverlay.contentMuted, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
-                if (shortcuts.isNotEmpty()) {
+                if (status.isNotBlank()) {
+                    Text(
+                        status, color = XdeskOverlay.contentMuted, fontSize = 11.sp,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    )
+                }
+                if (quickDock.isNotEmpty()) {
                     Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp).background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(10.dp)).padding(vertical = 4.dp),
-                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly,
+                        Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 4.dp).background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(10.dp)).padding(vertical = 4.dp, horizontal = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        shortcuts.forEach { s ->
-                            Box(
-                                Modifier.size(36.dp).background(Color.White.copy(alpha = 0.12f), CircleShape)
-                                    .pointerInput(s) { detectTapGestures(onTap = { s.onClick(); expanded = false; activity++ }) }
-                                    .semantics { contentDescription = s.description; role = Role.Button; onClick { s.onClick(); expanded = false; activity++; true } },
-                                contentAlignment = Alignment.Center,
+                        quickDock.forEach { s ->
+                            val tileTint = if (s.enabled) XdeskOverlay.content else XdeskOverlay.contentDisabled
+                            Column(
+                                Modifier.weight(1f).heightIn(min = 56.dp)
+                                    .pointerInput(s) { detectTapGestures(onTap = { if (s.enabled) { s.onClick(); expanded = false; activity++ } }) }
+                                    .semantics { contentDescription = s.description; role = Role.Button; onClick { if (s.enabled) { s.onClick(); expanded = false; activity++ }; true } },
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center,
                             ) {
-                                Icon(s.icon, contentDescription = null, Modifier.size(20.dp), tint = Color.White)
+                                Box(
+                                    Modifier.size(34.dp).background(Color.White.copy(alpha = if (s.enabled) 0.12f else 0.05f), CircleShape),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(s.icon, contentDescription = null, Modifier.size(18.dp), tint = tileTint)
+                                }
+                                Spacer(Modifier.size(3.dp))
+                                Text(s.label, color = tileTint, fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+                            }
+                        }
+                    }
+                    HorizontalDivider(Modifier.padding(vertical = 4.dp), color = XdeskOverlay.divider)
+                }
+                primaryActions.forEach { a ->
+                    FloatingActionRow(a, XdeskOverlay.content) {
+                        expanded = false
+                        activity++
+                    }
+                }
+                if (macShortcuts.isNotEmpty()) {
+                    Row(
+                        Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                            .pointerInput(Unit) { detectTapGestures(onTap = { shortcutsOpen = !shortcutsOpen; activity++ }) }
+                            .semantics { contentDescription = "Phím tắt Mac"; role = Role.Button; onClick { shortcutsOpen = !shortcutsOpen; activity++; true } }
+                            .padding(horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(XdeskIcons.Layers, contentDescription = null, Modifier.size(20.dp), tint = XdeskOverlay.content)
+                        Text("Phím tắt Mac", color = XdeskOverlay.content, fontSize = 15.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f).padding(start = 10.dp))
+                        Icon(
+                            XdeskIcons.Chevron,
+                            contentDescription = if (shortcutsOpen) "Thu gọn" else "Mở rộng",
+                            Modifier.size(16.dp).rotate(if (shortcutsOpen) 90f else 0f),
+                            tint = XdeskOverlay.contentMuted,
+                        )
+                    }
+                    if (shortcutsOpen) {
+                        Column(
+                            Modifier.fillMaxWidth().padding(start = 10.dp, end = 4.dp, bottom = 4.dp)
+                                .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(10.dp)),
+                        ) {
+                            macShortcuts.forEach { s ->
+                                Row(
+                                    Modifier.fillMaxWidth().heightIn(min = 44.dp)
+                                        .pointerInput(s) { detectTapGestures(onTap = { s.onClick(); expanded = false; activity++ }) }
+                                        .semantics { contentDescription = s.description; role = Role.Button; onClick { s.onClick(); expanded = false; activity++; true } }
+                                        .padding(horizontal = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Icon(s.icon, contentDescription = null, Modifier.size(18.dp), tint = XdeskOverlay.contentMuted)
+                                    Text(s.label, color = XdeskOverlay.content, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 10.dp))
+                                }
                             }
                         }
                     }
                 }
-                actions.forEach { a ->
-                    Box(
-                        Modifier.fillMaxWidth().heightIn(min = 48.dp)
-                            .pointerInput(a) { detectTapGestures(onTap = { if (a.enabled) { a.onClick(); expanded = false; activity++ } }) }
-                            .semantics { contentDescription = a.description; role = Role.Button; onClick { if (a.enabled) { a.onClick(); expanded = false; activity++ }; true } },
-                        contentAlignment = Alignment.CenterStart,
-                    ) {
-                        val tint = if (a.enabled) XdeskOverlay.content else XdeskOverlay.contentDisabled
-                        Row(Modifier.padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(a.icon, contentDescription = null, Modifier.size(22.dp), tint = tint)
-                            Text(a.label, color = tint, fontSize = 17.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 12.dp))
+                if (destructiveActions.isNotEmpty()) {
+                    HorizontalDivider(Modifier.padding(vertical = 4.dp), color = XdeskOverlay.divider)
+                    destructiveActions.forEach { a ->
+                        FloatingActionRow(a, XdeskOverlay.danger) {
+                            expanded = false
+                            activity++
                         }
                     }
                 }
@@ -164,5 +252,35 @@ fun FloatingControl(store: FloatingControlStore, status: String, actions: List<F
                 },
             contentAlignment = Alignment.Center,
         ) { Icon(if (expanded) Icons.Filled.Close else XdeskIcons.Ellipsis, contentDescription = null, tint = XdeskOverlay.content, modifier = Modifier.size(24.dp)) }
+    }
+}
+
+@Composable
+private fun FloatingActionRow(action: FloatingAction, baseTint: Color, onClose: () -> Unit) {
+    val tint = if (action.enabled) baseTint else XdeskOverlay.contentDisabled
+    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier.weight(1f).heightIn(min = 48.dp)
+                .pointerInput(action) { detectTapGestures(onTap = { if (action.enabled) { action.onClick(); onClose() } }) }
+                .semantics { contentDescription = action.description; role = Role.Button; onClick { if (action.enabled) { action.onClick(); onClose() }; true } }
+                .padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(action.icon, contentDescription = null, Modifier.size(20.dp), tint = tint)
+            Text(action.label, color = tint, fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 10.dp))
+        }
+        val trailingIcon = action.trailingIcon
+        val onTrailingClick = action.onTrailingClick
+        if (trailingIcon != null && onTrailingClick != null) {
+            Box(
+                Modifier.size(44.dp).padding(2.dp)
+                    .background(Color.White.copy(alpha = 0.08f), CircleShape)
+                    .pointerInput(onTrailingClick) { detectTapGestures(onTap = { onTrailingClick(); onClose() }) }
+                    .semantics { contentDescription = action.trailingDescription ?: action.label; role = Role.Button; onClick { onTrailingClick(); onClose(); true } },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(trailingIcon, contentDescription = null, Modifier.size(18.dp), tint = XdeskOverlay.contentMuted)
+            }
+        }
     }
 }

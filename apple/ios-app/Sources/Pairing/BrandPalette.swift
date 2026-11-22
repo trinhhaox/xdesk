@@ -18,6 +18,10 @@ enum BrandPalette {
     static let background = dynamic(light: 0xF6F7FA, dark: 0x101218)
     /// Nền tối cố định #101218 cho lớp phủ trên video (không đổi theo giao diện).
     static let overlaySurface = Color(hex: 0x101218)
+    /// Thẻ và thanh phụ trên nền tối cố định (khớp `XdeskOverlay.bar`).
+    static let overlayCard = Color(hex: 0x1C1C1E)
+    /// Nút phím và ô chạm trên lớp phủ tối cố định (khớp `XdeskOverlay.key`).
+    static let overlayKey = Color(hex: 0x2C2C2E)
     /// Màu nhấn trên lớp phủ tối cố định (tương phản ≥ 4.5:1 trên #101218).
     static let primaryOnOverlay = Color(hex: 0x5B8CFF)
 

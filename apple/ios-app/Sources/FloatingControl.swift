@@ -33,12 +33,12 @@ struct FloatingControl<Menu: View>: View {
     static var surface: Color { BrandPalette.overlaySurface }
     let store: FloatingControlStore
     let container: CGSize
-    @ViewBuilder let menu: (_ close: @escaping () -> Void) -> Menu
+    @ViewBuilder let menu: (_ close: @escaping () -> Void, _ keepAlive: @escaping () -> Void) -> Menu
     @State private var expanded = false
     @State private var dragCenter: CGPoint?
     @State private var idle = false
     @State private var activity = 0
-    @State private var menuSize = CGSize.zero
+    @State private var contentHeight: CGFloat = 280
 
     var body: some View {
         let center = dragCenter ?? restingCenter
@@ -88,17 +88,37 @@ struct FloatingControl<Menu: View>: View {
     }
 
     private func panel(near center: CGPoint) -> some View {
+        let horizontalPadding: CGFloat = 8
+        let panelWidth = min(276, max(220, container.width - Self.buttonSize - horizontalPadding * 3))
+        let maxPanelHeight = max(160, container.height - horizontalPadding * 2)
+        let visibleHeight = min(contentHeight, maxPanelHeight)
         let leftOfButton = store.placement.side == .trailing
-        let x = leftOfButton ? center.x - Self.buttonSize / 2 - 8 - menuSize.width / 2 : center.x + Self.buttonSize / 2 + 8 + menuSize.width / 2
-        let y = min(max(center.y, menuSize.height / 2 + 8), container.height - menuSize.height / 2 - 8)
-        return menu { expanded = false; activity += 1 }
-            .padding(6)
-            .background(RoundedRectangle(cornerRadius: 14).fill(Self.surface))
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(.white.opacity(0.35), lineWidth: 1))
-            .shadow(color: .black.opacity(0.45), radius: 8, y: 2)
-            .foregroundStyle(.white)
-            .fixedSize()
-            .background(GeometryReader { proxy in Color.clear.onAppear { menuSize = proxy.size }.onChange(of: proxy.size) { _, new in menuSize = new } })
-            .position(x: x, y: y)
+        let rawX = leftOfButton
+            ? center.x - Self.buttonSize / 2 - 8 - panelWidth / 2
+            : center.x + Self.buttonSize / 2 + 8 + panelWidth / 2
+        let minX = panelWidth / 2 + horizontalPadding
+        let maxX = max(minX, container.width - panelWidth / 2 - horizontalPadding)
+        let x = min(max(rawX, minX), maxX)
+        let minY = visibleHeight / 2 + horizontalPadding
+        let maxY = max(minY, container.height - visibleHeight / 2 - horizontalPadding)
+        let y = min(max(center.y, minY), maxY)
+        return ScrollView(.vertical, showsIndicators: contentHeight > maxPanelHeight) {
+            menu({ expanded = false; activity += 1 }, { activity += 1 })
+                .padding(6)
+                .frame(width: panelWidth, alignment: .leading)
+                .background(
+                    GeometryReader { proxy in
+                        Color.clear
+                            .onAppear { contentHeight = proxy.size.height }
+                            .onChange(of: proxy.size.height) { _, new in contentHeight = new }
+                    }
+                )
+        }
+        .frame(width: panelWidth, height: max(44, visibleHeight))
+        .background(RoundedRectangle(cornerRadius: 14).fill(Self.surface))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(.white.opacity(0.35), lineWidth: 1))
+        .shadow(color: .black.opacity(0.45), radius: 8, y: 2)
+        .foregroundStyle(.white)
+        .position(x: x, y: y)
     }
 }

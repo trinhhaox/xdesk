@@ -13,11 +13,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import vn.xox.xdesk.app.PointerSettingsStore
 import vn.xox.xdesk.app.Screen
 import vn.xox.xdesk.app.ViewerController
 import vn.xox.xdesk.app.connectManual
@@ -32,32 +30,35 @@ import vn.xox.xdesk.transport.KnownHost
 import vn.xox.xdesk.transport.ViewerTarget
 
 /**
- * Màn chính dựng lại theo iOS: tiêu đề lớn "Xdesk" với viên thuốc Tìm lại + Cài đặt, nút quét QR, "Máy Mac của bạn" (kể cả khi NSD không thấy),
- * "Máy Mac khác trên mạng", dòng tóm tắt Cài đặt và "Cách kết nối khác".
+ * Màn chính dựng lại theo iOS: tiêu đề lớn "Xdesk" với viên thuốc Tìm lại / + / Cài đặt,
+ * "Máy Mac của bạn" đưa lên đầu, "Máy Mac khác trên mạng" và "Thêm & kết nối khác".
  */
 @Composable
 fun HostListScreen(controller: ViewerController, onRefresh: () -> Unit) {
     var manual by remember { mutableStateOf("") }
     var forgetting by remember { mutableStateOf<KnownHost?>(null) }
-    val pointerStore = LocalContext.current.let { context -> remember { PointerSettingsStore(context) } }
     val trust = controller.trust
     val directory = controller.directory
+    val hasPaired = directory.paired.isNotEmpty()
     LazyColumn(
         Modifier.fillMaxSize(), contentPadding = PaddingValues(start = XdeskDims.gutter, end = XdeskDims.gutter, top = 8.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(XdeskDims.sectionGap),
     ) {
         item {
-            HomeToolbar(onRefresh) { controller.screen = Screen.SECURITY }
+            HomeToolbar(
+                onRefresh = onRefresh,
+                onSettings = { controller.screen = Screen.SECURITY },
+                onAdd = if (hasPaired) { { controller.openPairing(null) } } else null,
+            )
             Text("Xdesk", Modifier.padding(start = 4.dp, top = 8.dp), fontSize = 34.sp, fontWeight = FontWeight.Bold, lineHeight = 41.sp)
         }
         controller.identityError?.let { item { Text("$it. Vào Cài đặt để đặt lại danh tính.", color = MaterialTheme.colorScheme.error) } }
         controller.failure?.let { failure ->
             item { ConnectionErrorCard(failure, canRepair = controller.pairTarget != null, onRetry = controller::retry, onRepair = { controller.openPairing(controller.pairTarget) }, onDismiss = { controller.failure = null }) }
         }
-        item {
-            if (directory.paired.isEmpty()) EmptyPairingState { controller.openPairing(null) } else ScanQrRow { controller.openPairing(null) }
-        }
-        if (directory.paired.isNotEmpty()) {
+        if (!hasPaired) {
+            item { EmptyPairingState { controller.openPairing(null) } }
+        } else {
             item {
                 Group("Máy Mac của bạn") {
                     directory.paired.forEachIndexed { index, entry ->
@@ -83,12 +84,12 @@ fun HostListScreen(controller: ViewerController, onRefresh: () -> Unit) {
                 }
             }
         }
-        item { SettingsSummaryRow(settingsSummary(controller.display.mode, controller.display.fit, pointerStore.settings.mode)) { controller.screen = Screen.SECURITY } }
         item {
             OtherConnectionsGroup(
                 manual, { manual = it }, { controller.connectManual(it) },
                 canPair = ViewerTarget.parse(normalizeManualAddress(manual)) != null,
                 onPair = { controller.openPairing(ViewerTarget.parse(normalizeManualAddress(manual))) },
+                onScanQr = if (hasPaired) { { controller.openPairing(null) } } else null,
             )
         }
     }

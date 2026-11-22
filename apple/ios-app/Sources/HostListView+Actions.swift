@@ -32,8 +32,7 @@ extension HostListView {
     }
 
     private func normalizeManual(_ text: String) -> String {
-        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        return (!t.isEmpty && !t.contains(":") && !t.hasSuffix("]")) ? "\(t):47800" : t
+        OtherConnectionsSection.normalizedAddress(text)
     }
 
     func connectSaved(_ saved: ManualHost) {

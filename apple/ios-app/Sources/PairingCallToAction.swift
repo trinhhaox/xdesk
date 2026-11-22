@@ -1,23 +1,5 @@
 import SwiftUI
 
-/// Nút chính "Quét mã QR để ghép đôi" ở đầu danh sách khi đã có ít nhất một Mac.
-struct ScanQrRow: View {
-    let action: () -> Void
-
-    var body: some View {
-        Section {
-            Button(action: action) {
-                Label("Quét mã QR để ghép đôi", systemImage: "qrcode.viewfinder")
-                    .font(.headline).foregroundStyle(.white)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-            }
-            .listRowBackground(BrandPalette.primaryFill)
-        } footer: {
-            Text("Trên Mac: menu Xdesk → Ghép đôi thiết bị mới…")
-        }
-    }
-}
-
 /// Màn trống khi chưa ghép với Mac nào: hướng dẫn + quét QR là hành động chính, mã 6 số / nhập địa chỉ là phụ.
 struct EmptyPairingState: View {
     let action: () -> Void

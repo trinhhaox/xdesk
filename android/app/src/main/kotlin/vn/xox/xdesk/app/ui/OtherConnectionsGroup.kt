@@ -28,12 +28,31 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import vn.xox.xdesk.app.ui.theme.extras
 
-/** "Cách kết nối khác": "Nhập địa chỉ" và "Cáp USB", thu gọn mặc định và mở ngay tại chỗ (như DisclosureGroup của iOS). */
+/** "Thêm & kết nối khác" / "Cách kết nối khác": Quét QR (khi đã có máy), "Nhập địa chỉ" và "Cáp USB". */
 @Composable
-internal fun OtherConnectionsGroup(address: String, onAddressChange: (String) -> Unit, onConnect: (String) -> Unit, canPair: Boolean, onPair: () -> Unit) {
+internal fun OtherConnectionsGroup(
+    address: String,
+    onAddressChange: (String) -> Unit,
+    onConnect: (String) -> Unit,
+    canPair: Boolean,
+    onPair: () -> Unit,
+    onScanQr: (() -> Unit)? = null,
+) {
     var addressOpen by rememberSaveable { mutableStateOf(false) }
     var usbOpen by rememberSaveable { mutableStateOf(false) }
-    Group("Cách kết nối khác") {
+    Group(if (onScanQr != null) "Thêm & kết nối khác" else "Cách kết nối khác") {
+        if (onScanQr != null) {
+            GroupRow(onScanQr) {
+                RowIcon(QrScanIcon)
+                TitleAndSubtitle(
+                    "Quét mã QR để ghép đôi",
+                    "Trên Mac: menu Xdesk → Ghép đôi thiết bị mới…",
+                    Modifier.padding(start = XdeskDims.iconGap),
+                )
+                ChevronIcon()
+            }
+            GroupDivider(XdeskDims.rowPad + XdeskDims.iconBox + XdeskDims.iconGap)
+        }
         DisclosureRow(XdeskIcons.Globe, "Nhập địa chỉ", addressOpen) { addressOpen = !addressOpen }
         AnimatedVisibility(addressOpen) {
             Column(Modifier.padding(horizontal = XdeskDims.rowPad, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

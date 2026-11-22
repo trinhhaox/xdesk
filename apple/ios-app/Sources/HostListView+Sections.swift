@@ -25,13 +25,6 @@ extension HostListView {
                     .accessibilityLabel("Bàn phím & Chuột ảo cho \(row.device.name)")
                     // Nút "…" hiện rõ để xoá máy: vuốt/nhấn giữ khó phát hiện.
                     Menu {
-                        Button("Màn hình từ xa", systemImage: "play.display") {
-                            model.isTrackpadOnlyMode = false
-                            tapPaired(row)
-                        }
-                        Button("Bàn phím & Chuột ảo", systemImage: "computermouse.fill") {
-                            tapPairedTrackpad(row)
-                        }
                         Button("Xoá máy này", systemImage: "trash", role: .destructive) { forgetting = row.device }
                     } label: {
                         Image(systemName: "ellipsis.circle").font(.title3)

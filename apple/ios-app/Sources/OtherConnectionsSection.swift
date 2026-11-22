@@ -2,16 +2,42 @@ import SwiftUI
 import XdeskTransport
 import XdeskViewer
 
-/// "Nhập địa chỉ" (LAN/Tailscale) và "Cáp USB": thu gọn mặc định để danh sách máy Mac luôn ở đầu màn hình.
+/// "Thêm & kết nối khác" / "Cách kết nối khác": Quét QR (khi đã có máy), "Nhập địa chỉ" (LAN/Tailscale) và "Cáp USB".
 struct OtherConnectionsSection: View {
     let model: StreamViewModel
     @Binding var manualText: String
+    var onScanQr: (() -> Void)? = nil
     let onConnect: () -> Void
     @State private var addressOpen = false
     @State private var usbOpen = false
 
+    static func normalizedAddress(_ text: String) -> String {
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return (!t.isEmpty && !t.contains(":") && !t.hasSuffix("]")) ? "\(t):47800" : t
+    }
+
     var body: some View {
-        Section("Cách kết nối khác") {
+        Section(onScanQr != nil ? "Thêm & kết nối khác" : "Cách kết nối khác") {
+            if let onScanQr {
+                Button(action: onScanQr) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "qrcode.viewfinder")
+                            .font(.title3)
+                            .foregroundStyle(BrandPalette.primary)
+                            .frame(width: 24)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Quét mã QR để ghép đôi").foregroundStyle(.primary)
+                            Text("Trên Mac: menu Xdesk → Ghép đôi thiết bị mới…")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                    }
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
             DisclosureGroup(isExpanded: $addressOpen) {
                 TextField("192.168.1.10:47800 hoặc 100.x.y.z", text: $manualText)
                     .keyboardType(.numbersAndPunctuation)
@@ -19,7 +45,7 @@ struct OtherConnectionsSection: View {
                     .autocorrectionDisabled()
                     .onSubmit(onConnect)
                     .frame(minHeight: 44)
-                Button("Kết nối", action: onConnect).disabled(ViewerTarget.parse(manual: manualText) == nil)
+                Button("Kết nối", action: onConnect).disabled(ViewerTarget.parse(manual: Self.normalizedAddress(manualText)) == nil)
                 Button("Lưu máy này") { Task { if await model.addManualHost(address: manualText) { manualText = "" } } }
                     .disabled(ManualHostAddress(manualText) == nil)
                 if let error = model.manualHostError {

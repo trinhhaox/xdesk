@@ -79,7 +79,6 @@ fun StreamScreen(controller: ViewerController, window: Window) {
     val pointerStore = remember { PointerSettingsStore(window.context) }
     val floatingStore = remember { FloatingControlStore(window.context) }
     var showPointerSettings by remember { mutableStateOf(false) }
-    var showRemoteTrackpad by remember { mutableStateOf(false) }
     var viewRef by remember { mutableStateOf<StreamViewport?>(null) }
     var zoomed by remember { mutableStateOf(false) }
     val density = LocalDensity.current
@@ -142,27 +141,22 @@ fun StreamScreen(controller: ViewerController, window: Window) {
             AgentHelpBanner(help.reason, onResolved = { controller.resolveAgentHelp(help.id) })
         }
         val actions = floatingActions(
-            controller, pointerStore, zoomed, keyboardShown = imeBottom > 0,
-            onKeyboard = { if (imeBottom > 0) viewRef?.surfaceView?.hideKeyboard() else viewRef?.surfaceView?.showKeyboard() },
+            controller, pointerStore, zoomed,
             onResetZoom = { viewRef?.resetZoom() },
             onSendFile = { filePickerLauncher.launch("*/*") },
-            onRemoteTrackpad = { controller.isTrackpadOnlyMode = true }
         ) { showPointerSettings = true }
-        val shortcuts = dockShortcuts(controller, onRemoteTrackpad = { controller.isTrackpadOnlyMode = true })
-        if (!controller.awaitingFrame && controller.sasPrompt == null) FloatingControl(floatingStore, controller.stats, actions, shortcuts, Modifier.padding(bottom = with(density) { obscured.toDp() }))
+        val quickDock = quickDockShortcuts(
+            controller,
+            keyboardShown = imeBottom > 0,
+            onKeyboard = { if (imeBottom > 0) viewRef?.surfaceView?.hideKeyboard() else viewRef?.surfaceView?.showKeyboard() },
+            onRemoteTrackpad = { controller.isTrackpadOnlyMode = true },
+        )
+        val macShortcuts = macQuickShortcuts(controller)
+        if (!controller.awaitingFrame && controller.sasPrompt == null) {
+            FloatingControl(floatingStore, controller.stats, actions, quickDock, macShortcuts, Modifier.padding(bottom = with(density) { obscured.toDp() }))
+        }
         controller.input?.takeIf { imeBottom > 0 }?.let {
             KeyBar(it, onHide = { viewRef?.surfaceView?.hideKeyboard() }, modifier = Modifier.align(Alignment.BottomCenter).imePadding())
-        }
-    }
-    if (showRemoteTrackpad) {
-        androidx.compose.material3.ModalBottomSheet(
-            onDismissRequest = { showRemoteTrackpad = false },
-            containerColor = Color(0xFF141416)
-        ) {
-            RemoteTrackpadSheet(
-                controller = controller,
-                onDismiss = { showRemoteTrackpad = false }
-            )
         }
     }
     if (showPointerSettings) {
@@ -175,42 +169,44 @@ fun StreamScreen(controller: ViewerController, window: Window) {
 }
 
 private fun floatingActions(
-    controller: ViewerController, store: PointerSettingsStore, zoomed: Boolean, keyboardShown: Boolean,
-    onKeyboard: () -> Unit, onResetZoom: () -> Unit, onSendFile: () -> Unit, onRemoteTrackpad: () -> Unit, onPointerSettings: () -> Unit,
+    controller: ViewerController, store: PointerSettingsStore, zoomed: Boolean,
+    onResetZoom: () -> Unit, onSendFile: () -> Unit, onPointerSettings: () -> Unit,
 ) = buildList {
-    add(FloatingAction("Ngắt kết nối", XdeskIcons.Stop, onClick = controller::disconnect))
-    add(FloatingAction("Chuột & Bàn phím ảo", XdeskIcons.Cursor, "Mở bàn di chuột và phím ảo", onClick = onRemoteTrackpad))
-    add(FloatingAction(if (keyboardShown) "Ẩn bàn phím" else "Bàn phím", XdeskIcons.Keyboard, onClick = onKeyboard))
-    add(FloatingAction("Chuột: ${store.settings.mode.title()}", if (store.settings.mode == PointerMode.DIRECT) XdeskIcons.HandTap else XdeskIcons.Cursor, "Đổi chế độ chuột, đang là ${store.settings.mode.title()}", onClick = store::toggleMode))
-    add(FloatingAction("Cài đặt chuột", XdeskIcons.Sliders, "Cài đặt chuột và con trỏ", onClick = onPointerSettings))
+    add(
+        FloatingAction(
+            label = "Chuột: ${store.settings.mode.title()}",
+            icon = if (store.settings.mode == PointerMode.DIRECT) XdeskIcons.HandTap else XdeskIcons.Cursor,
+            description = "Đổi chế độ chuột, đang là ${store.settings.mode.title()}",
+            trailingIcon = XdeskIcons.Sliders,
+            trailingDescription = "Cài đặt chuột và con trỏ",
+            onTrailingClick = onPointerSettings,
+            onClick = store::toggleMode,
+        ),
+    )
     if (zoomed) add(FloatingAction("Vừa khung màn hình", XdeskIcons.FitScreen, "Thu về vừa khung màn hình", onClick = onResetZoom))
     controller.nextFit()?.let { next -> add(FloatingAction("Kiểu: ${controller.display.fit.title()}", XdeskIcons.Laptop, "Đổi kiểu Bản sao sang ${next.title()}, kết nối lại") { controller.switchFit(next) }) }
-    add(FloatingAction("Chụp màn hình Mac", XdeskIcons.Camera, "Chụp vùng màn hình (⌘ ⇧ 4)") { controller.input?.tapKey(0x21, 9) })
     add(FloatingAction("Gửi tệp sang Mac", XdeskIcons.FileTransfer, "Gửi tệp sang máy Mac", onClick = onSendFile))
+    add(FloatingAction("Ngắt kết nối", XdeskIcons.Stop, isDestructive = true, onClick = controller::disconnect))
 }
 
-private fun dockShortcuts(controller: ViewerController, onRemoteTrackpad: () -> Unit) = listOf(
-    DockShortcut("Trackpad", XdeskIcons.Cursor, "Bàn phím & Chuột ảo") {
-        onRemoteTrackpad()
-    },
-    DockShortcut("Spotlight", XdeskIcons.Search, "Tìm kiếm Spotlight (⌘ Space)") {
-        controller.input?.tapKey(0x2C, 8)
-    },
-    DockShortcut("Mission Control", XdeskIcons.Layers, "Mission Control (⌃ ↑)") {
-        controller.input?.tapKey(0x52, 2)
-    },
-    DockShortcut("App Switcher", XdeskIcons.AppWindow, "Chuyển ứng dụng (⌘ Tab)") {
-        controller.input?.tapKey(0x2B, 8)
-    },
-    DockShortcut("Undo", XdeskIcons.Undo, "Hoàn tác (⌘ Z)") {
-        controller.input?.tapKey(0x1D, 8)
-    },
-    DockShortcut("Lock", XdeskIcons.Lock, "Khóa máy Mac") {
-        controller.sendSystemLock()
-    },
-    DockShortcut("Unlock", XdeskIcons.Unlock, "Mở khóa/đánh thức Mac") {
-        controller.sendSystemUnlock()
-    },
+private fun quickDockShortcuts(
+    controller: ViewerController,
+    keyboardShown: Boolean,
+    onKeyboard: () -> Unit,
+    onRemoteTrackpad: () -> Unit,
+) = listOf(
+    DockShortcut("Trackpad", XdeskIcons.Cursor, "Chuột & Bàn phím ảo", onClick = onRemoteTrackpad),
+    DockShortcut(if (keyboardShown) "Ẩn phím" else "Bàn phím", XdeskIcons.Keyboard, if (keyboardShown) "Ẩn bàn phím" else "Hiện bàn phím", enabled = controller.streaming, onClick = onKeyboard),
+    DockShortcut("Khoá Mac", XdeskIcons.Lock, "Khóa máy Mac") { controller.sendSystemLock() },
+    DockShortcut("Chụp ảnh", XdeskIcons.Camera, "Chụp vùng màn hình Mac (⌘ ⇧ 4)") { controller.input?.tapKey(0x21, 9) },
+)
+
+private fun macQuickShortcuts(controller: ViewerController) = listOf(
+    DockShortcut("Spotlight (⌘ Space)", XdeskIcons.Search) { controller.input?.tapKey(0x2C, 8) },
+    DockShortcut("Mission Control (⌃ ↑)", XdeskIcons.Layers) { controller.input?.tapKey(0x52, 2) },
+    DockShortcut("Chuyển app (⌘ Tab)", XdeskIcons.AppWindow) { controller.input?.tapKey(0x2B, 8) },
+    DockShortcut("Hoàn tác (⌘ Z)", XdeskIcons.Undo) { controller.input?.tapKey(0x1D, 8) },
+    DockShortcut("Mở khoá Mac", XdeskIcons.Unlock) { controller.sendSystemUnlock() },
 )
 
 @Composable
@@ -223,18 +219,18 @@ private fun AgentHelpBanner(reason: String, onResolved: () -> Unit) {
     ) {
         Row(
             Modifier
-                .background(Color(0xFF1E1E1E), shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                .background(XdeskOverlay.bar, shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
                 .padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Column(Modifier.weight(1f)) {
-                Text("Agent AI cần trợ giúp", color = Color(0xFFFFB74D), fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                Text(reason, color = Color.White, fontSize = 12.sp, maxLines = 2)
+                Text("Agent AI cần trợ giúp", color = XdeskOverlay.warning, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Text(reason, color = XdeskOverlay.content, fontSize = 12.sp, maxLines = 2)
             }
             Button(
                 onClick = onResolved,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32), contentColor = Color.White)
+                colors = ButtonDefaults.buttonColors(containerColor = XdeskOverlay.good, contentColor = XdeskOverlay.content)
             ) {
                 Text("Đã xong", fontSize = 12.sp)
             }

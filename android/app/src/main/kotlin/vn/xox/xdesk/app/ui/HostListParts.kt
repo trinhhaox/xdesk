@@ -12,8 +12,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.DropdownMenu
@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import vn.xox.xdesk.app.discovery.HostBadge
@@ -41,23 +42,20 @@ import vn.xox.xdesk.app.discovery.PairedEntry
 import vn.xox.xdesk.app.ui.theme.extras
 import vn.xox.xdesk.transport.KnownHost
 
-/** Viên thuốc góc phải trên cùng chứa "Tìm lại" và "Cài đặt" (kính mờ của thanh công cụ iOS). */
+/** Viên thuốc góc phải trên cùng chứa "Tìm lại", "+" (khi đã có máy) và "Cài đặt". */
 @Composable
-internal fun HomeToolbar(onRefresh: () -> Unit, onSettings: () -> Unit) = Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-    Surface(shape = CircleShape, color = MaterialTheme.extras.toolbarPill, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))) {
-        Row(Modifier.padding(horizontal = 4.dp)) {
-            IconButton(onRefresh) { Icon(Icons.Filled.Refresh, contentDescription = "Tìm lại", tint = MaterialTheme.colorScheme.primary) }
-            IconButton(onSettings) { Icon(Icons.Outlined.Settings, contentDescription = "Cài đặt", tint = MaterialTheme.colorScheme.primary) }
+internal fun HomeToolbar(onRefresh: () -> Unit, onSettings: () -> Unit, onAdd: (() -> Unit)? = null) =
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+        Surface(shape = CircleShape, color = MaterialTheme.extras.toolbarPill, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))) {
+            Row(Modifier.padding(horizontal = 4.dp)) {
+                IconButton(onRefresh) { Icon(Icons.Filled.Refresh, contentDescription = "Tìm lại", tint = MaterialTheme.colorScheme.primary) }
+                if (onAdd != null) {
+                    IconButton(onAdd) { Icon(Icons.Filled.Add, contentDescription = "Thêm máy Mac", tint = MaterialTheme.colorScheme.primary) }
+                }
+                IconButton(onSettings) { Icon(Icons.Outlined.Settings, contentDescription = "Cài đặt", tint = MaterialTheme.colorScheme.primary) }
+            }
         }
     }
-}
-
-/** Nút chính "Quét mã QR để ghép đôi" (nền primaryFill, chữ trắng, bo tròn hết) kèm chú thích cách mở mã trên Mac. */
-@Composable
-internal fun ScanQrRow(onClick: () -> Unit) = Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-    ScanQrButton(onClick)
-    GroupFooter("Trên Mac: menu Xdesk → Ghép đôi thiết bị mới…")
-}
 
 @Composable
 internal fun ScanQrButton(onClick: () -> Unit) = Surface(onClick, Modifier.fillMaxWidth().heightIn(min = 64.dp), shape = CircleShape, color = MaterialTheme.extras.primaryFill, contentColor = Color.White) {
@@ -80,7 +78,7 @@ internal fun EmptyPairingState(onScan: () -> Unit) = Column(Modifier.fillMaxWidt
     )
 }
 
-/** Mac đã ghép: biểu tượng máy, tên, trạng thái mạng, nhãn "Đã ghép" và menu "…" (Kết nối / Xoá máy này). */
+/** Mac đã ghép: biểu tượng máy, tên, trạng thái mạng, nút chuột/bàn phím ảo và menu "…" (Xoá máy này). */
 @Composable
 internal fun PairedHostRow(entry: PairedEntry, onConnect: () -> Unit, onOpenTrackpad: () -> Unit, onForget: () -> Unit) {
     var menu by remember { mutableStateOf(false) }
@@ -90,19 +88,19 @@ internal fun PairedHostRow(entry: PairedEntry, onConnect: () -> Unit, onOpenTrac
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RowIcon(XdeskIcons.Monitor, if (offline) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary)
-        Column(Modifier.weight(1f).padding(start = XdeskDims.iconGap)) {
-            Text(entry.known.name, fontSize = 17.sp, lineHeight = 22.sp)
-            Text(entry.status.label, fontSize = 15.sp, lineHeight = 20.sp, color = if (entry.status == HostStatus.Ready) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(Modifier.weight(1f).padding(start = XdeskDims.iconGap, end = 4.dp)) {
+            Text(entry.known.name, fontSize = 17.sp, lineHeight = 22.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(
+                entry.status.label, fontSize = 14.sp, lineHeight = 19.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                color = if (entry.status == HostStatus.Ready) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
-        BadgeText(HostBadge.PAIRED, Modifier.padding(start = 6.dp))
         IconButton(onOpenTrackpad) {
             Icon(XdeskIcons.Cursor, contentDescription = "Bàn phím & Chuột ảo cho ${entry.known.name}", Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary)
         }
         Box {
             IconButton({ menu = true }) { Icon(XdeskIcons.EllipsisCircle, contentDescription = "Tuỳ chọn cho ${entry.known.name}", Modifier.size(26.dp), tint = MaterialTheme.colorScheme.primary) }
             DropdownMenu(menu, { menu = false }) {
-                DropdownMenuItem({ Text("Màn hình từ xa") }, { menu = false; onConnect() }, leadingIcon = { Icon(Icons.Filled.PlayArrow, contentDescription = null) })
-                DropdownMenuItem({ Text("Bàn phím & Chuột ảo") }, { menu = false; onOpenTrackpad() }, leadingIcon = { Icon(XdeskIcons.Cursor, contentDescription = null) })
                 DropdownMenuItem(
                     { Text("Xoá máy này", color = MaterialTheme.colorScheme.error) }, { menu = false; onForget() },
                     leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
@@ -132,16 +130,6 @@ private fun BadgeText(badge: HostBadge, modifier: Modifier = Modifier) {
     Text(badge.label, modifier, color = color, fontSize = 13.sp, fontWeight = FontWeight.Bold)
 }
 
-/** Dòng "Cài đặt" kèm tóm tắt hiện tại, ví dụ "Bản sao · Vừa với điện thoại · Chạm trực tiếp". */
-@Composable
-internal fun SettingsSummaryRow(summary: String, onClick: () -> Unit) = Group {
-    GroupRow(onClick) {
-        Icon(Icons.Outlined.Settings, contentDescription = null, Modifier.size(XdeskDims.iconBox), tint = MaterialTheme.colorScheme.primary)
-        TitleAndSubtitle("Cài đặt", summary, Modifier.padding(start = XdeskDims.iconGap))
-        ChevronIcon()
-    }
-}
-
 /** Hộp xác nhận xoá một Mac đã ghép; dùng chung cho màn chính và Cài đặt. */
 @Composable
 internal fun ForgetHostDialog(host: KnownHost, onConfirm: () -> Unit, onDismiss: () -> Unit) {
@@ -149,6 +137,6 @@ internal fun ForgetHostDialog(host: KnownHost, onConfirm: () -> Unit, onDismiss:
         "Xoá ${host.name}?",
         "Điện thoại sẽ không tự kết nối tới máy này nữa. Muốn dùng lại phải ghép đôi lại. " +
             "(Trên Mac, thiết bị này vẫn có trong danh sách cho tới khi bạn thu hồi.)",
-        "Xoá", onConfirm, onDismiss,
+        "Xoá", onConfirm = onConfirm, destructive = true, onDismiss = onDismiss,
     )
 }
