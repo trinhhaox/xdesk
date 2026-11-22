@@ -25,9 +25,13 @@ test-apple:
 test-mac: gen
 	xcodebuild test -project apple/mac-app/Xdesk.xcodeproj -scheme Xdesk-mac -destination 'platform=macOS'
 
+# Chạy test thật trên Simulator. Chọn máy: make test-ios IOS_SIM_ID=<udid>; mặc định lấy iPhone đầu tiên còn dùng được.
+IOS_SIM_ID := $(or $(IOS_SIM_ID),$(shell xcrun simctl list devices available 2>/dev/null | grep -m1 'iPhone' | grep -Eo '[0-9A-F-]{36}'))
+
 test-ios: gen
-	xcodebuild build-for-testing -project apple/ios-app/XdeskIOS.xcodeproj -scheme Xdesk-ios -configuration Debug \
-		-destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO
+	@test -n "$(IOS_SIM_ID)" || { echo "Không tìm thấy iPhone Simulator: tạo bằng Xcode hoặc truyền IOS_SIM_ID=<udid>"; exit 1; }
+	xcodebuild test -project apple/ios-app/XdeskIOS.xcodeproj -scheme Xdesk-ios -configuration Debug \
+		-destination 'platform=iOS Simulator,id=$(IOS_SIM_ID)' CODE_SIGNING_ALLOWED=NO
 
 test-android:
 	cd android && ./gradlew test
