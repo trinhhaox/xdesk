@@ -108,12 +108,15 @@ fun StreamScreen(controller: ViewerController, window: Window) {
     LaunchedEffect(controller.input) { viewRef?.resetZoom() }
 
     if (controller.isTrackpadOnlyMode) {
-        RemoteTrackpadSheet(
-            controller = controller,
-            isFullscreen = true,
-            onSwitchToScreen = { controller.isTrackpadOnlyMode = false },
-            onDismiss = controller::disconnect
-        )
+        Box(Modifier.fillMaxSize()) {
+            RemoteTrackpadSheet(
+                controller = controller,
+                isFullscreen = true,
+                onSwitchToScreen = { controller.isTrackpadOnlyMode = false },
+                onDismiss = controller::disconnect
+            )
+            Overlay(controller, waitForFrame = false)
+        }
         return
     }
 
@@ -241,11 +244,11 @@ private fun AgentHelpBanner(reason: String, onResolved: () -> Unit) {
 
 /** Mã SAS có lớp phủ riêng; còn lại, từ lúc chạm Mac tới khung hình đầu tiên là lớp phủ "Đang kết nối" có nút Huỷ. */
 @Composable
-private fun Overlay(controller: ViewerController) {
+private fun Overlay(controller: ViewerController, waitForFrame: Boolean = true) {
     val prompt = controller.sasPrompt
     if (prompt != null) {
         Box(Modifier.fillMaxSize().background(XdeskOverlay.scrim), contentAlignment = Alignment.Center) { SasCodeView(prompt) }
-    } else if (controller.awaitingFrame) {
+    } else if (if (waitForFrame) controller.awaitingFrame else controller.connecting) {
         ConnectingOverlay(controller.progress.targetName, onCancel = controller::disconnect)
     }
 }

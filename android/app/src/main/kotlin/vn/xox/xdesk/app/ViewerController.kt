@@ -77,7 +77,10 @@ class ViewerController(internal val container: AppContainer, private val deviceN
 
     fun connect(target: ViewerTarget) = start(listOf(target), ViewerAuth.Automatic)
 
-    fun pairWithSas(target: ViewerTarget) = start(listOf(target), ViewerAuth.Sas { prompt -> post { if (prompt.isPending) sasPrompt = prompt } }, isPairing = true)
+    fun pairWithSas(target: ViewerTarget) {
+        isTrackpadOnlyMode = false
+        start(listOf(target), ViewerAuth.Sas { prompt -> post { if (prompt.isPending) sasPrompt = prompt } }, isPairing = true)
+    }
 
     internal fun start(targets: List<ViewerTarget>, auth: ViewerAuth, isPairing: Boolean = false) {
         val trust = trust ?: return run { failure = ConnectionFailure(identityError.orEmpty(), false) }
@@ -118,7 +121,7 @@ class ViewerController(internal val container: AppContainer, private val deviceN
             ViewerState.Connecting -> connecting = true
             ViewerState.Idle -> { connecting = false; streaming = false }
             is ViewerState.Failed -> {
-                connecting = false; streaming = false; sasPrompt = null; agentApproval = null
+                connecting = false; streaming = false; sasPrompt = null; agentApproval = null; isTrackpadOnlyMode = false
                 decoder.stop()
                 failure = ConnectionFailure(state.message, state.code in REPAIRABLE_CODES, state.code, progress.targetName)
                 progress.finish(false)
@@ -144,7 +147,9 @@ class ViewerController(internal val container: AppContainer, private val deviceN
         // Giống màn hình Mac: cỡ thật do host quyết (tới 2560 cạnh dài) nên báo trần để decoder khỏi cấu hình lại.
         val maxSize = if (isNativeMirror) mapOf(MediaFormat.KEY_MAX_WIDTH to NATIVE_MAX_EDGE, MediaFormat.KEY_MAX_HEIGHT to NATIVE_MAX_EDGE) else emptyMap()
         val mime = if (config.codec == VideoCodec.HEVC) AndroidCodecList.MIME_HEVC else AndroidCodecList.MIME_AVC
-        decoder.start(target, config.w.toInt(), config.h.toInt(), maxSize, mime = mime)
+        if (decoder.start(target, config.w.toInt(), config.h.toInt(), maxSize, mime = mime)) {
+            session?.requestKeyframe()
+        }
     }
 
     private fun onVideoSize(w: Int, h: Int) {
@@ -157,6 +162,7 @@ class ViewerController(internal val container: AppContainer, private val deviceN
         // Huỷ lúc đang so mã: trả lời "không khớp" để đóng kết nối và nhả luồng đang chờ ngay.
         sasPrompt?.answer(false)
         sasPrompt = null
+        isTrackpadOnlyMode = false
         val ending = session ?: return
         endSession()
         session = null

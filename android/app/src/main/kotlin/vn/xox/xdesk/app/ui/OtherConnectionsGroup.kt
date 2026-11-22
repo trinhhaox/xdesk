@@ -30,7 +30,7 @@ import vn.xox.xdesk.app.ui.theme.extras
 
 /** "Cách kết nối khác": "Nhập địa chỉ" và "Cáp USB", thu gọn mặc định và mở ngay tại chỗ (như DisclosureGroup của iOS). */
 @Composable
-internal fun OtherConnectionsGroup(address: String, onAddressChange: (String) -> Unit, onConnect: () -> Unit, canPair: Boolean, onPair: () -> Unit) {
+internal fun OtherConnectionsGroup(address: String, onAddressChange: (String) -> Unit, onConnect: (String) -> Unit, canPair: Boolean, onPair: () -> Unit) {
     var addressOpen by rememberSaveable { mutableStateOf(false) }
     var usbOpen by rememberSaveable { mutableStateOf(false) }
     Group("Cách kết nối khác") {
@@ -40,7 +40,7 @@ internal fun OtherConnectionsGroup(address: String, onAddressChange: (String) ->
                 OutlinedTextField(address, onAddressChange, Modifier.fillMaxWidth(), label = { Text("192.168.1.10:47800 hoặc 100.x.y.z") }, singleLine = true)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Button(
-                        onConnect, Modifier.heightIn(min = 48.dp), enabled = address.isNotBlank(),
+                        { onConnect(address) }, Modifier.heightIn(min = 48.dp), enabled = address.isNotBlank(),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.extras.primaryFill, contentColor = Color.White),
                     ) { Text("Kết nối") }
                     OutlinedButton(onPair, Modifier.heightIn(min = 48.dp), enabled = canPair) { Text("Ghép đôi") }
@@ -62,7 +62,7 @@ internal fun OtherConnectionsGroup(address: String, onAddressChange: (String) ->
                 Button(
                     onClick = {
                         onAddressChange("127.0.0.1:47800")
-                        onConnect()
+                        onConnect("127.0.0.1:47800")
                     },
                     modifier = Modifier.heightIn(min = 44.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.extras.primaryFill, contentColor = Color.White),

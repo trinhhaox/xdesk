@@ -11,8 +11,8 @@ android {
         applicationId = "vn.xox.xdesk"
         minSdk = 31
         targetSdk = 36
-        versionCode = 8
-        versionName = "0.1.8-beta"
+        versionCode = 9
+        versionName = "0.1.9-beta"
     }
     buildFeatures { compose = true }
     // Khoá ký đọc từ biến môi trường do tools/release-android.sh đặt; không bao giờ nằm trong repo.

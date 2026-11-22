@@ -167,6 +167,7 @@ final class StreamViewModel {
     func failIfNeeded() {
         guard inStream, case .failed(let message) = session.state else { return }
         inStream = false
+        isTrackpadOnlyMode = false
         errorMessage = message
         // Phiên có thể vừa bị thu hồi (host đã bị xoá khỏi danh sách) → cập nhật nhãn "Đã ghép"/"Chưa ghép".
         Task {

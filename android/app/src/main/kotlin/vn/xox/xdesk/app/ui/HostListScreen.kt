@@ -25,6 +25,7 @@ import vn.xox.xdesk.app.connectPaired
 import vn.xox.xdesk.app.directory
 import vn.xox.xdesk.app.discovery.HostBadge
 import vn.xox.xdesk.app.forgetHost
+import vn.xox.xdesk.app.normalizeManualAddress
 import vn.xox.xdesk.app.openPairing
 import vn.xox.xdesk.app.retry
 import vn.xox.xdesk.transport.KnownHost
@@ -85,8 +86,9 @@ fun HostListScreen(controller: ViewerController, onRefresh: () -> Unit) {
         item { SettingsSummaryRow(settingsSummary(controller.display.mode, controller.display.fit, pointerStore.settings.mode)) { controller.screen = Screen.SECURITY } }
         item {
             OtherConnectionsGroup(
-                manual, { manual = it }, { controller.connectManual(manual) },
-                canPair = ViewerTarget.parse(manual) != null, onPair = { controller.openPairing(ViewerTarget.parse(manual)) },
+                manual, { manual = it }, { controller.connectManual(it) },
+                canPair = ViewerTarget.parse(normalizeManualAddress(manual)) != null,
+                onPair = { controller.openPairing(ViewerTarget.parse(normalizeManualAddress(manual))) },
             )
         }
     }

@@ -26,10 +26,15 @@ struct StreamView: View {
     }
 
     var body: some View {
-        if model.isTrackpadOnlyMode {
-            RemoteTrackpadView(model: model, onClose: { model.isTrackpadOnlyMode = false })
-        } else {
-            streamContent
+        ZStack {
+            if model.isTrackpadOnlyMode {
+                RemoteTrackpadView(model: model, onClose: { model.isTrackpadOnlyMode = false })
+            } else {
+                streamContent
+            }
+            if model.session.state != .streaming {
+                connectingOverlay
+            }
         }
     }
 
@@ -41,9 +46,6 @@ struct StreamView: View {
                     renderer: model.session.renderer, session: model.session, config: model.currentConfig,
                     composer: composer, pointer: pointer.settings, zoom: zoom
                 )
-                if model.session.state != .streaming {
-                    connectingOverlay
-                }
                 FloatingControl(store: floating, container: floatingArea(proxy.size)) { close in menuItems(close) }
                 if !composer.preview.isEmpty { composingPreview }
                 if let help = model.session.pendingAgentHelp { agentHelpBanner(help) }
@@ -99,6 +101,7 @@ struct StreamView: View {
             if model.isPairing { SasView(prompt: model.sasPrompt) } else { connectingCard }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.black.opacity(0.75).ignoresSafeArea())
     }
 
     /// Từ lúc chạm máy Mac tới khung hình đầu tiên: tên máy, vòng quay và nút Huỷ quay về danh sách.

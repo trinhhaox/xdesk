@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.sp
 import vn.xox.xdesk.app.Screen
 import vn.xox.xdesk.app.ViewerController
 import vn.xox.xdesk.app.describe
+import vn.xox.xdesk.app.normalizeManualAddress
 import vn.xox.xdesk.app.pairWithQr
 import vn.xox.xdesk.app.ui.theme.XdeskOverlay
 import vn.xox.xdesk.app.ui.theme.extras
@@ -56,7 +57,7 @@ import vn.xox.xdesk.transport.ViewerTarget
 fun PairingScreen(controller: ViewerController) {
     var link by remember { mutableStateOf("") }
     var address by remember { mutableStateOf(controller.pairTarget?.address.orEmpty()) }
-    val target = ViewerTarget.parse(address)
+    val target = ViewerTarget.parse(normalizeManualAddress(address))
     SettingsScaffold("Quét mã QR trên Mac", { controller.screen = Screen.HOSTS }) {
         item {
             Group(footer = "Trên Mac: menu Xdesk → \"Ghép đôi thiết bị mới…\", rồi hướng camera vào mã QR.") {

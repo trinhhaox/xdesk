@@ -31,13 +31,18 @@ extension HostListView {
         }
     }
 
+    private func normalizeManual(_ text: String) -> String {
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return (!t.isEmpty && !t.contains(":") && !t.hasSuffix("]")) ? "\(t):47800" : t
+    }
+
     func connectSaved(_ saved: ManualHost) {
-        guard let target = ViewerTarget.parse(manual: saved.address) else { return }
+        guard let target = ViewerTarget.parse(manual: normalizeManual(saved.address)) else { return }
         connectOrChoose(target)
     }
 
     func connectManual() {
-        guard let target = ViewerTarget.parse(manual: manualText) else { return }
+        guard let target = ViewerTarget.parse(manual: normalizeManual(manualText)) else { return }
         connectOrChoose(target)
     }
 
