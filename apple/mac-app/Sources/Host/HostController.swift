@@ -45,6 +45,8 @@ final class HostController {
     private(set) var lastReceivedFile: FileTransferCompletion?
     private(set) var fileTransferError: String?
     let usb = UsbDeviceMonitor()
+    /// Tự `adb reverse` cho Android cắm cáp khi đang chia sẻ.
+    let adbReverse = AdbReverseWatcher()
     var usbMessage: String?
     private let log = Logger(subsystem: "vn.xox.xdesk", category: "host-controller")
     let security: SecurityCenter
@@ -98,6 +100,7 @@ final class HostController {
             let port = try await startListener(listener)
             self.listener = listener
             status = .listening(port: port)
+            await adbReverse.start(publicPort: Self.preferredPort, hostPort: port)
             acceptTask = Task { [weak self] in
                 for await connection in listener.connections { self?.admit(connection) }
             }
@@ -171,6 +174,7 @@ final class HostController {
     func stop() async {
         acceptTask?.cancel()
         acceptTask = nil
+        await adbReverse.stop()
         await listener?.stop()
         listener = nil
         let running = Array(sessions.values)
