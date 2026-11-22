@@ -1,15 +1,15 @@
 # Kết nối agent AI với Xdesk qua MCP
 
-Xdesk có sẵn một máy chủ MCP cục bộ để agent AI (Claude Code, Cursor, Codex…) đọc trạng thái và điều khiển một màn hình ảo riêng tên **"Xdesk Agent"**, không đụng tới màn hình của bạn. Mặc định **TẮT**. Cả 14 tool đều chạy thật; mọi tool ngoài `xdesk_status`, `xdesk_request_control`, `xdesk_end_control` chỉ hoạt động khi bạn đã cấp quyền.
+Xdesk có sẵn một máy chủ MCP cục bộ để agent AI (Claude Code, Cursor, Codex…) đọc trạng thái và điều khiển một màn hình ảo riêng tên **"Xdesk Agent"**, không đụng tới màn hình của bạn. Mặc định **TẮT**. Cả 15 tool đều chạy thật; mọi tool ngoài `xdesk_status`, `xdesk_request_control`, `xdesk_end_control` chỉ hoạt động khi bạn đã cấp quyền.
 
 ## Bật máy chủ
 
-1. Biểu tượng Xdesk trên thanh menu, bật **Cho phép agent AI (MCP)**.
-2. Menu hiện `Agent AI: 127.0.0.1:47810`. Cổng mặc định là **47810** (host chia sẻ màn hình dùng 47800).
+1. Mở **Cài đặt** của Xdesk (⌘, hoặc biểu tượng Xdesk trên thanh menu › Cài đặt), tab **Agent AI**, bật **Cho phép agent AI (MCP)**.
+2. Tab hiện **Địa chỉ** `127.0.0.1:47810`. Cổng mặc định là **47810** (host chia sẻ màn hình dùng 47800).
 3. Đổi cổng: `defaults write vn.xox.xdesk mcp.port -int 47811`, rồi tắt/bật lại công tắc. Giá trị ngoài 1024-65535 bị bỏ qua.
 4. Công tắc được nhớ giữa các lần mở app.
 
-Menu có thêm:
+Tab **Agent AI** có thêm:
 
 - **Sao chép lệnh cấu hình**: chép sẵn lệnh `claude mcp add ...` kèm token vào clipboard (đánh dấu ẩn với trình quản lý clipboard).
 - **Đổi token**: tạo token mới ngay, mọi agent đang dùng token cũ nhận 401 và phải cấu hình lại.
@@ -70,7 +70,7 @@ Trong lúc agent điều khiển, một banner luôn nằm trên cùng màn hìn
 ## Màn hình "Xdesk Agent"
 
 - Sau `xdesk_end_control` (hoặc khi bạn bấm Dừng), màn hình agent **vẫn được giữ** để bạn xem lại kết quả. Banner ẩn đi.
-- Gỡ bằng mục **Gỡ màn hình agent** trên menu Xdesk (chỉ hiện khi màn hình đang tồn tại). Tắt công tắc MCP cũng gỡ nó.
+- Gỡ bằng mục **Gỡ màn hình agent** ở tab Agent AI trong Cài đặt (chỉ hiện khi màn hình đang tồn tại). Tắt công tắc MCP cũng gỡ nó.
 - Chỉ dùng được khi hệ thống tạo được màn hình ảo thật. Nếu macOS chỉ cho phản chiếu màn hình chính thì Xdesk từ chối cấp, vì agent không bao giờ được điều khiển màn hình của bạn.
 - `xdesk_set_workspace_size` đổi kích thước trong khoảng 640x480 đến 3840x2160 (màn hình được tạo lại, `ref` cũ hết hiệu lực).
 
@@ -86,7 +86,7 @@ Mỗi lần agent thao tác, Xdesk kiểm ứng dụng đích (cửa sổ dướ
 
 - App chưa có luật: **hỏi**.
 - Mặc định chặn (`never`): Cài đặt hệ thống (`com.apple.systempreferences`, kể cả mở thẳng bằng URL `x-apple.systempreferences:`), Truy cập chuỗi khoá (`com.apple.keychainaccess`), Terminal (`com.apple.Terminal`).
-- Sửa luật và thời gian im lặng (15 đến 1800 giây, mặc định 120) ở **Cài đặt agent AI…** trên menu Xdesk; lưu trong UserDefaults của app.
+- Sửa luật và thời gian im lặng (15 đến 1800 giây, mặc định 120) ở tab **Agent AI** trong Cài đặt (mục thời gian im lặng và luật theo app); lưu trong UserDefaults của app.
 - Gõ vào ô mật khẩu (`AXSecureTextField`) bị từ chối.
 
 ## Quyền macOS cần cấp cho Xdesk
@@ -95,7 +95,7 @@ Mỗi lần agent thao tác, Xdesk kiểm ứng dụng đích (cửa sổ dướ
 | --- | --- | --- |
 | **Trợ năng** (Accessibility) | Chèn chuột/bàn phím, đọc cây giao diện (`xdesk_ui_tree`), đưa cửa sổ lên màn hình agent (`xdesk_launch`) | Tool báo lỗi kèm hướng dẫn |
 | **Ghi màn hình** (Screen Recording) | `xdesk_screenshot` | Tool báo lỗi kèm đường dẫn cài đặt |
-| **Giám sát đầu vào** (Input Monitoring) | Phát hiện bạn chạm vào màn hình agent để tự tạm dừng | Agent vẫn chạy nhưng không tự dừng khi bạn chạm; menu hiện "Thiếu quyền Giám sát đầu vào" |
+| **Giám sát đầu vào** (Input Monitoring) | Phát hiện bạn chạm vào màn hình agent để tự tạm dừng | Agent vẫn chạy nhưng không tự dừng khi bạn chạm; tab Agent AI hiện "Thiếu quyền Giám sát đầu vào" |
 
 Cấp ở Cài đặt hệ thống › Quyền riêng tư & Bảo mật. Xdesk không tự cấp được các quyền này.
 
@@ -126,9 +126,13 @@ Khi agent xin quyền (hoặc xin dùng một app có luật `ask`), Xdesk gửi
 - Method: `initialize`, `notifications/initialized` (202), `ping`, `tools/list`, `tools/call`. Method lạ trả -32601, JSON hỏng trả -32700.
 - Lỗi của tool đi qua `isError: true` trong kết quả, không phải lỗi JSON-RPC. Tool không tồn tại là -32602.
 
-## Bộ tool (14)
+## Bộ tool (15)
 
-`xdesk_status` (chạy thật), `xdesk_request_control`, `xdesk_end_control`, `xdesk_screenshot`, `xdesk_ui_tree`, `xdesk_pointer`, `xdesk_scroll`, `xdesk_type_text`, `xdesk_press_keys`, `xdesk_run_steps`, `xdesk_launch`, `xdesk_set_workspace_size`, `xdesk_clipboard_read`, `xdesk_clipboard_write`. Schema và annotation (`readOnlyHint`, `destructiveHint`) lấy từ `tools/list`.
+`xdesk_status` (chạy thật), `xdesk_request_control`, `xdesk_end_control`, `xdesk_screenshot`, `xdesk_ui_tree`, `xdesk_pointer`, `xdesk_scroll`, `xdesk_type_text`, `xdesk_press_keys`, `xdesk_run_steps`, `xdesk_launch`, `xdesk_set_workspace_size`, `xdesk_clipboard_read`, `xdesk_clipboard_write`, `xdesk_request_user_help`. Schema và annotation (`readOnlyHint`, `destructiveHint`) lấy từ `tools/list`.
+
+### `xdesk_request_user_help`
+
+Agent gọi khi gặp việc chỉ người dùng làm được (giải CAPTCHA, 2FA, nhập OTP, đăng nhập tài khoản). Tham số: `reason` (chuỗi, cắt còn 300 ký tự) và `timeoutSeconds` (mặc định 120, kẹp 10-600). Xdesk gửi `agent.help` tới các điện thoại đang kết nối; tool **chờ** tới khi người dùng báo đã xử lý xong trên điện thoại (thiết bị cần quyền điều khiển) rồi trả thành công, hết giờ thì trả lỗi `timeout`. Cũng là tool cần quyền điều khiển đang hiệu lực như các tool khác (ngoài ba tool đầu).
 
 ## Kiểm thử nhanh
 

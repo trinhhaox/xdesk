@@ -1,6 +1,6 @@
 # Xdesk Wire v1 — Mã hoá, bắt tay và ghép đôi
 
-Trạng thái: **đầy đủ để cài đặt** (Swift: `apple/Packages/XdeskKit/Sources/XdeskCrypto`; Kotlin: phase 07).
+Trạng thái: **đã cài đặt** ở cả hai nền tảng (Swift: `apple/Packages/XdeskKit/Sources/XdeskCrypto`; Kotlin: `android/crypto`), cùng chạy xanh `noise-*.json` và `crypto-session.json`.
 Vector cho từng byte: `protocol/test-vectors/noise-*.json` (cacophony, công khai) và `crypto-session.json` (của Xdesk, sinh bởi `tools/gen-test-vectors`).
 
 ## 1. Thuật toán
@@ -12,7 +12,7 @@ Vector cho từng byte: `protocol/test-vectors/noise-*.json` (cacophony, công k
 
 ## 2. Danh tính thiết bị
 
-- Mỗi thiết bị có một khoá tĩnh X25519 (32 byte), sinh lần đầu, **không bao giờ rời thiết bị**. Mac/iOS: Keychain generic password trong **data-protection keychain** (`kSecUseDataProtectionKeychain`, `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`, `kSecAttrSynchronizable=false`; app phải ký bằng Team ID — thiếu entitlement thì thư viện báo `dataProtectionKeychainUnavailable` hoặc, ở chế độ `preferred`, rơi về login keychain cũ và báo qua `backend`). Android: lưu mã hoá bằng khoá Android Keystore (phase 07). Mất khoá = ghép đôi lại.
+- Mỗi thiết bị có một khoá tĩnh X25519 (32 byte), sinh lần đầu, **không bao giờ rời thiết bị**. Mac/iOS: Keychain generic password trong **data-protection keychain** (`kSecUseDataProtectionKeychain`, `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`, `kSecAttrSynchronizable=false`; app phải ký bằng Team ID — thiếu entitlement thì thư viện báo `dataProtectionKeychainUnavailable` hoặc, ở chế độ `preferred`, rơi về login keychain cũ và báo qua `backend`). Android: lưu mã hoá bằng khoá Android Keystore (`android/app/.../identity/KeystoreIdentityStore.kt`). Mất khoá = ghép đôi lại.
 - **Fingerprint** = 8 byte đầu `SHA-256(pub)`, hex HOA, nhóm 4 ký tự nối bằng `-`: `AB12-CD34-EF56-7890`. Cũng là `id` của thiết bị đã ghép và giá trị `id` trong TXT Bonjour của host. Ví dụ pub = 32 byte 0 → `6668-7AAD-F862-BD77`.
 - `PairedDevicesStore` (JSON, `schemaVersion` 1): `{schemaVersion, devices:[{id, name, pub (base64url), role: 0 host|1 viewer, createdAt, lastSeen?, permissions:{view,input,clipboard,audio}}], mac}`.
   `mac` = base64url `HMAC-SHA256(key, "xdesk v1 paired-devices" 0x00 | JSON chuẩn của {schemaVersion, devices})` (JSON chuẩn = bộ mã hoá sortedKeys, ngày ISO-8601 giây; không có trường `mac`), `key` = 32 B ngẫu nhiên trong Keychain cùng lớp truy cập với khoá tĩnh. File sai/thiếu MAC → coi là rỗng, bật cờ `integrityFailure` (fail-closed; UI phải báo). Tra cứu thiết bị luôn theo **khoá công khai đầy đủ 32 B** (so sánh hằng thời gian); `id` 64 bit chỉ để hiển thị. Thêm khoá có `id` trùng nhưng khác khoá → lỗi `deviceIdCollision`. File ghi 0600 (thư mục 0700). Mặc định thiết bị mới: view + input bật, clipboard + audio tắt. File lạ phiên bản hoặc hỏng → báo lỗi, không tự xoá.
@@ -148,11 +148,11 @@ Frame `0x02/0x03/0x04` mã hoá. Khung vẫn là `len | kind | payload` (`framin
 
 Mọi lỗi mật mã là `CryptoError` (Swift), kể cả điểm bậc thấp (CryptoKit tự ném → gói thành `invalidDiffieHellman`; kiểm DH toàn số 0 vẫn bắt buộc cho cổng Kotlin/JCA); không log khoá, nonce, token, psk, hash.
 
-## 11. Ghi chú Android (phase 07)
+## 11. Ghi chú Android
 
-JCA cần: X25519 (`XDH`), ChaCha20-Poly1305, HMAC-SHA256, SHA-256, HKDF tự cài trên HMAC. Phải kiểm API tối thiểu trên JP1; nếu thiếu thì dùng thư viện đã kiểm định (Tink/BouncyCastle — hỏi user). Kotlin phải chạy xanh `noise-*.json`, `crypto-session.json`.
+`android/crypto` dùng JCA, không thư viện ngoài: ChaCha20-Poly1305, SHA-256, HmacSHA256; HKDF tự cài trên HMAC. X25519 qua `XDH` của JCA (API 33+); nơi JCA không có `XDH` (API 31–32) thì dùng bản thuần Kotlin `X25519Fallback` (RFC 7748, không rẽ nhánh theo bit bí mật). Kiểm DH toàn số 0 vẫn bắt buộc ở cả hai đường. Test Kotlin chạy `noise-*.json`, `crypto-session.json` và một phiên đầu-cuối (`EndToEndSessionTest`).
 
-## 12. Điểm còn mở
+## 12. Quyết định đã chốt
 
-- MTU đã giải quyết: `maxPayload` = 1192 → datagram mã hoá ≤ 1232 B (đủ IPv6 1280).
-- Tên message control đã chốt ở 06b trong `control-messages.md`: `rekey`, `rekey.resync`, `pair.result`.
+- MTU: `maxPayload` = 1192 → datagram mã hoá ≤ 1232 B (đủ IPv6 1280).
+- Tên message control đã chốt trong `control-messages.md`: `rekey`, `rekey.resync`, `pair.result`.

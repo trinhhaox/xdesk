@@ -106,6 +106,106 @@
       "error" : "invalidField",
       "json" : "{\"id\":1,\"requestId\":\"\",\"t\":\"agent.approve\"}",
       "name" : "agent-approve-empty-request-id"
+    },
+    {
+      "error" : "invalidField",
+      "json" : "{\"codec\":\"h264\",\"fps\":60,\"h\":0,\"id\":1,\"scale\":1,\"t\":\"display.reconfigure\",\"w\":100}",
+      "name" : "display-reconfigure-zero-height"
+    },
+    {
+      "error" : "malformedJSON",
+      "json" : "{\"id\":1,\"t\":\"display.list\"}",
+      "name" : "display-list-missing-displays"
+    },
+    {
+      "error" : "malformedJSON",
+      "json" : "{\"displays\":[{\"height\":1,\"id\":1,\"name\":\"a\",\"width\":1}],\"id\":1,\"t\":\"display.list\"}",
+      "name" : "display-list-item-missing-is-main"
+    },
+    {
+      "error" : "malformedJSON",
+      "json" : "{\"id\":1,\"t\":\"video.pause\"}",
+      "name" : "video-pause-missing-stream-id"
+    },
+    {
+      "error" : "malformedJSON",
+      "json" : "{\"id\":1,\"key\":\"eject\",\"t\":\"media.key\"}",
+      "name" : "media-key-unknown-key"
+    },
+    {
+      "error" : "malformedJSON",
+      "json" : "{\"id\":1,\"ok\":true,\"t\":\"system.unlock.result\"}",
+      "name" : "system-unlock-result-missing-message"
+    },
+    {
+      "error" : "malformedJSON",
+      "json" : "{\"id\":1,\"reason\":\"x\",\"t\":\"agent.help\"}",
+      "name" : "agent-help-missing-request-id"
+    },
+    {
+      "error" : "malformedJSON",
+      "json" : "{\"id\":1,\"name\":\"a.txt\",\"size\":1,\"t\":\"file.start\"}",
+      "name" : "file-start-missing-transfer-id"
+    },
+    {
+      "error" : "invalidField",
+      "json" : "{\"id\":1,\"name\":\"a.txt\",\"size\":1,\"t\":\"file.start\",\"transferId\":\"\"}",
+      "name" : "file-start-empty-transfer-id"
+    },
+    {
+      "error" : "invalidField",
+      "json" : "{\"id\":1,\"name\":\"a.txt\",\"size\":1,\"t\":\"file.start\",\"transferId\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}",
+      "name" : "file-start-transfer-id-65-bytes"
+    },
+    {
+      "error" : "invalidField",
+      "json" : "{\"id\":1,\"name\":\"\",\"size\":1,\"t\":\"file.start\",\"transferId\":\"t\"}",
+      "name" : "file-start-empty-name"
+    },
+    {
+      "error" : "invalidField",
+      "json" : "{\"id\":1,\"name\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"size\":1,\"t\":\"file.start\",\"transferId\":\"t\"}",
+      "name" : "file-start-name-256-bytes"
+    },
+    {
+      "error" : "invalidField",
+      "json" : "{\"id\":1,\"name\":\"a.txt\",\"size\":2147483649,\"t\":\"file.start\",\"transferId\":\"t\"}",
+      "name" : "file-start-size-over-2gib"
+    },
+    {
+      "error" : "invalidField",
+      "json" : "{\"id\":1,\"size\":0,\"t\":\"file.chunk\",\"transferId\":\"t\"}",
+      "name" : "file-chunk-size-zero"
+    },
+    {
+      "error" : "invalidField",
+      "json" : "{\"id\":1,\"size\":65537,\"t\":\"file.chunk\",\"transferId\":\"t\"}",
+      "name" : "file-chunk-size-over-64kib"
+    },
+    {
+      "error" : "invalidField",
+      "json" : "{\"hash\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\"id\":1,\"t\":\"file.done\",\"transferId\":\"t\"}",
+      "name" : "file-done-uppercase-hash"
+    },
+    {
+      "error" : "invalidField",
+      "json" : "{\"hash\":\"abcd\",\"id\":1,\"t\":\"file.done\",\"transferId\":\"t\"}",
+      "name" : "file-done-short-hash"
+    },
+    {
+      "error" : "invalidField",
+      "json" : "{\"id\":1,\"t\":\"file.cancel\",\"transferId\":\"\"}",
+      "name" : "file-cancel-empty-transfer-id"
+    },
+    {
+      "error" : "malformedJSON",
+      "json" : "{\"id\":1,\"name\":\"a\",\"size\":1,\"t\":\"file.offer\"}",
+      "name" : "file-offer-missing-hash"
+    },
+    {
+      "error" : "malformedJSON",
+      "json" : "{\"chunk\":\"AA==\",\"id\":1,\"name\":\"a\",\"t\":\"file.data\"}",
+      "name" : "file-data-missing-is-last"
     }
   ],
   "messages" : [
@@ -269,6 +369,265 @@
       "json" : "{\"allow\":false,\"id\":16,\"requestId\":\"req-9c01\",\"t\":\"agent.approve\"}",
       "name" : "agent-approve-response-deny",
       "type" : "agent.approve"
+    },
+    {
+      "frameHex" : "0000007c027b2268617368223a2232636632346462613566623061333065323665383362326163356239653239653162313631653563316661373432356537333034333336323933386239383234222c226964223a372c226b696e64223a22696d616765222c2273697a65223a352c2274223a22636c69702e6f66666572227d",
+      "id" : 7,
+      "json" : "{\"hash\":\"2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824\",\"id\":7,\"kind\":\"image\",\"size\":5,\"t\":\"clip.offer\"}",
+      "name" : "clip-offer-with-hash",
+      "type" : "clip.offer"
+    },
+    {
+      "frameHex" : "0000007a027b2268617368223a2232636632346462613566623061333065323665383362326163356239653239653162313631653563316661373432356537333034333336323933386239383234222c226964223a382c226b696e64223a2274657874222c2273697a65223a352c2274223a22636c69702e64617461227d",
+      "id" : 8,
+      "json" : "{\"hash\":\"2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824\",\"id\":8,\"kind\":\"text\",\"size\":5,\"t\":\"clip.data\"}",
+      "name" : "clip-data",
+      "type" : "clip.data"
+    },
+    {
+      "frameHex" : "00000015027b226964223a302c2274223a2272656b6579227d",
+      "id" : 0,
+      "json" : "{\"id\":0,\"t\":\"rekey\"}",
+      "name" : "rekey",
+      "type" : "rekey"
+    },
+    {
+      "frameHex" : "00000033027b2261736b223a66616c73652c2265706f6368223a332c226964223a31372c2274223a2272656b65792e726573796e63227d",
+      "id" : 17,
+      "json" : "{\"ask\":false,\"epoch\":3,\"id\":17,\"t\":\"rekey.resync\"}",
+      "name" : "rekey-resync-announce",
+      "type" : "rekey.resync"
+    },
+    {
+      "frameHex" : "00000032027b2261736b223a747275652c2265706f6368223a322c226964223a31382c2274223a2272656b65792e726573796e63227d",
+      "id" : 18,
+      "json" : "{\"ask\":true,\"epoch\":2,\"id\":18,\"t\":\"rekey.resync\"}",
+      "name" : "rekey-resync-ask",
+      "type" : "rekey.resync"
+    },
+    {
+      "frameHex" : "0000002c027b226163636570746564223a747275652c226964223a31392c2274223a22706169722e726573756c74227d",
+      "id" : 19,
+      "json" : "{\"accepted\":true,\"id\":19,\"t\":\"pair.result\"}",
+      "name" : "pair-result-accepted",
+      "type" : "pair.result"
+    },
+    {
+      "frameHex" : "0000002d027b226163636570746564223a66616c73652c226964223a31392c2274223a22706169722e726573756c74227d",
+      "id" : 19,
+      "json" : "{\"accepted\":false,\"id\":19,\"t\":\"pair.result\"}",
+      "name" : "pair-result-rejected",
+      "type" : "pair.result"
+    },
+    {
+      "frameHex" : "000000a2027b22636f646563223a2268323634222c22646973706c61794964223a36393733333633322c22667073223a36302c2268223a323535362c226964223a332c226d6972726f72466974223a22666974446576696365222c226d6f6465223a226d6972726f72222c227363616c65223a332c2274223a22646973706c61792e636f6e666967222c22766964656f506175736564223a747275652c2277223a313137397d",
+      "id" : 3,
+      "json" : "{\"codec\":\"h264\",\"displayId\":69733632,\"fps\":60,\"h\":2556,\"id\":3,\"mirrorFit\":\"fitDevice\",\"mode\":\"mirror\",\"scale\":3,\"t\":\"display.config\",\"videoPaused\":true,\"w\":1179}",
+      "name" : "display-config-video-paused-display-id",
+      "type" : "display.config"
+    },
+    {
+      "frameHex" : "0000007c027b22636f646563223a2268657663222c22667073223a36302c2268223a323533322c226964223a32302c226d6972726f72466974223a22746f756368222c226d6f6465223a226d6972726f72222c227363616c65223a332c2274223a22646973706c61792e7265636f6e666967757265222c2277223a313137307d",
+      "id" : 20,
+      "json" : "{\"codec\":\"hevc\",\"fps\":60,\"h\":2532,\"id\":20,\"mirrorFit\":\"touch\",\"mode\":\"mirror\",\"scale\":3,\"t\":\"display.reconfigure\",\"w\":1170}",
+      "name" : "display-reconfigure",
+      "type" : "display.reconfigure"
+    },
+    {
+      "frameHex" : "00000089027b22636f646563223a2268323634222c22646973706c61794964223a322c22667073223a33302c2268223a313434302c226964223a32312c226d6f6465223a22657874656e64222c227363616c65223a322c2274223a22646973706c61792e7265636f6e666967757265222c22766964656f506175736564223a747275652c2277223a323536307d",
+      "id" : 21,
+      "json" : "{\"codec\":\"h264\",\"displayId\":2,\"fps\":30,\"h\":1440,\"id\":21,\"mode\":\"extend\",\"scale\":2,\"t\":\"display.reconfigure\",\"videoPaused\":true,\"w\":2560}",
+      "name" : "display-reconfigure-paused-display-id",
+      "type" : "display.reconfigure"
+    },
+    {
+      "frameHex" : "000000d3027b22646973706c617973223a5b7b22686569676874223a313936342c226964223a312c2269734d61696e223a747275652c226e616d65223a224dc3a06e2068c3ac6e6820526574696e612074c3ad63682068e1bba370222c227769647468223a333032347d2c7b22686569676874223a323136302c226964223a36393733333633322c2269734d61696e223a66616c73652c226e616d65223a2244454c4c2055323732335145222c227769647468223a333834307d5d2c226964223a32322c2274223a22646973706c61792e6c697374227d",
+      "id" : 22,
+      "json" : "{\"displays\":[{\"height\":1964,\"id\":1,\"isMain\":true,\"name\":\"Màn hình Retina tích hợp\",\"width\":3024},{\"height\":2160,\"id\":69733632,\"isMain\":false,\"name\":\"DELL U2723QE\",\"width\":3840}],\"id\":22,\"t\":\"display.list\"}",
+      "name" : "display-list",
+      "type" : "display.list"
+    },
+    {
+      "frameHex" : "00000029027b226964223a32332c2273747265616d4964223a312c2274223a22766964656f2e7061757365227d",
+      "id" : 23,
+      "json" : "{\"id\":23,\"streamId\":1,\"t\":\"video.pause\"}",
+      "name" : "video-pause",
+      "type" : "video.pause"
+    },
+    {
+      "frameHex" : "0000002a027b226964223a32342c2273747265616d4964223a312c2274223a22766964656f2e726573756d65227d",
+      "id" : 24,
+      "json" : "{\"id\":24,\"streamId\":1,\"t\":\"video.resume\"}",
+      "name" : "video-resume",
+      "type" : "video.resume"
+    },
+    {
+      "frameHex" : "0000001c027b226964223a32352c2274223a2273797374656d2e6c6f636b227d",
+      "id" : 25,
+      "json" : "{\"id\":25,\"t\":\"system.lock\"}",
+      "name" : "system-lock",
+      "type" : "system.lock"
+    },
+    {
+      "frameHex" : "0000001e027b226964223a32362c2274223a2273797374656d2e756e6c6f636b227d",
+      "id" : 26,
+      "json" : "{\"id\":26,\"t\":\"system.unlock\"}",
+      "name" : "system-unlock",
+      "type" : "system.unlock"
+    },
+    {
+      "frameHex" : "0000002f027b226964223a32372c2274223a2273797374656d2e756e6c6f636b222c22746f6b656e223a22742d37663361227d",
+      "id" : 27,
+      "json" : "{\"id\":27,\"t\":\"system.unlock\",\"token\":\"t-7f3a\"}",
+      "name" : "system-unlock-with-token",
+      "type" : "system.unlock"
+    },
+    {
+      "frameHex" : "0000005a027b226964223a32382c226d657373616765223a22c490c3a3206de1bb9f206b686fc3a1206dc3a06e2068c3ac6e68204d6163222c226f6b223a747275652c2274223a2273797374656d2e756e6c6f636b2e726573756c74227d",
+      "id" : 28,
+      "json" : "{\"id\":28,\"message\":\"Đã mở khoá màn hình Mac\",\"ok\":true,\"t\":\"system.unlock.result\"}",
+      "name" : "system-unlock-result-ok",
+      "type" : "system.unlock.result"
+    },
+    {
+      "frameHex" : "0000007a027b226964223a32392c226d657373616765223a225468e1bbad206de1bb9f206b686fc3a1207175c3a1206e6869e1bb8175206ce1baa76e2c20767569206cc3b26e6720c491e1bba3692031207068c3ba74222c226f6b223a66616c73652c2274223a2273797374656d2e756e6c6f636b2e726573756c74227d",
+      "id" : 29,
+      "json" : "{\"id\":29,\"message\":\"Thử mở khoá quá nhiều lần, vui lòng đợi 1 phút\",\"ok\":false,\"t\":\"system.unlock.result\"}",
+      "name" : "system-unlock-result-rate-limited",
+      "type" : "system.unlock.result"
+    },
+    {
+      "frameHex" : "0000002c027b226964223a33302c226b6579223a22706c61795061757365222c2274223a226d656469612e6b6579227d",
+      "id" : 30,
+      "json" : "{\"id\":30,\"key\":\"playPause\",\"t\":\"media.key\"}",
+      "name" : "media-key-play-pause",
+      "type" : "media.key"
+    },
+    {
+      "frameHex" : "00000027027b226964223a33312c226b6579223a226e657874222c2274223a226d656469612e6b6579227d",
+      "id" : 31,
+      "json" : "{\"id\":31,\"key\":\"next\",\"t\":\"media.key\"}",
+      "name" : "media-key-next",
+      "type" : "media.key"
+    },
+    {
+      "frameHex" : "0000002b027b226964223a33322c226b6579223a2270726576696f7573222c2274223a226d656469612e6b6579227d",
+      "id" : 32,
+      "json" : "{\"id\":32,\"key\":\"previous\",\"t\":\"media.key\"}",
+      "name" : "media-key-previous",
+      "type" : "media.key"
+    },
+    {
+      "frameHex" : "0000002b027b226964223a33332c226b6579223a22766f6c756d655570222c2274223a226d656469612e6b6579227d",
+      "id" : 33,
+      "json" : "{\"id\":33,\"key\":\"volumeUp\",\"t\":\"media.key\"}",
+      "name" : "media-key-volume-up",
+      "type" : "media.key"
+    },
+    {
+      "frameHex" : "0000002d027b226964223a33342c226b6579223a22766f6c756d65446f776e222c2274223a226d656469612e6b6579227d",
+      "id" : 34,
+      "json" : "{\"id\":34,\"key\":\"volumeDown\",\"t\":\"media.key\"}",
+      "name" : "media-key-volume-down",
+      "type" : "media.key"
+    },
+    {
+      "frameHex" : "00000027027b226964223a33352c226b6579223a226d757465222c2274223a226d656469612e6b6579227d",
+      "id" : 35,
+      "json" : "{\"id\":35,\"key\":\"mute\",\"t\":\"media.key\"}",
+      "name" : "media-key-mute",
+      "type" : "media.key"
+    },
+    {
+      "frameHex" : "0000006e027b226964223a33362c22726561736f6e223a2243e1baa76e206e68e1baad70206dc3a3204f54502067e1bbad692076e1bb8120c49169e1bb876e2074686fe1baa169222c22726571756573744964223a2268656c702d33316332222c2274223a226167656e742e68656c70227d",
+      "id" : 36,
+      "json" : "{\"id\":36,\"reason\":\"Cần nhập mã OTP gửi về điện thoại\",\"requestId\":\"help-31c2\",\"t\":\"agent.help\"}",
+      "name" : "agent-help-request",
+      "type" : "agent.help"
+    },
+    {
+      "frameHex" : "00000043027b226964223a33372c22726571756573744964223a2268656c702d33316332222c227265736f6c766564223a747275652c2274223a226167656e742e68656c70227d",
+      "id" : 37,
+      "json" : "{\"id\":37,\"requestId\":\"help-31c2\",\"resolved\":true,\"t\":\"agent.help\"}",
+      "name" : "agent-help-resolved",
+      "type" : "agent.help"
+    },
+    {
+      "frameHex" : "00000083027b226964223a34302c226e616d65223a22e1baa36e68206368e1bba570206dc3a06e2068c3ac6e682e706e67222c2273697a65223a313034383537362c2274223a2266696c652e7374617274222c227472616e736665724964223a2237663361396330312d356232652d346431312d396134372d306336653264386231663535227d",
+      "id" : 40,
+      "json" : "{\"id\":40,\"name\":\"ảnh chụp màn hình.png\",\"size\":1048576,\"t\":\"file.start\",\"transferId\":\"7f3a9c01-5b2e-4d11-9a47-0c6e2d8b1f55\"}",
+      "name" : "file-start",
+      "type" : "file.start"
+    },
+    {
+      "frameHex" : "00000049027b226964223a34312c226e616d65223a22726f6e672e747874222c2273697a65223a302c2274223a2266696c652e7374617274222c227472616e736665724964223a22742d30227d",
+      "id" : 41,
+      "json" : "{\"id\":41,\"name\":\"rong.txt\",\"size\":0,\"t\":\"file.start\",\"transferId\":\"t-0\"}",
+      "name" : "file-start-empty-file",
+      "type" : "file.start"
+    },
+    {
+      "frameHex" : "00000073027b226964223a34322c226e616d65223a226469736b2e696d67222c2273697a65223a323134373438333634382c2274223a2266696c652e7374617274222c227472616e736665724964223a2237663361396330312d356232652d346431312d396134372d306336653264386231663535227d",
+      "id" : 42,
+      "json" : "{\"id\":42,\"name\":\"disk.img\",\"size\":2147483648,\"t\":\"file.start\",\"transferId\":\"7f3a9c01-5b2e-4d11-9a47-0c6e2d8b1f55\"}",
+      "name" : "file-start-max-2gib",
+      "type" : "file.start"
+    },
+    {
+      "frameHex" : "0000005c027b226964223a34332c2273697a65223a36353533362c2274223a2266696c652e6368756e6b222c227472616e736665724964223a2237663361396330312d356232652d346431312d396134372d306336653264386231663535227d",
+      "id" : 43,
+      "json" : "{\"id\":43,\"size\":65536,\"t\":\"file.chunk\",\"transferId\":\"7f3a9c01-5b2e-4d11-9a47-0c6e2d8b1f55\"}",
+      "name" : "file-chunk-full",
+      "type" : "file.chunk"
+    },
+    {
+      "frameHex" : "00000058027b226964223a34342c2273697a65223a352c2274223a2266696c652e6368756e6b222c227472616e736665724964223a2237663361396330312d356232652d346431312d396134372d306336653264386231663535227d",
+      "id" : 44,
+      "json" : "{\"id\":44,\"size\":5,\"t\":\"file.chunk\",\"transferId\":\"7f3a9c01-5b2e-4d11-9a47-0c6e2d8b1f55\"}",
+      "name" : "file-chunk-tail",
+      "type" : "file.chunk"
+    },
+    {
+      "frameHex" : "00000098027b2268617368223a2232636632346462613566623061333065323665383362326163356239653239653162313631653563316661373432356537333034333336323933386239383234222c226964223a34352c2274223a2266696c652e646f6e65222c227472616e736665724964223a2237663361396330312d356232652d346431312d396134372d306336653264386231663535227d",
+      "id" : 45,
+      "json" : "{\"hash\":\"2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824\",\"id\":45,\"t\":\"file.done\",\"transferId\":\"7f3a9c01-5b2e-4d11-9a47-0c6e2d8b1f55\"}",
+      "name" : "file-done",
+      "type" : "file.done"
+    },
+    {
+      "frameHex" : "00000065027b226964223a34362c22726561736f6e223a2263616e63656c6c6564222c2274223a2266696c652e63616e63656c222c227472616e736665724964223a2237663361396330312d356232652d346431312d396134372d306336653264386231663535227d",
+      "id" : 46,
+      "json" : "{\"id\":46,\"reason\":\"cancelled\",\"t\":\"file.cancel\",\"transferId\":\"7f3a9c01-5b2e-4d11-9a47-0c6e2d8b1f55\"}",
+      "name" : "file-cancel",
+      "type" : "file.cancel"
+    },
+    {
+      "frameHex" : "00000050027b226964223a34372c2274223a2266696c652e63616e63656c222c227472616e736665724964223a2237663361396330312d356232652d346431312d396134372d306336653264386231663535227d",
+      "id" : 47,
+      "json" : "{\"id\":47,\"t\":\"file.cancel\",\"transferId\":\"7f3a9c01-5b2e-4d11-9a47-0c6e2d8b1f55\"}",
+      "name" : "file-cancel-no-reason",
+      "type" : "file.cancel"
+    },
+    {
+      "frameHex" : "0000008b027b2268617368223a2232636632346462613566623061333065323665383362326163356239653239653162313631653563316661373432356537333034333336323933386239383234222c226964223a34382c226e616d65223a2262c3a16f2063c3a16f2e706466222c2273697a65223a313034383537362c2274223a2266696c652e6f66666572227d",
+      "id" : 48,
+      "json" : "{\"hash\":\"2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824\",\"id\":48,\"name\":\"báo cáo.pdf\",\"size\":1048576,\"t\":\"file.offer\"}",
+      "name" : "file-offer-legacy",
+      "type" : "file.offer"
+    },
+    {
+      "frameHex" : "00000045027b2268617368223a22222c226964223a34392c226e616d65223a2262c3a16f2063c3a16f2e706466222c2273697a65223a352c2274223a2266696c652e6f66666572227d",
+      "id" : 49,
+      "json" : "{\"hash\":\"\",\"id\":49,\"name\":\"báo cáo.pdf\",\"size\":5,\"t\":\"file.offer\"}",
+      "name" : "file-offer-legacy-empty-hash",
+      "type" : "file.offer"
+    },
+    {
+      "frameHex" : "00000052027b226368756e6b223a22534756736247383d222c226964223a35302c2269734c617374223a747275652c226e616d65223a2262c3a16f2063c3a16f2e706466222c2274223a2266696c652e64617461227d",
+      "id" : 50,
+      "json" : "{\"chunk\":\"SGVsbG8=\",\"id\":50,\"isLast\":true,\"name\":\"báo cáo.pdf\",\"t\":\"file.data\"}",
+      "name" : "file-data-legacy",
+      "type" : "file.data"
     }
   ],
   "version" : 1

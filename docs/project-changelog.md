@@ -2,11 +2,69 @@
 
 Định dạng theo từng giai đoạn (phase) của kế hoạch `plans/261118-2215-xdesk-clean-room/`.
 
-## Chưa phát hành: giao diện Android theo iOS, mặc định Tối
+## Chưa phát hành
 
-- Android dựng lại màn chính, Cài đặt, Chuột và con trỏ, Bảo mật, ghép đôi, thẻ lỗi, nút nổi và thanh phím theo iOS (bản tham chiếu).
-- Mục mới "Giao diện" ở Cài đặt (cả iOS và Android): Tối (mặc định) | Sáng | Theo hệ thống. Android có nền cửa sổ tối ngay lúc khởi động.
+- Mac tự chạy `adb reverse tcp:47800 tcp:<cổng host>` khi có điện thoại Android cắm cáp (đã bật USB debugging) trong lúc đang phát: cứ 4 giây xem `adb devices`, rút cáp rồi cắm lại thì làm lại; không có `adb` thì bỏ qua. Media Android qua cáp đi bằng MediaOverTcp. Mã: `apple/mac-app/Sources/UsbTunnel/AdbReverseWatcher.swift`; mô tả: `protocol/spec/framing.md`, `docs/audio-and-usb.md`.
+- `make test-ios` giờ chạy test thật trên iOS Simulator (`xcodebuild test`, chọn máy bằng `IOS_SIM_ID=<udid>`, mặc định iPhone đầu tiên còn dùng được) thay vì chỉ `build-for-testing`.
+- Quyền truyền tệp riêng cho từng thiết bị: gửi/nhận tệp (`file.*`) tách khỏi quyền điều khiển (`input`) thành quyền riêng, bật/tắt theo từng thiết bị đã ghép. Đang được hoàn thiện song song; không đổi định dạng wire.
+- Spec và test vector giao thức khớp mã 0.2.0-beta: `control-messages.md` có đủ message `display.reconfigure`, `display.list`, `video.pause/resume`, `file.*`, `system.lock/unlock(.result)`, `media.key`, `agent.help`; `xdesk-wire-v1-overview.md` có capability bit 7–12; `control-frames.json` thêm vector cho mọi type này (Swift và Kotlin cùng chạy), thêm test bảo đảm mọi type đều có vector.
+- Tài liệu: `docs/mcp-setup.md` (15 tool, công tắc MCP nằm ở Cài đặt › Agent AI, tool `xdesk_request_user_help`).
+
+## 0.2.0-beta (2026-11-22)
+
+Chi tiết: `docs/release-notes/0.2.0-beta.md`.
+- 5 chế độ làm việc thống nhất; `video.pause`/`video.resume` tạm dừng capture/encode khi ở chế độ chỉ điều khiển; `display.reconfigure` đổi chế độ/kiểu chiếu không ngắt kết nối.
+- Tự kết nối lại (1 s → 2 s → 4 s, chuyển LAN sang Tailscale), trợ lý Tailscale, media Android qua USB bằng MediaOverTcp.
+- Đồng bộ clipboard 2 chiều trên Android (văn bản và PNG ≤ 10 MiB, SHA-256); truyền tệp streaming 2 chiều `file.start/chunk/done/cancel` (≤ 2 GiB, mảnh 64 KiB, SHA-256, Mac lưu vào `~/Downloads/Xdesk/`).
+- Mở khoá Mac từ xa (`system.unlock`, mật khẩu trong Keychain, quyền kép, sinh trắc học trên điện thoại, giới hạn 3 lần/60 s); chọn màn hình Mac (`display.list`) và vị trí màn hình phụ; FPS 30/60/120, phím media (`media.key`), cử chỉ trackpad; chọn HEVC/H.264 trên iOS và Android.
+- Capability bit 7–12 (`hotReconfigure`, `videoPause`, `fileTransfer`, `remoteUnlock`, `mediaKeys`, `multiDisplay`).
+
+## 0.1.9-beta (2026-11-22)
+
+Chi tiết: `docs/release-notes/0.1.9-beta.md`.
+- Nhập địa chỉ thủ công tự thêm cổng 47800; Android tự nhận máy Mac đã ghép khi đổi IP (LAN sang Tailscale).
+- Sửa nút "Nối cáp USB" (Android) truyền nhầm địa chỉ cũ; sửa lớp phủ "Đang kết nối…" kẹt ở chế độ Trackpad; tự xin keyframe khi chuyển sang xem màn hình.
+
+## 0.1.8-beta (2026-11-22)
+
+Chi tiết: `docs/release-notes/0.1.8-beta.md`.
+- Chế độ Bàn phím & Chuột ảo chuyên dụng toàn màn hình mở thẳng từ danh sách máy Mac, không cần luồng video; chuyển nhanh giữa trackpad và xem màn hình.
+- Đồng bộ giao diện iOS/Android; ngắt kết nối và giải phóng tài nguyên khi thoát chế độ này.
+
+## 0.1.7-beta (2026-11-22)
+
+Chi tiết: `docs/release-notes/0.1.7-beta.md`.
+- Trackpad đa chạm, nút chuột vật lý, bàn phím ảo và Text Composer (tiếng Việt), Numpad, điều khiển trình chiếu (iOS và Android).
+- Codec HEVC trên host và viewer; thanh Sidecar Quick Dock (Spotlight, Mission Control, App Switcher, Hoàn tác, khoá/mở khoá).
+- AI Co-Pilot Help (`agent.help`): agent AI xin người dùng trợ giúp, viewer hiện banner; truyền tệp đầu tiên (`file.offer`/`file.data`, lưu `~/Downloads/Xdesk`, kiểm SHA-256); USB tunnel Android.
+
+## 0.1.6-beta (2026-11-20)
+
+Android: chạm 2 lần để mở bàn phím (tắt được trong Cài đặt chuột), nút "Xong" ẩn bàn phím, dòng đang gõ không bị che; giải thích khi không cập nhật được vì khác chữ ký. Chi tiết: `docs/release-notes/0.1.6-beta.md`.
+
+## 0.1.5-beta (2026-11-20)
+
+- Ghép đôi bằng mã 6 số phải bấm "Khớp" ở cả hai máy; chỉ lưu Mac sau khi người dùng xác nhận.
+- Agent AI (MCP): không mất kết quả xin quyền khi duyệt chậm hơn 10 giây; sửa giới hạn số kết nối đồng thời.
+- Chạm trực tiếp: vuốt một ngón cuộn có quán tính, nhấn giữ kéo thả/chuột phải; click chính xác hơn khi tay rung. Chi tiết: `docs/release-notes/0.1.5-beta.md`.
+
+## 0.1.4-beta (2026-11-20)
+
+Mac thêm tiếng Anh (Cài đặt › Chung › Ngôn ngữ); hộp thoại cập nhật đúng ngôn ngữ và không bị bảng menu che; bảng thanh menu có số thiết bị đang xem, phiên bản app, nút "Dừng chia sẻ" rõ hơn.
+
+## 0.1.3-beta (2026-11-20)
+
+- Android và iPhone dùng chung giao diện (bố cục, chữ, biểu tượng, màu); mục "Giao diện" ở Cài đặt: Tối (mặc định) | Sáng | Theo hệ thống; Android có nền cửa sổ tối ngay lúc khởi động.
 - Bảng token dùng chung `docs/design-tokens.md`; màu primary/accent/warning/danger của Android khớp `BrandPalette.swift`.
+- Mac: bảng thanh menu tự đóng khi mở cửa sổ khác; nút "Mở lại Xdesk" sau khi cấp quyền Ghi màn hình.
+
+## 0.1.2-beta (2026-11-20)
+
+Giao diện mới trên cả ba app (bảng điều khiển thanh menu, Cài đặt 5 mục, quét QR và nhiều máy Mac trên điện thoại); ghép đôi QR hoạt động khi mạng nhà chặn máy nói chuyện với nhau (dùng Tailscale); sửa luật mặc định "Cấm" cho Terminal, Keychain Access, Cài đặt hệ thống với agent AI có thể bị ghi đè.
+
+## 0.1.1-beta (2026-11-19)
+
+Chế độ "Bản sao" là mặc định (3 kiểu vừa khung); cửa sổ Mac tự co giãn vừa màn hình điện thoại; bàn phím mới và cài đặt chuột (chạm trực tiếp/con trỏ, cuộn tự nhiên, nhấn giữ chuột phải); nút điều khiển nổi; Mac tự cập nhật; Android tự cập nhật, sửa văng khi mở, giảm giật trên chip Unisoc.
 
 ## 0.1.0-beta (2026-11-19)
 

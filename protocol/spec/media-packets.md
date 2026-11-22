@@ -94,7 +94,7 @@ bỏ frame và gửi `keyframe.request`. Sender giữ mảnh đã gửi để g�
 
 ## Input (ptype 0x30) — sự kiện cố định 28 byte
 
-(Phase file ghi 24 B nhưng tổng các trường đã nêu là 28 B; **chốt 28 B**.)
+Kích thước cố định theo code (`InputEvent.size`); `maxBatch` = ⌊1192 / 28⌋ = 42.
 
 | Offset | Kiểu | Trường |
 |---|---|---|
@@ -128,5 +128,5 @@ Văn bản Unicode (IME/Telex) không đi qua input UDP mà qua control `input.t
 
 ## Đường dài (Tailscale / 4G)
 
-- MTU Tailscale 1280 → payload 1200 B ở trên đã an toàn, không cần chỉnh.
+- MTU Tailscale 1280 → gói mã hoá ≤ 1232 B (payload ≤ 1192 B) ở đầu tài liệu đã an toàn, không cần chỉnh.
 - ABR của host (`BitrateController`): khi `net.report.rttMs` > 20 ms bitrate bị chặn trần 15 000 kb/s (giảm ngay xuống 15 Mb/s nếu đang cao hơn, không tăng vượt); RTT ≤ 20 ms trở lại trần LAN 40 Mb/s.

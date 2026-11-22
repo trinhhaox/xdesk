@@ -39,9 +39,14 @@ Mac (host, TCP-client) ──usbmuxd /var/run/usbmuxd── cáp ── iPhone (
 - Media chỉ qua MediaOverTcp (kind 0x04, mã hoá bằng khoá TCP). Audio luôn AAC-ELD.
 - Giới hạn v1: xoay màn hình iPhone giữa phiên không tự đổi cấu hình (Mac nối lại); app vào nền thì phiên đóng; chưa có tên máy (usbmux không cho tên).
 
-### Android qua cáp (`adb reverse`) — chỉ tài liệu, chưa tự động hoá
+### Android qua cáp (`adb reverse`)
 
-`adb reverse tcp:47800 tcp:47800` rồi nhập `127.0.0.1:47800` trong app Android (nhập tay). **Cảnh báo:** `adb reverse` chỉ chuyển TCP. Viewer Android hiện chưa có MediaOverTcp, còn video/audio/input đi UDP tới `127.0.0.1:<udpPort>` của chính điện thoại → không tới Mac. Vì vậy qua cáp hiện chỉ kênh control (bắt tay, ghép đôi) thông; muốn có hình phải bổ sung MediaOverTcp cho Android (cờ `mediaOverTcp` ở viewer + host chấp nhận cho peer loopback) — chưa làm.
+Android không có usbmuxd nên dùng `adb reverse`, biến `127.0.0.1:47800` trên điện thoại thành cổng control của Mac. `adb reverse` chỉ chuyển TCP, vì vậy media đi bằng **MediaOverTcp** (kind 0x04, mã hoá bằng khoá TCP) như đường hầm iOS, không qua UDP:
+
+- Viewer Android đưa cờ `mediaOverTcp` khi mọi địa chỉ đích là loopback (`127.0.0.1`, `::1`, `localhost`) và dùng `UdpMediaChannel.overTcp` khi host giữ lại cờ trong `welcome` (`android/transport`, test `MediaOverTcpAndClipboardTest`); host chấp nhận cờ này cho peer loopback. Audio qua đường này cũng là AAC-ELD.
+- **Mac tự chạy `adb reverse`**: khi đang phát (host chạy), Mac cứ 4 giây chạy `adb devices`; máy Android ở trạng thái `device` (đã bật USB debugging và tin cậy máy tính) mà chưa reverse thì chạy `adb -s <serial> reverse tcp:47800 tcp:<cổng host>`. Rút cáp rồi cắm lại thì làm lại. Mac tìm `adb` ở Homebrew, `ANDROID_HOME`/`ANDROID_SDK_ROOT`, Android Studio SDK (`~/Library/Android/sdk`) và SDK trên ổ ngoài; không có `adb` thì không làm gì. Mã: `apple/mac-app/Sources/UsbTunnel/AdbReverseWatcher.swift`.
+- Trên điện thoại: mở Xdesk, chọn "Nối cáp USB" (nối `127.0.0.1:47800`). Muốn tự tay: `adb reverse tcp:47800 tcp:47800` rồi nhập `127.0.0.1:47800`.
+- Ghép đôi và mã hoá y hệt Wi-Fi (ghép đôi lần đầu qua Wi-Fi/QR hoặc mã 6 số).
 
 ## 3. Cờ kiểm thử (build Debug, `apple/mac-app/Sources/App/AutomationHooks+Audio.swift`)
 

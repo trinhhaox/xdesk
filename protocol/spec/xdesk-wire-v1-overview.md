@@ -37,6 +37,14 @@ Capability là bitmask u32 (`caps`); phiên dùng giao của hai tập.
 | 4 | 0x10 | clipboard |
 | 5 | 0x20 | media over TCP (frame 0x04) |
 | 6 | 0x40 | touch input |
+| 7 | 0x80 | hotReconfigure: `display.reconfigure` đổi cấu hình giữa phiên không đóng kết nối |
+| 8 | 0x100 | videoPause: `video.pause` / `video.resume` (chế độ Chỉ điều khiển) |
+| 9 | 0x200 | fileTransfer: truyền tệp (`file.*`) |
+| 10 | 0x400 | remoteUnlock: `system.unlock` mở khoá/đánh thức Mac |
+| 11 | 0x800 | mediaKeys: `media.key` phím media/âm lượng |
+| 12 | 0x1000 | multiDisplay: host gửi `display.list`, `display.config.displayId` chọn màn hình |
+
+Bit 7–12 chỉ là cờ thương lượng: bit nằm trong giao mới được dùng message tương ứng (chi tiết trong `control-messages.md`). Mac luôn đưa 7, 8, 9, 11, 12 vào `welcome`; bit 10 chỉ khi thiết bị viewer được cấp quyền mở khoá **và** Mac bật mở khoá từ xa.
 
 ## Luồng cơ bản
 
@@ -51,7 +59,7 @@ display.ready(udpPort, streamId) → UDP media ↔ input / nack / net.report`.
 
 ## Test vectors
 
-`protocol/test-vectors/{control-frames,media-headers,input-events}.json`, sinh bởi `tools/gen-test-vectors`
+`protocol/test-vectors/{control-frames,media-headers,input-events,audio-payloads,crypto-session}.json` (`audio-payloads.json`: gói audio ptype 0x20; `crypto-session.json`: vector phiên mã hoá của Xdesk; ngoài ra `noise-*.json` là vector công khai của cacophony), sinh bởi `tools/gen-test-vectors`
 (`cd tools/gen-test-vectors && swift run gen-test-vectors`). Mọi bản cài đặt (Swift, Kotlin) phải khớp: mã hoá ra đúng hex,
 giải mã hex ra đúng giá trị, hex không hợp lệ ra đúng mã lỗi. JSON control so sánh theo ngữ nghĩa (thứ tự khoá tự do);
 dạng chuẩn dùng khoá sắp xếp, không khoảng trắng.
