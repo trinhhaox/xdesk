@@ -1,4 +1,3 @@
-import LocalAuthentication
 import SwiftUI
 import UIKit
 import XdeskInput
@@ -23,10 +22,12 @@ struct StreamView: View {
     @State private var noticeTask: Task<Void, Never>?
     @State private var zoom = VideoZoomState()
     @State private var floating = FloatingControlStore()
+    @State private var windowAdjust: WindowAdjustController
 
     init(model: StreamViewModel) {
         self.model = model
         _composer = State(initialValue: TextComposerController(session: model.session))
+        _windowAdjust = State(initialValue: WindowAdjustController(session: model.session))
     }
 
     var body: some View {
@@ -35,6 +36,9 @@ struct StreamView: View {
                 RemoteTrackpadView(model: model)
             } else {
                 streamContent
+            }
+            if model.session.state == .streaming, model.session.hostVideoUnavailable {
+                HostLockedOverlay(session: model.session) { Task { await model.disconnect() } }
             }
             if model.session.state != .streaming {
                 connectingOverlay
@@ -48,14 +52,18 @@ struct StreamView: View {
                 Color.black
                 VideoSurface(
                     renderer: model.session.renderer, session: model.session, config: model.currentConfig,
-                    composer: composer, pointer: pointer.settings, zoom: zoom
+                    composer: composer, pointer: pointer.settings, zoom: zoom, windowAdjust: windowAdjust
                 )
-                FloatingControl(
-                    store: floating,
-                    container: floatingArea(proxy.size),
-                    onCollapse: { shortcutsExpanded = false; fitExpanded = false; displaysExpanded = false }
-                ) { close, keepAlive in
-                    menuItems(close, keepAlive: keepAlive)
+                if windowAdjust.isActive {
+                    WindowAdjustChrome(controller: windowAdjust)
+                } else {
+                    FloatingControl(
+                        store: floating,
+                        container: floatingArea(proxy.size),
+                        onCollapse: { shortcutsExpanded = false; fitExpanded = false; displaysExpanded = false }
+                    ) { close, keepAlive in
+                        menuItems(close, keepAlive: keepAlive)
+                    }
                 }
                 if !composer.preview.isEmpty { composingPreview }
                 if let help = model.session.pendingAgentHelp { agentHelpBanner(help) }
@@ -76,6 +84,8 @@ struct StreamView: View {
         }
         .ignoresSafeArea(.keyboard)
         .background(Color.black.ignoresSafeArea())
+        .onAppear { windowAdjust.onNotice = { showTransientNotice($0) } }
+        .onChange(of: windowAdjustAvailable) { _, available in if !available { windowAdjust.exit() } }
         .sheet(isPresented: $showPointerSettings) { PointerSettingsSheet(store: pointer) }
         .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.item]) { result in
             if case .success(let url) = result {
@@ -98,6 +108,11 @@ struct StreamView: View {
             showTransientNotice(result.message)
             model.session.clearLastUnlockResult()
         }
+        .onChange(of: model.session.lastLockResult) { _, result in
+            guard let result else { return }
+            showTransientNotice(result.message)
+            model.session.clearLastLockResult()
+        }
         .onChange(of: model.session.lastFileTransferError) { _, err in
             guard let err else { return }
             showTransientNotice("Nhận tệp thất bại: \(err)")
@@ -111,6 +126,17 @@ struct StreamView: View {
         } message: { request in
             Text("\(request.agentName): \(request.summary)\nChỉ cho phép nếu chính bạn vừa yêu cầu agent làm việc trên Mac.")
         }
+    }
+
+    /// Chỉnh cửa sổ chỉ ở chế độ có hình, khi host cấp cap và đang truyền; mất một trong các điều kiện thì tự thoát chế độ.
+    private var windowAdjustAvailable: Bool {
+        model.session.supportsWindowControl && model.session.state == .streaming && !model.activeWorkMode.isControlMode
+    }
+
+    private func startWindowAdjust() {
+        composer.isActive = false
+        windowAdjust.enter()
+        Haptics.light()
     }
 
     /// Vùng nút nổi được di chuyển: bàn phím không làm đổi cỡ vùng stream (`ignoresSafeArea(.keyboard)`, nếu đổi sẽ phải xin lại cấu hình
@@ -232,6 +258,7 @@ struct StreamView: View {
                     hostDisplayPickerMenu(dismiss: dismiss, keepAlive: keepAlive)
                 }
             }
+            if windowAdjustAvailable { item("Chỉnh cửa sổ", "macwindow", dismiss) { startWindowAdjust() } }
             if zoom.isZoomed { item("Vừa khung màn hình", "arrow.down.right.and.arrow.up.left", dismiss) { zoom.reset?() } }
             Button {
                 Haptics.light()
@@ -296,6 +323,12 @@ struct StreamView: View {
             dockTile(systemName: "camera.viewfinder", label: "Chụp ảnh", accessibility: "Chụp ảnh màn hình Mac") {
                 sendShortcut(usage: 0x21, mods: [.command, .shift])
                 close()
+            }
+            if windowAdjustAvailable, model.activeWorkMode == .mirror, model.mirrorFit == .touch {
+                dockTile(systemName: "macwindow", label: "Cửa sổ", accessibility: "Chỉnh cửa sổ Mac") {
+                    startWindowAdjust()
+                    close()
+                }
             }
         }
         .padding(.horizontal, 4)
@@ -398,22 +431,9 @@ struct StreamView: View {
         }
     }
 
+    /// Gửi yêu cầu mở khoá; Face ID/mật mã hiện khi điện thoại ký thử thách của Mac (xem `SecureEnclaveUnlockSigner`).
     private func unlockMacWithBiometrics() {
-        let context = LAContext()
-        var error: NSError?
-        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) else {
-            showTransientNotice("Cần bật Face ID / mật mã điện thoại để mở khoá Mac")
-            return
-        }
-        context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "Xác thực để mở khóa máy Mac") { success, _ in
-            Task { @MainActor in
-                if success {
-                    await model.session.sendSystemUnlock()
-                } else {
-                    showTransientNotice("Đã huỷ xác thực mở khoá Mac")
-                }
-            }
-        }
+        Task { await model.session.sendSystemUnlock() }
     }
 
     @ViewBuilder
@@ -595,16 +615,19 @@ private struct VideoSurface: UIViewRepresentable {
     let composer: TextComposerController
     let pointer: PointerSettings
     let zoom: VideoZoomState
+    let windowAdjust: WindowAdjustController
 
     func makeUIView(context: Context) -> VideoHostView {
-        VideoHostView(videoLayer: renderer.layer, touchView: TouchInputView(session: session, renderer: renderer), controller: composer, zoomState: zoom)
+        VideoHostView(videoLayer: renderer.layer, touchView: TouchInputView(session: session, renderer: renderer), controller: composer, zoomState: zoom, windowAdjust: windowAdjust)
     }
 
     func updateUIView(_ view: VideoHostView, context: Context) {
         view.touchView.pointer = pointer
         view.syncKeyboard(active: composer.isActive)
         view.zoomEnabled = config?.isNativeMirror ?? false
+        view.windowAdjustActive = windowAdjust.isActive
         guard let config, config.scale > 0 else { return }
+        view.touchView.configScale = config.scale
         view.touchView.hostPoints = CGSize(width: Double(config.w) / config.scale, height: Double(config.h) / config.scale)
     }
 }

@@ -35,4 +35,10 @@ object Capabilities {
     const val REMOTE_UNLOCK = 1L shl 10
     const val MEDIA_KEYS = 1L shl 11
     const val MULTI_DISPLAY = 1L shl 12
+
+    /** Mở khoá Mac phải kèm chữ ký ECDSA của khoá sinh trắc học trên điện thoại. */
+    const val UNLOCK_ATTESTATION = 1L shl 13
+
+    /** Viewer chọn/kéo/đổi cỡ cửa sổ app trên Mac (`window.pick/selected/adjust`); host cần quyền input + Accessibility. */
+    const val WINDOW_CONTROL = 1L shl 14
 }

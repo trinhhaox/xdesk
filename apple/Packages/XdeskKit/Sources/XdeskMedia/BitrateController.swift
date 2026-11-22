@@ -1,5 +1,5 @@
 /// ABR kiểu AIMD, logic thuần (người gọi truyền `nowMs`, không đọc đồng hồ).
-/// Giảm ×0.8 khi mất gói > 2% hoặc RTT vượt đường nền > 30%; tăng +5% sau 2 s ổn định. Sàn 2 Mb/s, trần 40 Mb/s (LAN); trần 15 Mb/s khi RTT > 20 ms (Tailscale/4G).
+/// Giảm ×0.8 khi mất gói > 2% hoặc RTT vượt đường nền > 30%; tăng +5% sau 2 s ổn định. Sàn 2 Mb/s, trần 40 Mb/s (LAN); trần 15 Mb/s khi RTT > 20 ms (Tailscale/4G), 5 Mb/s khi RTT > 80 ms (relay).
 public struct BitrateController: Sendable {
     public struct Limits: Sendable, Equatable {
         public var minKbps = 2_000
@@ -14,6 +14,10 @@ public struct BitrateController: Sendable {
         /// RTT vượt ngưỡng này (ms) thì áp trần `highRttMaxKbps` (đường dài như Tailscale qua 4G).
         public var highRttThresholdMs = 20
         public var highRttMaxKbps = 15_000
+        /// RTT vượt ngưỡng này: gần như chắc đi qua relay (Tailscale DERP) với băng thông hạn chế; đẩy cao hơn chỉ gây nghẽn,
+        /// mất gói, xin keyframe liên tục → hình nhoè và chớp.
+        public var relayRttThresholdMs = 80
+        public var relayMaxKbps = 5_000
         public init() {}
     }
 
@@ -31,7 +35,7 @@ public struct BitrateController: Sendable {
     /// Nạp một báo cáo mạng (`net.report`); trả bitrate mới nếu đổi.
     public mutating func update(lossPermille: Int, rttMs: Int, nowMs: Int) -> Int? {
         let previous = kbps
-        let ceiling = rttMs > limits.highRttThresholdMs ? min(limits.maxKbps, limits.highRttMaxKbps) : limits.maxKbps
+        let ceiling = ceilingKbps(rttMs: rttMs)
         if kbps > ceiling {
             kbps = ceiling
             lastEventMs = nowMs
@@ -48,6 +52,12 @@ public struct BitrateController: Sendable {
             kbps = min(ceiling, max(kbps + 1, Int(Double(kbps) * limits.increaseFactor)))
         }
         return kbps == previous ? nil : kbps
+    }
+
+    func ceilingKbps(rttMs: Int) -> Int {
+        if rttMs > limits.relayRttThresholdMs { return min(limits.maxKbps, limits.relayMaxKbps) }
+        if rttMs > limits.highRttThresholdMs { return min(limits.maxKbps, limits.highRttMaxKbps) }
+        return limits.maxKbps
     }
 
     private func isCongested(lossPermille: Int, rttMs: Int) -> Bool {

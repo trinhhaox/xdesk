@@ -67,6 +67,8 @@ final class StreamViewModel {
         }
     }
     let session: ViewerSession
+    /// Bàn phím Mac ảo sống theo phiên (Caps Lock không mất khi đổi tab/chế độ).
+    let macKeyboard = MacKeyboardModel()
     /// Danh tính + host đã ghép của iPhone/iPad; nil khi không mở được Keychain/file (xem `securityError`).
     let security: DeviceSecurityStores?
     let securityError: String?
@@ -119,11 +121,13 @@ final class StreamViewModel {
             security = stores
             securityError = nil
             self.trust = trust
-            session = ViewerSession(security: AppSecurity.current, deviceName: UIDevice.current.name, trust: trust, clipboard: clipboard, audio: audio)
+            session = ViewerSession(security: AppSecurity.current, deviceName: UIDevice.current.name, trust: trust, clipboard: clipboard, audio: audio, unlockSigner: SecureEnclaveUnlockSigner())
         } catch {
             security = nil
             trust = nil
             securityError = error.localizedDescription
+            // Không có kho danh tính (lỗi Keychain) thì không có khoá tĩnh để gắn vào chữ ký và cũng không ghép đôi/kết nối mã hoá được,
+            // nên cố ý không đưa signer vào: phiên này không đưa `unlockAttestation` và host không bao giờ gõ mật khẩu cho nó.
             session = ViewerSession(security: AppSecurity.current, deviceName: UIDevice.current.name, clipboard: clipboard, audio: audio)
         }
     }
@@ -201,6 +205,8 @@ final class StreamViewModel {
         if let neededScreen = next.screenMode, screenMode != neededScreen {
             screenMode = neededScreen
         }
+        // Vào/ra chế độ điều khiển đổi `display.config` (màn hình thật ↔ màn hình theo điện thoại).
+        if wasControl != next.isControlMode { displayOptionsChanged() }
     }
 
     /// Thoát về danh sách host, gửi `bye` lịch sự (cũng là nút Huỷ khi đang kết nối).
@@ -212,6 +218,7 @@ final class StreamViewModel {
         selectedDisplayId = nil
         activeWorkMode = defaultWorkMode
         suspended = false
+        macKeyboard.reset()
         await session.disconnect()
     }
 
@@ -350,7 +357,10 @@ final class StreamViewModel {
         guard var config = DisplayConfigPlanner.config(
             pointsWidth: metrics.size.width, pointsHeight: metrics.size.height, scale: metrics.scale,
             fps: targetFps, codec: videoCodec,
-            mode: screenMode, mirrorFit: mirrorFit
+            // Chế độ điều khiển (chuột/bàn phím/trình chiếu) không có hình: giữ nguyên màn hình thật của Mac
+            // (chiếu gốc, không tạo màn hình ảo, không co cửa sổ, không đổi khi xoay điện thoại).
+            mode: activeWorkMode.isControlMode ? .mirror : screenMode,
+            mirrorFit: activeWorkMode.isControlMode ? .native : mirrorFit
         ) else { return nil }
         config.videoPaused = activeWorkMode.isControlMode ? true : nil
         config.displayId = (screenMode == .mirror ? selectedDisplayId : nil)

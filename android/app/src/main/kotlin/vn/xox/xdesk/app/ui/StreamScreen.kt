@@ -5,9 +5,6 @@ import android.view.SurfaceHolder
 import android.view.Window
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.biometric.BiometricManager
-import androidx.biometric.BiometricPrompt
-import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -78,6 +75,8 @@ import vn.xox.xdesk.app.clearViewport
 import vn.xox.xdesk.app.onViewportChanged
 import vn.xox.xdesk.app.switchFit
 import vn.xox.xdesk.app.switchWorkMode
+import vn.xox.xdesk.app.window.WindowSpace
+import vn.xox.xdesk.wire.MirrorFit
 
 /**
  * Toàn màn hình (immersive): một [StreamViewport] aspect-fit trong vùng đã trừ tai thỏ, đúng vùng đã xin host qua `display.config`.
@@ -94,6 +93,12 @@ fun StreamScreen(controller: ViewerController, window: Window) {
     var zoomed by remember { mutableStateOf(false) }
     val density = LocalDensity.current
     val context = LocalContext.current
+    DisposableEffect(context) {
+        val host = context as? FragmentActivity
+        controller.unlockSigner.activity = host
+        // So sánh trước khi xoá: màn hình mới có thể đã gắn activity của nó trước khi dispose của màn cũ chạy.
+        onDispose { if (controller.unlockSigner.activity === host) controller.unlockSigner.activity = null }
+    }
     val filePickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         uri?.let {
             var displayName = uri.lastPathSegment?.substringAfterLast('/') ?: "file"
@@ -124,6 +129,9 @@ fun StreamScreen(controller: ViewerController, window: Window) {
         while (controller.streaming) { controller.refreshStats(); delay(1000) }
     }
     LaunchedEffect(controller.input) { viewRef?.resetZoom() }
+    // Rời chế độ có hình, mất quyền hoặc ngắt kết nối thì thoát chế độ chỉnh cửa sổ.
+    val windowControl = controller.windowControlAvailable
+    LaunchedEffect(windowControl) { if (!windowControl) controller.windowAdjust.exit() }
 
     if (controller.isControlMode) {
         Box(Modifier.fillMaxSize()) {
@@ -131,7 +139,6 @@ fun StreamScreen(controller: ViewerController, window: Window) {
                 controller = controller,
                 activeMode = controller.activeWorkMode,
                 onSelectMode = controller::switchWorkMode,
-                isFullscreen = true,
                 onDismiss = controller::disconnect
             )
             Overlay(controller, waitForFrame = false)
@@ -163,18 +170,24 @@ fun StreamScreen(controller: ViewerController, window: Window) {
         controller.activeFileTransfer?.let { transfer ->
             FileTransferBanner(transfer, onCancel = controller::cancelFileTransfer)
         }
+        val windowAdjust = controller.windowAdjust
+        if (windowAdjust.active) {
+            WindowAdjustOverlay(windowAdjust) { viewRef?.let { WindowSpace.of(it.mapper, it.viewport, it.panY, controller.windowPointSize) } }
+        }
         val actions = floatingActions(
             controller, pointerStore, zoomed,
             onResetZoom = { viewRef?.resetZoom() },
             onSendFile = { filePickerLauncher.launch("*/*") },
+            onAdjustWindow = windowAdjust::enter,
         ) { showPointerSettings = true }
         val quickDock = quickDockShortcuts(
             controller,
             keyboardShown = imeBottom > 0,
             onKeyboard = { if (imeBottom > 0) viewRef?.surfaceView?.hideKeyboard() else viewRef?.surfaceView?.showKeyboard() },
+            onAdjustWindow = windowAdjust::enter,
         )
-        val macShortcuts = macQuickShortcuts(controller, context)
-        if (!controller.awaitingFrame && controller.sasPrompt == null) {
+        val macShortcuts = macQuickShortcuts(controller)
+        if (!controller.awaitingFrame && controller.sasPrompt == null && !windowAdjust.active) {
             FloatingControl(
                 store = floatingStore,
                 status = controller.stats,
@@ -209,7 +222,7 @@ fun StreamScreen(controller: ViewerController, window: Window) {
 
 private fun floatingActions(
     controller: ViewerController, store: PointerSettingsStore, zoomed: Boolean,
-    onResetZoom: () -> Unit, onSendFile: () -> Unit, onPointerSettings: () -> Unit,
+    onResetZoom: () -> Unit, onSendFile: () -> Unit, onAdjustWindow: () -> Unit, onPointerSettings: () -> Unit,
 ) = buildList {
     add(
         FloatingAction(
@@ -232,6 +245,9 @@ private fun floatingActions(
             ),
         )
     }
+    if (controller.windowControlAvailable) {
+        add(FloatingAction("Chỉnh cửa sổ", XdeskIcons.AppWindow, "Kéo, đổi cỡ hoặc xếp cửa sổ trên Mac", onClick = onAdjustWindow))
+    }
     if (zoomed) add(FloatingAction("Vừa khung màn hình", XdeskIcons.FitScreen, "Thu về vừa khung màn hình", onClick = onResetZoom))
     if (controller.clipboardAvailable) {
         add(FloatingAction("Gửi clipboard sang Mac", XdeskIcons.Clipboard, "Gửi clipboard sang máy Mac", afterShortcuts = true, onClick = controller::sendClipboardToMac))
@@ -246,53 +262,27 @@ private fun quickDockShortcuts(
     controller: ViewerController,
     keyboardShown: Boolean,
     onKeyboard: () -> Unit,
-) = listOf(
+    onAdjustWindow: () -> Unit,
+) = listOfNotNull(
     DockShortcut(if (keyboardShown) "Ẩn phím" else "Bàn phím", XdeskIcons.Keyboard, if (keyboardShown) "Ẩn bàn phím" else "Hiện bàn phím", enabled = controller.streaming, onClick = onKeyboard),
     DockShortcut("Khoá Mac", XdeskIcons.Lock, "Khóa máy Mac") { controller.sendSystemLock() },
     DockShortcut("Chụp ảnh", XdeskIcons.Camera, "Chụp vùng màn hình Mac (⌘ ⇧ 4)") { controller.input?.tapKey(0x21, 9) },
+    DockShortcut("Cửa sổ", XdeskIcons.AppWindow, "Chỉnh cửa sổ trên Mac", onClick = onAdjustWindow).takeIf {
+        controller.windowControlAvailable && controller.activeWorkMode == WorkMode.MIRROR && controller.display.fit == MirrorFit.TOUCH
+    },
 )
 
-private fun macQuickShortcuts(controller: ViewerController, context: android.content.Context) = listOf(
+private fun macQuickShortcuts(controller: ViewerController) = listOf(
     DockShortcut("Spotlight (⌘ Space)", XdeskIcons.Search) { controller.input?.tapKey(0x2C, 8) },
     DockShortcut("Mission Control (⌃ ↑)", XdeskIcons.Layers) { controller.input?.tapKey(0x52, 2) },
     DockShortcut("Chuyển app (⌘ Tab)", XdeskIcons.AppWindow) { controller.input?.tapKey(0x2B, 8) },
     DockShortcut("Hoàn tác (⌘ Z)", XdeskIcons.Undo) { controller.input?.tapKey(0x1D, 8) },
-    DockShortcut("Mở khoá Mac", XdeskIcons.Unlock) { unlockMacWithBiometrics(controller, context) },
+    DockShortcut("Mở khoá Mac", XdeskIcons.Unlock) { unlockMacWithBiometrics(controller) },
 )
 
-private fun unlockMacWithBiometrics(controller: ViewerController, context: android.content.Context) {
-    val activity = context as? FragmentActivity ?: run {
-        controller.showToast("Cần xác thực vân tay / khoá màn hình để mở khoá Mac")
-        return
-    }
-    val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or
-        BiometricManager.Authenticators.BIOMETRIC_WEAK or
-        BiometricManager.Authenticators.DEVICE_CREDENTIAL
-    val status = BiometricManager.from(activity).canAuthenticate(authenticators)
-    if (status != BiometricManager.BIOMETRIC_SUCCESS) {
-        controller.showToast("Cần bật vân tay / khoá màn hình trên điện thoại để mở khoá Mac")
-        return
-    }
-    val executor = ContextCompat.getMainExecutor(activity)
-    val prompt = BiometricPrompt(
-        activity,
-        executor,
-        object : BiometricPrompt.AuthenticationCallback() {
-            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                controller.sendSystemUnlock()
-            }
-
-            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                controller.showToast("Đã huỷ xác thực mở khoá Mac")
-            }
-        },
-    )
-    val info = BiometricPrompt.PromptInfo.Builder()
-        .setTitle("Mở khoá máy Mac")
-        .setSubtitle("Xác thực sinh trắc học hoặc mã khoá điện thoại để tiếp tục")
-        .setAllowedAuthenticators(authenticators)
-        .build()
-    prompt.authenticate(info)
+/** Gửi yêu cầu mở khoá; vân tay/mã khoá hiện khi điện thoại ký thử thách của Mac (xem `AndroidKeystoreUnlockSigner`). */
+private fun unlockMacWithBiometrics(controller: ViewerController) {
+    controller.sendSystemUnlock()
 }
 
 @Composable
@@ -379,6 +369,8 @@ private fun Overlay(controller: ViewerController, waitForFrame: Boolean = true) 
         Box(Modifier.fillMaxSize().background(XdeskOverlay.scrim), contentAlignment = Alignment.Center) { SasCodeView(prompt) }
     } else if (controller.reconnectAttempt > 0 || (if (waitForFrame) controller.awaitingFrame else controller.connecting)) {
         ConnectingOverlay(controller.progress.targetName, controller.reconnectAttempt, onCancel = controller::disconnect)
+    } else if (controller.streaming && controller.hostVideoUnavailable) {
+        HostLockedOverlay(controller)
     }
 }
 

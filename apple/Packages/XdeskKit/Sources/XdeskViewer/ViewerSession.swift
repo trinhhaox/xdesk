@@ -32,6 +32,12 @@ public final class ViewerSession {
     public private(set) var negotiatedCaps: Capabilities = []
     public var supportsHotReconfigure: Bool { negotiatedCaps.contains(.hotReconfigure) }
     public var supportsVideoPause: Bool { negotiatedCaps.contains(.videoPause) }
+    /// Host cho phép chọn/kéo/đổi cỡ cửa sổ Mac (cần quyền `input` + Accessibility); UI ẩn "Chỉnh cửa sổ" khi `false`.
+    public var supportsWindowControl: Bool { negotiatedCaps.contains(.windowControl) }
+    /// `window.selected` gần nhất của host (kể cả `ok == false`, kèm `message`); nil khi chưa có/đã ngắt kết nối.
+    public internal(set) var selectedWindow: WindowSelected?
+    /// Gọi trên main actor mỗi khi host gửi `window.selected` (dùng khi cần phân biệt từng phản hồi, kể cả lỗi lặp lại).
+    @ObservationIgnored public var onWindowSelected: (@MainActor (WindowSelected) -> Void)?
     public private(set) var lastFailureTransient = false
     /// Đích đã kết nối thành công (QR có thể thử nhiều địa chỉ); phiên mở lại dùng đích này.
     public internal(set) var connectedTarget: ViewerTarget?
@@ -43,6 +49,10 @@ public final class ViewerSession {
     public internal(set) var refusedHostId: String?
     /// Fingerprint host của phiên hiện tại (đặt sau khi bắt tay mã hoá thành công).
     @ObservationIgnored var connectedHostId: String?
+    /// Khoá tĩnh Noise và tên của host đang kết nối (gắn vào dữ liệu ký mở khoá, hiện trong lời nhắc Face ID).
+    @ObservationIgnored var connectedHostKey: [UInt8]?
+    @ObservationIgnored var connectedHostName: String?
+    @ObservationIgnored var unlockGate = UnlockRequestGate()
     /// Yêu cầu duyệt quyền điều khiển cho agent AI đang chờ trả lời (xem `agent.approve`); nil khi không có/đã hết hạn.
     public internal(set) var pendingAgentApproval: AgentApprovalRequest?
     public struct AgentHelpNotice: Sendable, Equatable, Identifiable {
@@ -72,6 +82,13 @@ public final class ViewerSession {
     public internal(set) var lastFileTransferError: String?
     /// Kết quả đánh thức / mở khoá Mac gần nhất do host gửi về.
     public internal(set) var lastUnlockResult: SystemUnlockResult?
+    /// Kết quả khoá màn hình Mac gần nhất do host gửi về.
+    public internal(set) var lastLockResult: SystemLockResult?
+    /// Trạng thái màn hình Mac do host báo (nil = host cũ/chưa báo). `videoAvailable == false`: Mac đang khoá/tắt màn hình, chưa có hình
+    /// nhưng phiên vẫn sống: không coi thiếu khung hình là mất liên lạc và hiện nút mở khoá.
+    public internal(set) var hostState: HostState?
+    /// Mac đang khoá/tắt màn hình nên host chưa phát hình.
+    public var hostVideoUnavailable: Bool { hostState?.videoAvailable == false }
     /// Số liệu phát audio (nil khi phiên không có audio); cập nhật mỗi 500 ms.
     public internal(set) var audioStats: AudioPlaybackStats?
     /// Ước lượng trễ audio đầu-cuối (ms): host giữ + rtt/2 + jitter buffer + thiết bị phát.
@@ -84,6 +101,7 @@ public final class ViewerSession {
     @ObservationIgnored let trust: ViewerTrust?
     @ObservationIgnored let clipboardConfig: ClipboardConfig?
     @ObservationIgnored let audioConfig: AudioConfig?
+    @ObservationIgnored let unlockSigner: (any UnlockSigner)?
     @ObservationIgnored var audioPlayer: AudioPlayer?
     @ObservationIgnored var clipboardSync: ClipboardSync?
     @ObservationIgnored var connection: ControlConnection?
@@ -124,8 +142,9 @@ public final class ViewerSession {
     /// `trust` bắt buộc khi `security == .encrypted` (danh tính + host đã biết); plaintext (Debug) bỏ qua.
     public init(
         security: TransportSecurity, deviceName: String, trust: ViewerTrust? = nil, clipboard: ClipboardConfig? = nil,
-        audio: AudioConfig? = nil
+        audio: AudioConfig? = nil, unlockSigner: (any UnlockSigner)? = nil
     ) {
+        self.unlockSigner = unlockSigner
         self.clipboardConfig = clipboard
         self.audioConfig = audio
         self.security = security
@@ -150,6 +169,9 @@ public final class ViewerSession {
         lastFailureTransient = false
         refusedHostId = nil
         connectedHostId = nil
+        connectedHostKey = nil
+        connectedHostName = nil
+        unlockGate.reset()
         connectedRemoteAddress = nil
         do {
             try await establish(candidates, config: config, auth: auth)
@@ -185,6 +207,7 @@ public final class ViewerSession {
         let result = try await conn.performViewerHandshake(name: deviceName, caps: offeredCaps(tunnel: conn.isUsbTunnel), display: config)
         negotiatedCaps = result.caps
         await startClipboard(on: conn, negotiated: result.caps)
+        await registerUnlockKey(on: conn, negotiated: result.caps)
         startAudio(negotiated: result.caps)
         factory = SampleBufferFactory(codec: config.codec)
         streamId = result.ready.streamId
@@ -242,6 +265,7 @@ public final class ViewerSession {
         }
         earlyReadyIds.removeAll()
         hostDisplays = []
+        hostState = nil
         activeFileTransfer = nil
         if let sendingId = activeSendingFileId {
             fileCancelToken.cancel(sendingId)
@@ -251,6 +275,7 @@ public final class ViewerSession {
         negotiatedCaps = []
         pendingAgentApproval = nil
         pendingAgentHelp = nil
+        selectedWindow = nil
         await stopClipboard()
         stopAudio()
         tasks.forEach { $0.cancel() }
@@ -339,12 +364,11 @@ public final class ViewerSession {
         _ = try? await connection.send(.systemLock(SystemLock()))
     }
 
-    public func sendSystemUnlock() async {
-        guard let connection else { return }
-        _ = try? await connection.send(.systemUnlock(SystemUnlock()))
-    }
+    public func sendSystemUnlock() async { await requestUnlock() }
 
     public func clearLastUnlockResult() { lastUnlockResult = nil }
+    public func clearLastLockResult() { lastLockResult = nil }
+    public func existingUnlockPublicKey() async -> [UInt8]? { await unlockSigner?.existingPublicKey() }
     public func clearLastReceivedFile() { lastReceivedFileURL = nil }
     public func clearLastFileTransferError() { lastFileTransferError = nil }
 

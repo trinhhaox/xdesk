@@ -63,6 +63,8 @@ extension ViewerSession {
         }
         await remember(outcome, target: target, trust: trust)
         connectedHostId = DeviceFingerprint.make(publicKey: outcome.hostKey)
+        connectedHostKey = outcome.hostKey
+        connectedHostName = outcome.hostName
     }
 
     /// Host báo đã thu hồi (thông điệp đã xác thực trên kênh mã hoá): xoá host khỏi danh sách đã biết.

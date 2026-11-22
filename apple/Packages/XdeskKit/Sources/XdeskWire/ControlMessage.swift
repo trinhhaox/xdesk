@@ -24,8 +24,12 @@ public enum ControlMessage: Sendable, Equatable {
     case pairResult(PairResult)
     case agentApprove(AgentApprove)
     case systemLock(SystemLock)
+    case systemLockResult(SystemLockResult)
+    case hostState(HostState)
     case systemUnlock(SystemUnlock)
     case systemUnlockResult(SystemUnlockResult)
+    case systemUnlockChallenge(SystemUnlockChallenge)
+    case unlockKey(UnlockKey)
     case mediaKey(MediaKey)
     case displayList(DisplayList)
     case fileOffer(FileOffer)
@@ -35,6 +39,9 @@ public enum ControlMessage: Sendable, Equatable {
     case fileDone(FileDone)
     case fileCancel(FileCancel)
     case agentHelp(AgentHelp)
+    case windowPick(WindowPick)
+    case windowSelected(WindowSelected)
+    case windowAdjust(WindowAdjust)
     case unknown(type: String)
 
     /// Giá trị trường `t` trên wire.
@@ -67,8 +74,12 @@ public enum ControlMessage: Sendable, Equatable {
         case .pairResult(let p): ("pair.result", p)
         case .agentApprove(let p): ("agent.approve", p)
         case .systemLock(let p): ("system.lock", p)
+        case .systemLockResult(let p): ("system.lock.result", p)
+        case .hostState(let p): ("host.state", p)
         case .systemUnlock(let p): ("system.unlock", p)
         case .systemUnlockResult(let p): ("system.unlock.result", p)
+        case .systemUnlockChallenge(let p): ("system.unlock.challenge", p)
+        case .unlockKey(let p): ("unlock.key", p)
         case .mediaKey(let p): ("media.key", p)
         case .displayList(let p): ("display.list", p)
         case .fileOffer(let p): ("file.offer", p)
@@ -78,6 +89,9 @@ public enum ControlMessage: Sendable, Equatable {
         case .fileDone(let p): ("file.done", p)
         case .fileCancel(let p): ("file.cancel", p)
         case .agentHelp(let p): ("agent.help", p)
+        case .windowPick(let p): ("window.pick", p)
+        case .windowSelected(let p): ("window.selected", p)
+        case .windowAdjust(let p): ("window.adjust", p)
         case .unknown(let type): (type, nil)
         }
     }
@@ -97,6 +111,13 @@ public enum ControlMessage: Sendable, Equatable {
             guard n.lossPermille <= 1000 else { throw WireError.invalidField("net.report.lossPermille") }
         case .agentApprove(let a):
             try a.validate()
+        case .systemUnlockChallenge(let c):
+            guard UnlockAttestation.decodeNonce(c.nonce) != nil else { throw WireError.invalidField("system.unlock.challenge.nonce") }
+        case .unlockKey(let k):
+            guard k.alg == UnlockAttestation.algorithm else { throw WireError.invalidField("unlock.key.alg") }
+            guard UnlockAttestation.decodePublicKey(k.pub) != nil else { throw WireError.invalidField("unlock.key.pub") }
+        case .systemUnlock(let u):
+            if let sig = u.sig, !UnlockAttestation.isPlausibleSignature(sig) { throw WireError.invalidField("system.unlock.sig") }
         case .clipOffer(let o):
             guard o.size > 0, Int(o.size) <= ClipLimits.maxBytes else { throw WireError.invalidField("clip.offer.size") }
             if let hash = o.hash, !ClipLimits.isValidHash(hash) { throw WireError.invalidField("clip.offer.hash") }
@@ -115,6 +136,9 @@ public enum ControlMessage: Sendable, Equatable {
             guard ClipLimits.isValidHash(d.hash) else { throw WireError.invalidField("file.done.hash") }
         case .fileCancel(let c):
             guard !c.id.isEmpty, c.id.utf8.count <= FileTransferLimits.maxIdBytes else { throw WireError.invalidField("file.cancel.id") }
+        case .windowPick(let p): try p.validate()
+        case .windowSelected(let p): try p.validate()
+        case .windowAdjust(let p): try p.validate()
         default:
             break
         }

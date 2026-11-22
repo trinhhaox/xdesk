@@ -42,6 +42,16 @@ internal fun LazyListScope.securityPageItems(controller: ViewerController, onFor
                     Text(controller.fingerprint ?: (controller.identityError ?: "Không có"), fontSize = 13.sp, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+            val unlockFingerprint = remember { controller.unlockKeyFingerprint() }
+            if (unlockFingerprint != null) {
+                GroupDivider()
+                GroupRow {
+                    Column(Modifier.weight(1f)) {
+                        Text("Khoá mở khoá Mac", fontSize = 17.sp)
+                        Text(unlockFingerprint, fontSize = 13.sp, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
             GroupDivider()
             GroupRow(onReset) {
                 Column(Modifier.weight(1f)) {

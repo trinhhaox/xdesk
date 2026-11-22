@@ -54,7 +54,8 @@ class ViewerSessionTest {
         await("hello+display.config tới host") { host.received.any { it is ControlMessage.DisplayConfig } }
         val hello = host.received.filterIsInstance<ControlMessage.Hello>().single()
         val expected = Capabilities.H264 or Capabilities.HOT_RECONFIGURE or Capabilities.VIDEO_PAUSE or
-            Capabilities.FILE_TRANSFER or Capabilities.REMOTE_UNLOCK or Capabilities.MEDIA_KEYS or Capabilities.MULTI_DISPLAY
+            Capabilities.FILE_TRANSFER or Capabilities.REMOTE_UNLOCK or Capabilities.MEDIA_KEYS or Capabilities.MULTI_DISPLAY or
+            Capabilities.WINDOW_CONTROL
         assertEquals(expected, hello.caps)
         assertEquals(1280L, host.received.filterIsInstance<ControlMessage.DisplayConfig>().single().w)
     }
@@ -170,7 +171,8 @@ class ViewerSessionTest {
         host.push(ControlMessage.AgentApprove("old", "Claude", "x", System.currentTimeMillis() - 1000))
         host.push(ControlMessage.AgentApprove.response("echo", true))
         host.push(ControlMessage.AgentApprove("good", "Claude", "y", System.currentTimeMillis() + 60_000))
-        await("yêu cầu hợp lệ hiện lên") { session.pendingAgentApproval != null }
+        // AgentApprovalGate gán `current` trước khi gọi onChange: chờ cả hai, nếu không có thể đọc approvalEvents quá sớm.
+        await("yêu cầu hợp lệ hiện lên") { session.pendingAgentApproval != null && approvalEvents.isNotEmpty() }
         assertEquals("good", session.pendingAgentApproval?.id)
         assertEquals(listOf("good"), approvalEvents.mapNotNull { it?.id })
     }

@@ -18,6 +18,12 @@ class AudioJitterBuffer {
     }
 
     val counters = Counters()
+
+    /** Mức đệm hiện tại: bắt đầu [TARGET_MS], mỗi lần thiếu mẫu tăng [TARGET_STEP_MS] tới [MAX_TARGET_MS] (mạng rung như
+     *  Tailscale qua relay cần đệm sâu hơn LAN, nếu không sẽ nghe rè vì liên tục thiếu/cắt mẫu). */
+    var targetMs = TARGET_MS
+        private set
+    private val overflowMs: Int get() = targetMs + OVERFLOW_MARGIN_MS
     private var samples = ShortArray(INITIAL_CAPACITY)
     private var head = 0
     private var size = 0
@@ -50,7 +56,7 @@ class AudioJitterBuffer {
         val want = frames * CHANNELS
         val out = ShortArray(want)
         if (!started) {
-            if (bufferedFrames < TARGET_MS * FRAMES_PER_MS) return out
+            if (bufferedFrames < targetMs * FRAMES_PER_MS) return out
             started = true
         }
         val available = minOf(want, size)
@@ -60,6 +66,7 @@ class AudioJitterBuffer {
         if (available < want) {
             started = false
             counters.underruns++
+            targetMs = minOf(MAX_TARGET_MS, targetMs + TARGET_STEP_MS)
         }
         return out
     }
@@ -93,8 +100,8 @@ class AudioJitterBuffer {
     }
 
     private fun trimIfOverflowing() {
-        if (depthMs <= OVERFLOW_MS) return
-        val keep = TARGET_MS * FRAMES_PER_MS * CHANNELS
+        if (depthMs <= overflowMs) return
+        val keep = targetMs * FRAMES_PER_MS * CHANNELS
         val drop = size - keep
         head = (head + drop) % samples.size
         size = keep
@@ -104,6 +111,9 @@ class AudioJitterBuffer {
     companion object {
         const val TARGET_MS = 40
         const val OVERFLOW_MS = 100
+        const val OVERFLOW_MARGIN_MS = OVERFLOW_MS - TARGET_MS
+        const val TARGET_STEP_MS = 20
+        const val MAX_TARGET_MS = 200
         const val MAX_CONCEALED_PACKETS = 50
         private const val CHANNELS = AudioPayload.CHANNELS
         private const val FRAMES_PER_MS = AudioPayload.SAMPLE_RATE / 1000

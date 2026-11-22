@@ -5,7 +5,7 @@ private let helloSha256 = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043
 private let transferId = "7f3a9c01-5b2e-4d11-9a47-0c6e2d8b1f55"
 
 func controlVectors() -> JSONObject {
-    let messages: [(String, UInt32, ControlMessage)] = baseMessages + sessionMessages + fileMessages
+    let messages: [(String, UInt32, ControlMessage)] = baseMessages + sessionMessages + fileMessages + unlockAttestationMessages + windowControlMessages
     let frames: [(String, ControlFrameKind, [UInt8])] = [
         ("handshake-3-bytes", .handshake, [0xAA, 0xBB, 0xCC]),
         ("bulk-1-byte", .bulk, [0x00]),
@@ -28,6 +28,7 @@ func controlVectors() -> JSONObject {
             ["name": "payload-missing", "hex": "0000000a02aabb"],
         ] as [JSONObject],
         "invalidMessages": invalidMessages(),
+        "unlockAttestation": unlockAttestationSignatureVector,
     ]
 }
 
@@ -144,7 +145,7 @@ private func invalidMessages() -> [JSONObject] {
         ("display-ready-port-zero", "{\"id\":1,\"streamId\":1,\"t\":\"display.ready\",\"udpPort\":0}", "invalidField"),
         ("net-report-loss-over-1000", "{\"id\":1,\"jitterMs\":0,\"lossPermille\":1001,\"recvKbps\":0,\"rttMs\":0,\"t\":\"net.report\"}", "invalidField"),
         ("agent-approve-empty-request-id", "{\"id\":1,\"requestId\":\"\",\"t\":\"agent.approve\"}", "invalidField"),
-    ] + newInvalidMessages
+    ] + newInvalidMessages + unlockAttestationInvalidMessages + windowControlInvalidMessages
 
     return cases.map { name, json, error in
         expectError(name, error) { _ = try ControlMessageCodec.decode(Array(json.utf8)) }

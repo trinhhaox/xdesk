@@ -1,6 +1,5 @@
 import SwiftUI
 
-@main
 struct XdeskApp: App {
     private let security: SecurityCenter
     private let host: HostController

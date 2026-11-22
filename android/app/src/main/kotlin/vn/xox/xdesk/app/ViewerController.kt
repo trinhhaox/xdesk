@@ -15,6 +15,7 @@ import java.io.File
 import java.io.InputStream
 import java.util.concurrent.Executors
 import vn.xox.xdesk.app.discovery.DiscoveredHost
+import vn.xox.xdesk.app.window.WindowAdjustState
 import vn.xox.xdesk.media.AndroidCodecList
 import vn.xox.xdesk.media.VideoDecoder
 import vn.xox.xdesk.transport.AgentApprovalRequest
@@ -51,6 +52,7 @@ class ViewerController(
     internal val background = Executors.newSingleThreadExecutor { Thread(it, "xdesk-connect") }
     internal val decoder = VideoDecoder({ session?.requestKeyframe() }, { post { onDecoderError(it) } }, onVideoSize = { w, h -> post { onVideoSize(w, h) } })
     private val audio = AppAudio()
+    internal val unlockSigner = AndroidKeystoreUnlockSigner()
     internal var session: ViewerSession? = null
         private set
     private var generation = 0 // tăng mỗi lần mở/đóng phiên: trạng thái muộn của phiên cũ bị bỏ qua
@@ -68,6 +70,9 @@ class ViewerController(
     var knownHosts by mutableStateOf<List<KnownHost>>(container.knownHosts.all())
     var connecting by mutableStateOf(false)
     var streaming by mutableStateOf(false)
+
+    /** Caps Lock của bàn phím Mac ảo: chỉ nằm trên điện thoại, sống suốt phiên, xoá khi ngắt kết nối. */
+    val macCapsLock = vn.xox.xdesk.app.input.CapsLockState()
     var reconnectAttempt by mutableStateOf(0)
         private set
     var clipboardAvailable by mutableStateOf(false)
@@ -80,6 +85,10 @@ class ViewerController(
         private set
     var hostDisplays by mutableStateOf<List<DisplayInfo>>(emptyList())
         private set
+    /** Host báo Mac khoá/tắt màn hình nên chưa có hình (`host.state`); phiên vẫn sống, UI hiện lớp phủ kèm nút mở khoá. */
+    var hostState by mutableStateOf<ControlMessage.HostState?>(null)
+        private set
+    val hostVideoUnavailable: Boolean get() = hostState?.videoAvailable == false
     var selectedDisplayId by mutableStateOf<Long?>(null)
         private set
     var activeFileTransfer by mutableStateOf<FileTransferProgress?>(null)
@@ -107,6 +116,24 @@ class ViewerController(
         private set
     var input: StreamInputRouter? = null
         private set
+
+    /** Chế độ "Chỉnh cửa sổ" (kéo/đổi cỡ/xếp cửa sổ Mac từ điện thoại). */
+    val windowAdjust = WindowAdjustState(
+        pick = { x, y -> session?.pickWindow(x, y) },
+        adjust = { session?.adjustWindow(it) },
+        toast = ::showToast,
+    )
+
+    /** Chỉ ở chế độ có hình, khi Mac đã cấp `windowControl` (quyền nhập liệu + Accessibility). */
+    val windowControlAvailable: Boolean get() = streaming && !isControlMode && session?.supportsWindowControl == true
+
+    /** Cỡ luồng video theo điểm (khung giải mã ÷ `display.config.scale`): hệ toạ độ của `window.*`; null khi chưa biết. */
+    val windowPointSize: Pair<Double, Double>?
+        get() {
+            val (w, h) = videoSize ?: return null
+            val scale = currentConfig?.scale?.takeIf { it > 0.0 } ?: return null
+            return w / scale to h / scale
+        }
 
     /** Giống màn hình Mac: Mac giữ nguyên cỡ, viewer zoom/kéo; xoay máy không đàm phán lại. */
     val isNativeMirror: Boolean get() = currentConfig?.mirrorFit == MirrorFit.NATIVE
@@ -159,11 +186,16 @@ class ViewerController(
             preferMediaOverTcp = preferTcp,
             fileTempDir = File(container.appContext.cacheDir, "xdesk-transfers"),
             onDisplayList = { list -> post { if (current == generation) hostDisplays = list } },
+            onHostState = { state -> post { if (current == generation) hostState = state } },
             onFileProgress = { progress -> post { if (current == generation) activeFileTransfer = progress } },
             onFileReceived = { completion -> handleIncomingFile(completion) },
             onFileError = { name, err -> post { if (current == generation) showToast("Nhận tệp $name thất bại: $err") } },
             onUnlockResult = { result -> post { if (current == generation) showToast(result.message) } },
+            unlockSigner = unlockSigner,
+            onLockResult = { result -> post { if (current == generation) showToast(result.message) } },
+            onWindowSelected = { selected -> post { if (current == generation) windowAdjust.onSelected(selected) } },
         )
+        hostState = null
         session = next
         input = StreamInputRouter(next).also { it.configure(config.w / config.scale.toFloat(), config.h / config.scale.toFloat()) }
         background.execute { next.connect(targets, config, auth) }
@@ -182,7 +214,10 @@ class ViewerController(
             w.toDouble(), h.toDouble(), density.toDouble(),
             fps = effectiveFps,
             codec = requestedCodec,
-            mode = activeScreenMode, mirrorFit = container.display.fit,
+            // Chế độ điều khiển (chuột/bàn phím/trình chiếu) không có hình: giữ nguyên màn hình thật của Mac
+            // (chiếu gốc, không tạo màn hình ảo, không co cửa sổ, không đổi khi xoay điện thoại).
+            mode = if (isControlMode) ScreenMode.MIRROR else activeScreenMode,
+            mirrorFit = if (isControlMode) MirrorFit.NATIVE else container.display.fit,
         )?.copy(
             videoPaused = if (activeWorkMode.isControlMode) true else null,
             displayId = if (activeScreenMode == ScreenMode.MIRROR) selectedDisplayId else null,
@@ -229,9 +264,11 @@ class ViewerController(
                 audioMuted = false
                 audio.player.muted = false
                 hostDisplays = emptyList()
+        hostState = null
                 selectedDisplayId = null
                 activeFileTransfer = null
                 connecting = false; streaming = false; sasPrompt = null; agentApproval = null
+                macCapsLock.on = false
                 activeWorkMode = container.display.defaultWorkMode
                 negotiatedScreenMode = null
                 decoder.stop()
@@ -313,6 +350,7 @@ class ViewerController(
         audioMuted = false
         audio.player.muted = false
         hostDisplays = emptyList()
+        hostState = null
         selectedDisplayId = null
         activeFileTransfer = null
         clearClipboardNotice()
@@ -345,6 +383,9 @@ class ViewerController(
     fun sendSystemLock() { session?.sendSystemLock() }
 
     fun sendSystemUnlock() { session?.sendSystemUnlock() }
+
+    /** Dấu vân tay khoá mở khoá Mac (để đối chiếu với Mac); `null` khi chưa tạo khoá. */
+    fun unlockKeyFingerprint(): String? = unlockSigner.existingPublicKey()?.let(vn.xox.xdesk.wire.UnlockAttestation::fingerprint)
 
     fun sendText(text: String) { session?.sendText(text) }
 
@@ -469,6 +510,7 @@ class ViewerController(
         clipboardAvailable = false
         audioAvailable = false
         activeFileTransfer = null
+        hostState = null
     }
 
     internal fun post(block: () -> Unit) { main.post(block) }

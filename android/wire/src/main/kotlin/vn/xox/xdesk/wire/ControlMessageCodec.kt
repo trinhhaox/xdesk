@@ -65,8 +65,12 @@ object ControlMessageCodec {
         is ControlMessage.PairResult -> "pair.result"
         is ControlMessage.AgentApprove -> "agent.approve"
         ControlMessage.SystemLock -> "system.lock"
+        is ControlMessage.SystemLockResult -> "system.lock.result"
+        is ControlMessage.HostState -> "host.state"
         is ControlMessage.SystemUnlock -> "system.unlock"
         is ControlMessage.SystemUnlockResult -> "system.unlock.result"
+        is ControlMessage.SystemUnlockChallenge -> "system.unlock.challenge"
+        is ControlMessage.UnlockKey -> "unlock.key"
         is ControlMessage.MediaKey -> "media.key"
         is ControlMessage.DisplayList -> "display.list"
         is ControlMessage.FileOffer -> "file.offer"
@@ -76,6 +80,9 @@ object ControlMessageCodec {
         is ControlMessage.FileDone -> "file.done"
         is ControlMessage.FileCancel -> "file.cancel"
         is ControlMessage.AgentHelp -> "agent.help"
+        is ControlMessage.WindowPick -> "window.pick"
+        is ControlMessage.WindowSelected -> "window.selected"
+        is ControlMessage.WindowAdjust -> "window.adjust"
         is ControlMessage.Unknown -> message.type
     }
 }
@@ -109,6 +116,14 @@ internal class FieldReader(private val obj: JsonObject) {
     fun u32(key: String): Long = i64(key).takeIf { it in 0..0xFFFFFFFFL } ?: bad(key)
 
     fun optU32(key: String): Long? = if (obj[key] == null || obj[key] == JsonNull) null else u32(key)
+
+    fun optDouble(key: String): Double? = if (obj[key] == null || obj[key] == JsonNull) null else double(key)
+
+    fun optObject(key: String): FieldReader? = when (val v = obj[key]) {
+        null, JsonNull -> null
+        is JsonObject -> FieldReader(v)
+        else -> bad(key)
+    }
 
     fun array(key: String): List<JsonValue> = (obj[key] as? JsonArray)?.items ?: bad(key)
 

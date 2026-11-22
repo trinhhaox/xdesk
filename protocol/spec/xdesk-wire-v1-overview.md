@@ -43,6 +43,8 @@ Capability là bitmask u32 (`caps`); phiên dùng giao của hai tập.
 | 10 | 0x400 | remoteUnlock: `system.unlock` mở khoá/đánh thức Mac |
 | 11 | 0x800 | mediaKeys: `media.key` phím media/âm lượng |
 | 12 | 0x1000 | multiDisplay: host gửi `display.list`, `display.config.displayId` chọn màn hình |
+| 13 | 0x2000 | unlockAttestation: mở khoá Mac kèm chữ ký sinh trắc học (`unlock.key`, `system.unlock.challenge`, `system.unlock{sig}`; chữ ký gắn khoá tĩnh host+viewer); host đưa bit này mỗi khi đưa `remoteUnlock` |
+| 14 | 0x4000 | windowControl: `window.pick/selected/adjust` chọn, kéo, đổi cỡ, xếp cửa sổ app trên Mac; host chỉ đưa bit này khi thiết bị có quyền `input` và Mac đã cấp Accessibility |
 
 Bit 7–12 chỉ là cờ thương lượng: bit nằm trong giao mới được dùng message tương ứng (chi tiết trong `control-messages.md`). Mac luôn đưa 7, 8, 9, 11, 12 vào `welcome`; bit 10 chỉ khi thiết bị viewer được cấp quyền mở khoá **và** Mac bật mở khoá từ xa.
 

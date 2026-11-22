@@ -27,6 +27,10 @@ internal class ControlReader(
     private val onFileTransfer: (ControlMessage) -> Unit = {},
     private val onDisplayList: (ControlMessage.DisplayList) -> Unit = {},
     private val onUnlockResult: (ControlMessage.SystemUnlockResult) -> Unit = {},
+    private val onUnlockChallenge: (ControlMessage.SystemUnlockChallenge) -> Unit = {},
+    private val onLockResult: (ControlMessage.SystemLockResult) -> Unit = {},
+    private val onHostState: (ControlMessage.HostState) -> Unit = {},
+    private val onWindowSelected: (ControlMessage.WindowSelected) -> Unit = {},
 ) {
     fun run() {
         try {
@@ -47,6 +51,10 @@ internal class ControlReader(
                     is ControlMessage.DisplayReady -> onDisplayReady(envelope.id, message)
                     is ControlMessage.DisplayList -> onDisplayList(message)
                     is ControlMessage.SystemUnlockResult -> onUnlockResult(message)
+                    is ControlMessage.SystemUnlockChallenge -> onUnlockChallenge(message)
+                    is ControlMessage.SystemLockResult -> onLockResult(message)
+                    is ControlMessage.HostState -> onHostState(message)
+                    is ControlMessage.WindowSelected -> onWindowSelected(message)
                     is ControlMessage.ClipOffer, is ControlMessage.ClipPull, is ControlMessage.ClipData -> onClipboard(message)
                     is ControlMessage.FileStart, is ControlMessage.FileChunk, is ControlMessage.FileDone, is ControlMessage.FileCancel ->
                         onFileTransfer(message)

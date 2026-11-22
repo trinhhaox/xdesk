@@ -5,12 +5,16 @@ import XdeskCrypto
 struct SecuritySettingsView: View {
     let model: StreamViewModel
     @State private var forgetting: PairedDevice?
+    @State private var unlockKeyFingerprint: String?
 
     var body: some View {
             Form {
                 Section("Thiết bị này") {
                     if let fingerprint = model.ownFingerprint {
                         LabeledContent("Dấu vân tay") { Text(fingerprint).font(.system(.footnote, design: .monospaced)).textSelection(.enabled) }
+                    }
+                    if let unlockKeyFingerprint {
+                        LabeledContent("Khoá mở khoá Mac") { Text(unlockKeyFingerprint).font(.system(.footnote, design: .monospaced)).textSelection(.enabled) }
                     }
                     if let error = model.securityError {
                         Label("Không mở được kho khoá bảo mật: \(error). Chưa thể ghép đôi.", systemImage: "exclamationmark.triangle.fill")
@@ -32,7 +36,10 @@ struct SecuritySettingsView: View {
             .background(BrandPalette.background)
             .navigationTitle("Bảo mật")
             .navigationBarTitleDisplayMode(.inline)
-            .task { await model.refreshTrust() }
+            .task {
+                await model.refreshTrust()
+                unlockKeyFingerprint = await model.session.existingUnlockPublicKey().map(UnlockKeyFormat.fingerprint(of:))
+            }
             .forgetHostDialog($forgetting, model: model)
     }
 }

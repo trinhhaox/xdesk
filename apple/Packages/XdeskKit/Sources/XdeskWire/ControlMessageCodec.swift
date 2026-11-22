@@ -77,8 +77,12 @@ public enum ControlMessageCodec {
         case "pair.result": return .pairResult(try body(PairResult.self))
         case "agent.approve": return .agentApprove(try body(AgentApprove.self))
         case "system.lock": return .systemLock(try body(SystemLock.self))
+        case "system.lock.result": return .systemLockResult(try body(SystemLockResult.self))
+        case "host.state": return .hostState(try body(HostState.self))
         case "system.unlock": return .systemUnlock(try body(SystemUnlock.self))
         case "system.unlock.result": return .systemUnlockResult(try body(SystemUnlockResult.self))
+        case "system.unlock.challenge": return .systemUnlockChallenge(try body(SystemUnlockChallenge.self))
+        case "unlock.key": return .unlockKey(try body(UnlockKey.self))
         case "media.key": return .mediaKey(try body(MediaKey.self))
         case "display.list": return .displayList(try body(DisplayList.self))
         case "file.offer": return .fileOffer(try body(FileOffer.self))
@@ -88,6 +92,9 @@ public enum ControlMessageCodec {
         case "file.done": return .fileDone(try body(FileDone.self))
         case "file.cancel": return .fileCancel(try body(FileCancel.self))
         case "agent.help": return .agentHelp(try body(AgentHelp.self))
+        case "window.pick": return .windowPick(try body(WindowPick.self))
+        case "window.selected": return .windowSelected(try body(WindowSelected.self))
+        case "window.adjust": return .windowAdjust(try body(WindowAdjust.self))
         default: return .unknown(type: type)
         }
     }

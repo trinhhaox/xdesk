@@ -42,8 +42,17 @@ class ViewerSession(
     private val onFileReceived: (FileTransferCompletion) -> Unit = {},
     private val onFileError: (String, String) -> Unit = { _, _ -> },
     private val onUnlockResult: (ControlMessage.SystemUnlockResult) -> Unit = {},
+    private val unlockSigner: UnlockSigner? = null,
+    private val onLockResult: (ControlMessage.SystemLockResult) -> Unit = {},
+    private val onHostState: (ControlMessage.HostState) -> Unit = {},
+    /** Gọi trên thread đọc control mỗi khi host gửi `window.selected` (kể cả `ok == false`); đẩy sang UI thread khi cần. */
+    private val onWindowSelected: (ControlMessage.WindowSelected) -> Unit = {},
 ) {
     private val connector = ViewerConnector(trust, deviceName, nowMs)
+    @Volatile private var connectedHostInfo: UnlockHostInfo? = null
+    private val unlockClient = UnlockAttestationClient(
+        unlockSigner, trust.identity.publicKey, { connectedHostInfo }, nowMs, { msg -> runIo { connection?.send(msg) } }, onUnlockResult,
+    )
     private val lock = Any()
     private var io: ScheduledExecutorService? = null
     private var connection: ControlConnection? = null
@@ -71,6 +80,8 @@ class ViewerSession(
     val supportsHotReconfigure: Boolean get() = (negotiatedCaps and Capabilities.HOT_RECONFIGURE) != 0L
     val supportsVideoPause: Boolean get() = (negotiatedCaps and Capabilities.VIDEO_PAUSE) != 0L
     val supportsFileTransfer: Boolean get() = (negotiatedCaps and Capabilities.FILE_TRANSFER) != 0L
+    /** Host cho phép chọn/kéo/đổi cỡ cửa sổ Mac (cần quyền `input` + Accessibility); UI ẩn "Chỉnh cửa sổ" khi `false`. */
+    val supportsWindowControl: Boolean get() = (negotiatedCaps and Capabilities.WINDOW_CONTROL) != 0L
     val audioAvailable: Boolean get() = state == ViewerState.Streaming && audioActive
     val clipboardAvailable: Boolean
         get() = state == ViewerState.Streaming &&
@@ -151,13 +162,31 @@ class ViewerSession(
         runIo { connection?.send(ControlMessage.SystemLock) }
     }
 
+    /** Mở cờ chờ thử thách (30 s), gửi lại khoá công khai rồi xin thử thách; Face ID/vân tay hiện khi ký thử thách. */
     fun sendSystemUnlock() {
-        runIo { connection?.send(ControlMessage.SystemUnlock()) }
+        unlockClient.arm()
+        runIo {
+            unlockClient.registerKey(negotiatedCaps)
+            connection?.send(ControlMessage.SystemUnlock())
+        }
     }
+
+    fun existingUnlockPublicKey(): ByteArray? = unlockSigner?.existingPublicKey()
 
     fun sendMediaKey(key: MediaKeyKind) {
         if (state != ViewerState.Streaming) return
         runIo { connection?.send(ControlMessage.MediaKey(key)) }
+    }
+
+    /** Chọn cửa sổ trên cùng tại điểm (x, y) của luồng video đang xem; kết quả về [onWindowSelected]. */
+    fun pickWindow(x: Double, y: Double) = sendWindowMessage(ControlMessage.WindowPick(x, y))
+
+    /** Dời / đổi cỡ / xếp cửa sổ đã chọn (`WindowAdjust.move/resize/preset`); host trả `window.selected`. Viewer nên gộp theo khung hình. */
+    fun adjustWindow(adjust: ControlMessage.WindowAdjust) = sendWindowMessage(adjust)
+
+    private fun sendWindowMessage(message: ControlMessage) {
+        if (state != ViewerState.Streaming || !supportsWindowControl) return
+        runIo { connection?.send(message) }
     }
 
     fun setVideoPaused(paused: Boolean) {
@@ -286,6 +315,8 @@ class ViewerSession(
         connection = conn
         connectedTarget = host.target
         connectedHostId = host.hostId
+        connectedHostInfo = UnlockHostInfo(host.hostKey, host.hostName)
+        unlockClient.reset()
         val result = ViewerHandshake.run(conn, deviceName, offeredCaps(), config)
         negotiatedCaps = result.caps
         if (clipboardAccess != null && (result.caps and Capabilities.CLIPBOARD) != 0L) {
@@ -321,11 +352,16 @@ class ViewerSession(
             onFileTransfer = { msg -> handleIncomingFileMessage(msg) },
             onDisplayList = { list -> onDisplayList(list.displays) },
             onUnlockResult = onUnlockResult,
+            onUnlockChallenge = unlockClient::answer,
+            onLockResult = onLockResult,
+            onHostState = onHostState,
+            onWindowSelected = onWindowSelected,
         )
         Thread(reader::run, "xdesk-control").apply { isDaemon = true }.start()
         if (useMediaOverTcp) {
             executor.execute { guardedIo { channel?.sendProbe() } }
         }
+        executor.execute { guardedIo { unlockClient.registerKey(result.caps) } }
         executor.scheduleWithFixedDelay({ guardedIo { inputPump?.maintain(nowMs()) } }, 50, InputPump.MAINTENANCE_INTERVAL_MS, TimeUnit.MILLISECONDS)
         executor.scheduleWithFixedDelay({ guardedIo { reportNow() } }, 500, 500, TimeUnit.MILLISECONDS)
         executor.execute { pingLoop(100) }
@@ -352,9 +388,11 @@ class ViewerSession(
     private fun offeredCaps(): Long {
         var caps = (if (preferHevc) Capabilities.H264 or Capabilities.HEVC else Capabilities.H264) or
             Capabilities.HOT_RECONFIGURE or Capabilities.VIDEO_PAUSE or
-            Capabilities.FILE_TRANSFER or Capabilities.REMOTE_UNLOCK or Capabilities.MEDIA_KEYS or Capabilities.MULTI_DISPLAY
+            Capabilities.FILE_TRANSFER or Capabilities.REMOTE_UNLOCK or Capabilities.MEDIA_KEYS or Capabilities.MULTI_DISPLAY or
+            Capabilities.WINDOW_CONTROL
         if (audioSink != null) caps = caps or Capabilities.AUDIO_PCM or Capabilities.AUDIO_AAC_ELD
         if (clipboardAccess != null) caps = caps or Capabilities.CLIPBOARD
+        if (unlockClient.offered) caps = caps or Capabilities.UNLOCK_ATTESTATION
         if (preferMediaOverTcp) caps = caps or Capabilities.MEDIA_OVER_TCP
         return caps
     }

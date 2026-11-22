@@ -11,6 +11,9 @@ extension ViewerSession {
         setState(.connecting)
         refusedHostId = nil
         connectedHostId = nil
+        connectedHostKey = nil
+        connectedHostName = nil
+        unlockGate.reset()
         connectedRemoteAddress = nil
         connectedTarget = nil
         do {
@@ -40,6 +43,8 @@ extension ViewerSession {
         }
         await remember(outcome, target: nil, trust: trust)
         connectedHostId = host.id
+        connectedHostKey = host.publicKey
+        connectedHostName = host.name
         try await finishEstablishing(conn, config: config, target: nil)
     }
 }

@@ -39,6 +39,8 @@ final class SecurityCenter {
     internal(set) var pendingPairing: PairingRequest?
     /// Bản ghi sự kiện host mới nhất (không chứa bí mật), cho cửa sổ trạng thái/thông báo.
     internal(set) var lastEvent: HostAuthEvent?
+    /// Hạn cửa sổ đăng ký khoá Face ID/vân tay theo id thiết bị (sau "Đặt lại khoá"), để UI báo đang chờ điện thoại.
+    internal(set) var unlockEnrollmentUntil: [String: Date] = [:]
 
     let stores: DeviceSecurityStores?
     let hostAuthenticator: HostAuthenticator?
@@ -55,7 +57,7 @@ final class SecurityCenter {
 
     init() {
         do {
-            let stores = try DeviceSecurityStores.openDefault()
+            let stores = try Self.openStores()
             self.stores = stores
             hostAuthenticator = HostAuthenticator(identity: stores.identity, deviceName: HostIdentity.displayName, store: stores.hostDevices)
             viewerTrust = ViewerTrust(identity: stores.identity, knownHosts: stores.knownHosts)
@@ -69,6 +71,15 @@ final class SecurityCenter {
             startupError = error.localizedDescription
             log.error("không mở được kho bảo mật: \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    /// Trong test host chỉ dùng data-protection keychain (thiếu entitlement thì báo lỗi) và thư mục tạm,
+    /// để không bao giờ chạm login keychain hay danh sách thiết bị thật của người dùng.
+    private static func openStores() throws -> DeviceSecurityStores {
+        guard RuntimeEnvironment.isUnitTestHost else { return try DeviceSecurityStores.openDefault() }
+        let temp = FileManager.default.temporaryDirectory.appendingPathComponent("xdesk-test-host", isDirectory: true)
+        try FileManager.default.createDirectory(at: temp, withIntermediateDirectories: true)
+        return try DeviceSecurityStores.openDefault(directory: temp, policy: .required)
     }
 
     /// Gắn hook quyết định ghép đôi và bắt đầu nghe sự kiện host. Gọi một lần khi host bật.
@@ -108,7 +119,16 @@ final class SecurityCenter {
     }
 
     func setPermissions(deviceId: String, _ permissions: DevicePermissions) async {
-        do { try await stores?.hostDevices.setPermissions(id: deviceId, permissions) } catch {
+        let wasUnlock = pairedViewers.first { $0.id == deviceId }?.permissions.unlock ?? false
+        do {
+            try await stores?.hostDevices.setPermissions(id: deviceId, permissions)
+            // Kho tự mở cửa sổ 5 phút khi bật "Mở khoá Mac": hiện cho người dùng thấy đang chờ điện thoại.
+            if permissions.unlock && !wasUnlock {
+                unlockEnrollmentUntil[deviceId] = Date().addingTimeInterval(PairedDevicesStore.unlockEnrollmentWindow)
+            } else if !permissions.unlock {
+                unlockEnrollmentUntil[deviceId] = nil
+            }
+        } catch {
             log.error("đổi quyền lỗi: \(error.localizedDescription, privacy: .public)")
         }
         await refresh()

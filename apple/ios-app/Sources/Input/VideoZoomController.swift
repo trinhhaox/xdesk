@@ -24,10 +24,17 @@ final class VideoZoomController: NSObject, UIGestureRecognizerDelegate {
 
     var enabled = false {
         didSet {
-            pinch.isEnabled = enabled
-            pan.isEnabled = enabled
+            updateRecognizers()
             if !enabled { reset() }
         }
+    }
+
+    /// Đang chỉnh cửa sổ: tạm tắt cử chỉ zoom/kéo nhưng giữ nguyên mức zoom hiện tại để thoát ra là như cũ.
+    var suspended = false { didSet { updateRecognizers() } }
+
+    private func updateRecognizers() {
+        pinch.isEnabled = enabled && !suspended
+        pan.isEnabled = enabled && !suspended
     }
 
     init(host: UIView, touchView: TouchInputView, onChange: @escaping () -> Void) {

@@ -15,6 +15,16 @@ enum class MediaKeyKind(val wire: String) {
     MUTE("mute"),
 }
 
+enum class WindowAdjustOp(val wire: String) { MOVE("move"), RESIZE("resize"), PRESET("preset") }
+enum class WindowPreset(val wire: String) {
+    FILL("fill"), LEFT("left"), RIGHT("right"), CENTER("center"), RESTORE("restore"),
+}
+
+/** Khung cửa sổ theo toạ độ điểm của luồng video viewer. */
+data class WindowFrame(val x: Double, val y: Double, val w: Double, val h: Double) {
+    internal val isValid: Boolean get() = x.isFinite() && y.isFinite() && w.isFinite() && h.isFinite() && w > 0.0 && h > 0.0
+}
+
 data class DisplayInfo(
     val id: Long,
     val name: String,
@@ -92,8 +102,17 @@ sealed interface ControlMessage {
         }
     }
     data object SystemLock : ControlMessage
-    data class SystemUnlock(val token: String? = null) : ControlMessage
+    /** Host → viewer: kết quả khoá màn hình Mac (không cần cap; viewer cũ bỏ qua type lạ). */
+    data class SystemLockResult(val ok: Boolean, val message: String) : ControlMessage
+    /** Host → viewer: Mac khoá/tắt màn hình nên chưa có hình ([videoAvailable]=false); control/input/unlock vẫn dùng được. */
+    data class HostState(val videoAvailable: Boolean, val locked: Boolean) : ControlMessage
+    /** Không có `sig` → xin thử thách; có `sig` (base64 DER ECDSA) → trả lời thử thách. */
+    data class SystemUnlock(val token: String? = null, val sig: String? = null) : ControlMessage
     data class SystemUnlockResult(val ok: Boolean, val message: String) : ControlMessage
+    /** Host → viewer: nonce base64 32 byte, dùng một lần, hết hạn sau [ttlMs]. */
+    data class SystemUnlockChallenge(val nonce: String, val ttlMs: Long) : ControlMessage
+    /** Viewer → host: khoá công khai (X9.63, base64) của khoá sinh trắc học. */
+    data class UnlockKey(val alg: String, val pub: String) : ControlMessage
     data class MediaKey(val key: MediaKeyKind) : ControlMessage
     data class DisplayList(val displays: List<DisplayInfo>) : ControlMessage
     data class FileOffer(val name: String, val size: Long, val hash: String) : ControlMessage
@@ -109,6 +128,39 @@ sealed interface ControlMessage {
             fun request(requestId: String, reason: String) = AgentHelp(requestId, reason = reason)
             fun resolved(requestId: String) = AgentHelp(requestId, resolved = true)
             fun resolve(requestId: String) = resolved(requestId)
+        }
+    }
+    /** Viewer → host (cap `windowControl`): chọn cửa sổ trên cùng tại điểm (x, y). */
+    data class WindowPick(val x: Double, val y: Double) : ControlMessage
+    /** Host → viewer: kết quả chọn/chỉnh; `ok == false` kèm [message] tiếng Việt. */
+    data class WindowSelected(
+        val ok: Boolean,
+        val windowId: Long? = null,
+        val app: String? = null,
+        val title: String? = null,
+        val frame: WindowFrame? = null,
+        val resizable: Boolean? = null,
+        val message: String? = null,
+    ) : ControlMessage {
+        companion object {
+            const val MAX_TEXT_BYTES = 256
+            fun failure(message: String) = WindowSelected(ok = false, message = message)
+        }
+    }
+    /** `move` cần dx,dy; `resize` cần w,h (> 0); `preset` cần [preset]. */
+    data class WindowAdjust(
+        val windowId: Long,
+        val op: WindowAdjustOp,
+        val dx: Double? = null,
+        val dy: Double? = null,
+        val w: Double? = null,
+        val h: Double? = null,
+        val preset: WindowPreset? = null,
+    ) : ControlMessage {
+        companion object {
+            fun move(windowId: Long, dx: Double, dy: Double) = WindowAdjust(windowId, WindowAdjustOp.MOVE, dx = dx, dy = dy)
+            fun resize(windowId: Long, w: Double, h: Double) = WindowAdjust(windowId, WindowAdjustOp.RESIZE, w = w, h = h)
+            fun preset(windowId: Long, preset: WindowPreset) = WindowAdjust(windowId, WindowAdjustOp.PRESET, preset = preset)
         }
     }
     data class Unknown(val type: String) : ControlMessage
@@ -138,6 +190,7 @@ internal fun ControlMessage.validate() {
         is ControlMessage.NetReport ->
             if (lossPermille > 1000) wireError(WireErrorCode.invalidField, "net.report.lossPermille")
         is ControlMessage.AgentApprove -> validateAgentApprove()
+        is ControlMessage.SystemUnlock, is ControlMessage.SystemUnlockChallenge, is ControlMessage.UnlockKey -> validateUnlockAttestation()
         is ControlMessage.ClipOffer -> {
             if (size < 1L || size > ClipLimits.MAX_BYTES) wireError(WireErrorCode.invalidField, "clip.offer.size")
             if (hash != null && !ClipLimits.isValidHash(hash)) wireError(WireErrorCode.invalidField, "clip.offer.hash")
@@ -167,6 +220,7 @@ internal fun ControlMessage.validate() {
             val idBytes = id.toByteArray(Charsets.UTF_8).size
             if (id.isEmpty() || idBytes > FileTransferLimits.MAX_ID_BYTES) wireError(WireErrorCode.invalidField, "file.cancel.id")
         }
+        is ControlMessage.WindowPick, is ControlMessage.WindowSelected, is ControlMessage.WindowAdjust -> ControlWindowFields.validate(this)
         else -> Unit
     }
 }

@@ -80,4 +80,15 @@ class AudioJitterBufferTest {
         assertTrue(expected > 0)
         assertEquals(0, jitter.counters.underruns)
     }
+
+    @Test
+    fun underrunsDeepenTheBufferUpToTheCap() {
+        val buffer = AudioJitterBuffer()
+        assertEquals(AudioJitterBuffer.TARGET_MS, buffer.targetMs)
+        buffer.push(0, ShortArray(48 * 2 * AudioJitterBuffer.TARGET_MS))
+        buffer.pull(48 * (AudioJitterBuffer.TARGET_MS + 10))
+        assertEquals(AudioJitterBuffer.TARGET_MS + AudioJitterBuffer.TARGET_STEP_MS, buffer.targetMs)
+        repeat(50) { buffer.pull(480) }
+        assertTrue(buffer.targetMs <= AudioJitterBuffer.MAX_TARGET_MS)
+    }
 }

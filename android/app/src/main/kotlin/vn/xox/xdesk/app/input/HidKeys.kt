@@ -19,6 +19,23 @@ object HidKeys {
     const val END = 0x4D
     const val PAGE_UP = 0x4B
     const val PAGE_DOWN = 0x4E
+    const val F5 = 0x3E
+    const val Z = 0x1D
+
+    /** Bàn phím số (Keypad) thật: Num0 0x62, Num1–9 0x59–0x61, . 0x63, + 0x57, - 0x56, * 0x55, / 0x54, = 0x67, Enter 0x58. */
+    const val KEYPAD_ENTER = 0x58
+
+    fun keypadUsage(c: Char): Int? = when (c) {
+        in '1'..'9' -> 0x59 + (c - '1')
+        '0' -> 0x62
+        '.' -> 0x63
+        '+' -> 0x57
+        '-' -> 0x56
+        '*' -> 0x55
+        '/' -> 0x54
+        '=' -> 0x67
+        else -> null
+    }
 
     /** `null` nếu phím không có ánh xạ (bỏ qua, không gửi). */
     fun fromAndroid(keyCode: Int): Int? = when (keyCode) {

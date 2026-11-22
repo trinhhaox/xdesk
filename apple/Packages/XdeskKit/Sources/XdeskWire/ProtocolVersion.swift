@@ -41,4 +41,8 @@ public struct Capabilities: OptionSet, Sendable, Hashable {
     public static let remoteUnlock = Capabilities(rawValue: 1 << 10)
     public static let mediaKeys = Capabilities(rawValue: 1 << 11)
     public static let multiDisplay = Capabilities(rawValue: 1 << 12)
+    /// Mở khoá Mac phải kèm chữ ký ECDSA của khoá sinh trắc học trên điện thoại.
+    public static let unlockAttestation = Capabilities(rawValue: 1 << 13)
+    /// Viewer chọn/kéo/đổi cỡ cửa sổ app trên Mac (`window.pick/selected/adjust`); host cần quyền input + Accessibility.
+    public static let windowControl = Capabilities(rawValue: 1 << 14)
 }

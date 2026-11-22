@@ -30,6 +30,15 @@ extension ViewerSession {
                     }
                 case .displayList(let list): hostDisplays = list.displays
                 case .systemUnlockResult(let result): lastUnlockResult = result
+                case .systemLockResult(let result): lastLockResult = result
+                case .hostState(let state):
+                    let recovered = hostVideoUnavailable && state.videoAvailable
+                    hostState = state
+                    if recovered { await requestKeyframe() }
+                case .systemUnlockChallenge(let challenge): Task { [weak self] in await self?.answerUnlockChallenge(challenge) }
+                case .windowSelected(let selected):
+                    selectedWindow = selected
+                    onWindowSelected?(selected)
                 case .displayReady: finishReconfigure(id: envelope.id, ok: true)
                 case .pong(let pong): updateClock(ClockSample(pong: pong, receivedAtMs: ClockSync.wallClockMs()))
                 case .bye(let bye): throw TransportError.rejected(reason: "bye", detail: bye.reason)

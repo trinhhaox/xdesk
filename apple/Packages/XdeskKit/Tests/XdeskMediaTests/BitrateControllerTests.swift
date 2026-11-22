@@ -81,3 +81,19 @@ import Testing
         #expect(c.update(lossPermille: 0, rttMs: 2, nowMs: 2_000) == 31_500)
     }
 }
+
+@Suite struct BitrateRelayCeilingTests {
+    @Test func relayRttClampsToRelayCeiling() {
+        var c = BitrateController(initialKbps: 10_000)
+        #expect(c.update(lossPermille: 0, rttMs: 150, nowMs: 0) == 5_000)
+        #expect(c.update(lossPermille: 0, rttMs: 150, nowMs: 2_000) == nil)
+        #expect(c.kbps == 5_000)
+    }
+
+    @Test func tailscaleDirectKeepsHighRttCeiling() {
+        let c = BitrateController(initialKbps: 10_000)
+        #expect(c.ceilingKbps(rttMs: 50) == 15_000)
+        #expect(c.ceilingKbps(rttMs: 81) == 5_000)
+        #expect(c.ceilingKbps(rttMs: 3) == 40_000)
+    }
+}

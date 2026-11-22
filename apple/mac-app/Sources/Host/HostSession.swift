@@ -35,6 +35,7 @@ actor HostSession {
     var mutedLocalOutput = false
     let audioSettings: HostAudioSettings
     var input: HostInputService?
+    var windowControl: WindowControlService?
     var viewerReady = false
     /// Tên thiết bị viewer tự khai trong Hello (dự phòng khi chưa có peer đã xác thực).
     private var helloName = ""
@@ -44,12 +45,26 @@ actor HostSession {
     }
     var bitrate = BitrateController(initialKbps: HostSession.initialBitrateKbps)
     private var tasks: [Task<Void, Never>] = []
-    private var framePumpTask: Task<Void, Never>?
-    private let frameCounter = FrameCounter()
-    private let pipelineOrigin = ProcessInfo.processInfo.systemUptime
+    var framePumpTask: Task<Void, Never>?
+    let frameCounter = FrameCounter()
+    let pipelineOrigin = ProcessInfo.processInfo.systemUptime
+    /// Đọc trạng thái khoá/ngủ của Mac và tín hiệu "capture được lại" (tiêm được để test).
+    let screenState: @Sendable () -> LockScreenState
+    let screenWakeEvents: @Sendable () -> AsyncStream<Void>
+    let videoRetryPoll: Duration
+    var videoConfig: DisplayConfig?
+    var videoShape: VideoShape?
+    /// Mac đang khoá/tắt màn hình nên chưa capture được; phiên vẫn sống (xem `HostSession+Video`).
+    var videoUnavailable = false
+    var videoGeneration = 0
+    var videoRetryTask: Task<Void, Never>?
+    var lastHostState: HostState?
+    var videoBusy = false
+    var videoWaiters: [CheckedContinuation<Void, Never>] = []
+    var ended = false
     private var activeUdpPort: UInt16 = 1
     private var isMediaOverTcp = false
-    private var videoPaused = false
+    var videoPaused = false
     let pasteboard: (any PasteboardAccess)?
     let permissionLookup: @Sendable ([UInt8]) async -> DevicePermissions?
     let extendSideLookup: @Sendable () async -> ExtendSide
@@ -58,7 +73,12 @@ actor HostSession {
     let onFileReceived: @Sendable (FileTransferCompletion) -> Void
     let onFileFailed: @Sendable (String, String) -> Void
     var remoteUnlockSettingSnapshot: Bool
-    private var unlockLimiter = RemoteUnlockRateLimiter()
+    let unlockLimits: UnlockRateLimits
+    let hostStaticKey: @Sendable () async -> [UInt8]?
+    var unlockMismatchNotified = false
+    var unlockChallenges = UnlockChallengeBook(ttl: Double(UnlockAttestation.challengeTTLms) / 1000)
+    let unlockKeyLookup: @Sendable ([UInt8]) async -> [UInt8]?
+    let unlockKeyEnroll: @Sendable (_ viewerKey: [UInt8], _ unlockKey: [UInt8]) async -> PairedDevicesStore.UnlockKeyEnrollment
     private(set) var negotiatedCaps: Capabilities = []
     var clipboard: ClipboardSync?
     var activeSendingFileId: String?
@@ -86,16 +106,30 @@ actor HostSession {
         extendSideLookup: @escaping @Sendable () async -> ExtendSide = { .right },
         remoteUnlockEnabled: Bool = false,
         remoteUnlockLookup: @escaping @Sendable () async -> Bool = { false },
+        unlockLimits: UnlockRateLimits = UnlockRateLimits(),
+        hostStaticKey: @escaping @Sendable () async -> [UInt8]? = { nil },
+        unlockKeyLookup: @escaping @Sendable ([UInt8]) async -> [UInt8]? = { _ in nil },
+        unlockKeyEnroll: @escaping @Sendable ([UInt8], [UInt8]) async -> PairedDevicesStore.UnlockKeyEnrollment = { _, _ in .notPermitted },
         onTransferProgress: @escaping @Sendable (FileTransferProgress?) -> Void = { _ in },
         onFileReceived: @escaping @Sendable (FileTransferCompletion) -> Void = { _ in },
-        onFileFailed: @escaping @Sendable (String, String) -> Void = { _, _ in }
+        onFileFailed: @escaping @Sendable (String, String) -> Void = { _, _ in },
+        screenState: @escaping @Sendable () -> LockScreenState = { LockScreenState.current() },
+        screenWakeEvents: @escaping @Sendable () -> AsyncStream<Void> = { ScreenWakeSignals.stream() },
+        videoRetryPoll: Duration = .seconds(3)
     ) {
+        self.screenState = screenState
+        self.screenWakeEvents = screenWakeEvents
+        self.videoRetryPoll = videoRetryPoll
         self.audioSettings = audioSettings
         self.pasteboard = pasteboard
         self.permissionLookup = permissionLookup
         self.extendSideLookup = extendSideLookup
         self.remoteUnlockSettingSnapshot = remoteUnlockEnabled
         self.remoteUnlockLookup = remoteUnlockLookup
+        self.unlockLimits = unlockLimits
+        self.hostStaticKey = hostStaticKey
+        self.unlockKeyLookup = unlockKeyLookup
+        self.unlockKeyEnroll = unlockKeyEnroll
         self.onTransferProgress = onTransferProgress
         self.onFileReceived = onFileReceived
         self.onFileFailed = onFileFailed
@@ -151,38 +185,16 @@ actor HostSession {
     }
 
     func handleSystemLock() async {
-        guard permissions.input else { return }
+        guard await livePermissions().input else {
+            _ = try? await connection.send(.systemLockResult(SystemLockResult(
+                ok: false, message: "Thiết bị này chưa được cấp quyền điều khiển Mac")))
+            return
+        }
         log.notice("Nhận lệnh khóa màn hình Mac từ xa")
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/pmset")
-        process.arguments = ["displaysleepnow"]
-        try? process.run()
-    }
-
-    func handleSystemUnlock() async {
-        guard unlockLimiter.allowAttempt() else {
-            _ = try? await connection.send(.systemUnlockResult(SystemUnlockResult(
-                ok: false, message: "Thử mở khoá quá nhiều lần, vui lòng đợi 1 phút"
-            )))
-            return
-        }
-        let livePerms = await livePermissions()
-        let globalUnlock = await remoteUnlockLookup()
-        guard RemoteUnlockPolicy.canUnlock(globalEnabled: globalUnlock, deviceAllowed: livePerms.unlock) else {
-            if livePerms.input && !RemoteUnlockExecutor.isScreenLocked() {
-                RemoteUnlockExecutor.wakeDisplay()
-                _ = try? await connection.send(.systemUnlockResult(SystemUnlockResult(
-                    ok: true, message: "Đã đánh thức màn hình Mac (mở khoá bằng mật khẩu đang tắt)"
-                )))
-            } else {
-                _ = try? await connection.send(.systemUnlockResult(SystemUnlockResult(
-                    ok: false, message: "Mac chưa bật mở khoá từ xa cho thiết bị này"
-                )))
-            }
-            return
-        }
-        let outcome = await RemoteUnlockExecutor.performUnlock()
-        _ = try? await connection.send(.systemUnlockResult(SystemUnlockResult(ok: outcome.ok, message: outcome.message)))
+        let outcome = await RemoteLockExecutor.lockScreen()
+        log.notice("Khoá màn hình từ xa: \(String(describing: outcome), privacy: .public)")
+        let result = RemoteLockExecutor.result(for: outcome)
+        _ = try? await connection.send(.systemLockResult(SystemLockResult(ok: result.ok, message: result.message)))
     }
 
     // MARK: Chuẩn bị (trong handshake)
@@ -218,25 +230,8 @@ actor HostSession {
 
     private func startPipeline(_ config: DisplayConfig, caps: Capabilities) async throws {
         guard let channel else { throw TransportError.noPeer }
-        let (acquired, width, height) = try await acquireDisplay(for: config)
-        if let reason = acquired.fallbackReason { log.notice("fallback mirror: \(reason, privacy: .public)") }
-        log.notice("màn hình \(acquired.mode == .native ? "native" : "ảo", privacy: .public) \(width)x\(height) fit=\(config.fit.rawValue, privacy: .public)")
-        videoPaused = config.videoPaused ?? false
-        let settings = EncoderSettings(width: width, height: height, fps: Int(config.fps), bitrateKbps: Self.initialBitrateKbps, codec: config.codec)
-        audio = await makeAudioStreamer(caps: caps, channel: channel)
-        let audioSink = audio.map { streamer in { @Sendable (samples: [Int16], captureMs: Double, nowMs: Double) in streamer.ingest(samples: samples, captureMs: captureMs, nowMs: nowMs) } }
-        let pipeline = try HostPipeline(
-            displayID: acquired.displayID, settings: settings, origin: pipelineOrigin,
-            initiallyPaused: videoPaused, audioSink: audioSink
-        ) { [connection] error in
-            Task { _ = try? await connection.send(.bye(Bye(reason: error?.localizedDescription ?? "capture stopped"))); await connection.close() }
-        }
-        self.pipeline = pipeline
-        try await pipeline.start()
-        let counter = frameCounter
-        framePumpTask = Task { await Self.pumpFrames(pipeline.encoder, counter: counter, to: channel) }
-        await startInput(displayID: acquired.displayID)
-        await beginWindowFit(config, displayID: acquired.displayID)
+        try await startVideoOrDefer(config)
+        if input == nil { await startInput(displayID: CGMainDisplayID()) }
         tasks.append(Task {
             for await event in channel.events {
                 switch event {
@@ -248,17 +243,14 @@ actor HostSession {
                 }
             }
         })
-        await reportStreaming(mode: acquired.mode, width: width, height: height, config: config)
-        if caps.contains(.multiDisplay) {
-            let displays = await physicalDisplays()
-            if !displays.isEmpty { _ = try? await connection.send(.displayList(DisplayList(displays: displays))) }
-        }
+        await reportCurrentStreaming(config)
+        await sendDisplayListIfSupported()
     }
 
     private func handlePeerConnected() async {
         viewerReady = true
         audio?.setActive(true)
-        if videoPaused {
+        if videoPaused || videoUnavailable {
             // Thông báo ngay cho viewer biết kênh UDP đã thông dù chưa phát khung hình nào.
             let probe = MediaPacket(header: MediaHeader(type: .probe, streamId: Self.streamId, frameNo: 0), payload: [])
             try? await channel?.sendPacket(probe)
@@ -275,45 +267,15 @@ actor HostSession {
     }
 
     func reconfigureDisplay(_ config: DisplayConfig, requestId: UInt32) async throws {
-        guard let channel else { return }
-        framePumpTask?.cancel()
-        framePumpTask = nil
-        await pipeline?.stop()
-        pipeline = nil
-        await endWindowFit()
-
-        let (acquired, width, height) = try await acquireDisplay(for: config)
-        if let reason = acquired.fallbackReason { log.notice("fallback mirror on reconfigure: \(reason, privacy: .public)") }
-        log.notice("reconfigure \(width)x\(height) mode=\(config.screenMode.rawValue, privacy: .public) fit=\(config.fit.rawValue, privacy: .public)")
-
-        await input?.updateDisplay(acquired.displayID)
-        await beginWindowFit(config, displayID: acquired.displayID)
-
-        let nextPaused = config.videoPaused ?? false
-        videoPaused = nextPaused
-        let settings = EncoderSettings(width: width, height: height, fps: Int(config.fps), bitrateKbps: bitrate.kbps, codec: config.codec)
-        let audioSink = audio.map { streamer in { @Sendable (samples: [Int16], captureMs: Double, nowMs: Double) in streamer.ingest(samples: samples, captureMs: captureMs, nowMs: nowMs) } }
-        let nextPipeline = try HostPipeline(
-            displayID: acquired.displayID, settings: settings, origin: pipelineOrigin,
-            initiallyPaused: nextPaused, audioSink: audioSink
-        ) { [connection] error in
-            Task { _ = try? await connection.send(.bye(Bye(reason: error?.localizedDescription ?? "capture stopped"))); await connection.close() }
-        }
-        self.pipeline = nextPipeline
-        try await nextPipeline.start()
-        let counter = frameCounter
-        framePumpTask = Task { await Self.pumpFrames(nextPipeline.encoder, counter: counter, to: channel) }
-        if viewerReady && !nextPaused { nextPipeline.beginStreaming() }
-
+        guard channel != nil else { return }
+        log.notice("reconfigure \(config.w)x\(config.h) mode=\(config.screenMode.rawValue, privacy: .public) fit=\(config.fit.rawValue, privacy: .public)")
+        try await startVideoOrDefer(config)
         _ = try await connection.send(.displayReady(DisplayReady(udpPort: activeUdpPort, streamId: Self.streamId)), id: requestId)
-        await reportStreaming(mode: acquired.mode, width: width, height: height, config: config)
-        if negotiatedCaps.contains(.multiDisplay) {
-            let displays = await physicalDisplays()
-            if !displays.isEmpty { _ = try? await connection.send(.displayList(DisplayList(displays: displays))) }
-        }
+        await reportCurrentStreaming(config)
+        await sendDisplayListIfSupported()
     }
 
-    private func reportStreaming(mode: DisplayMode, width: Int, height: Int, config: DisplayConfig) async {
+    func reportStreaming(mode: DisplayMode, width: Int, height: Int, config: DisplayConfig) async {
         let peerName = await connection.peer?.name
         let info = ViewerSessionInfo.make(
             name: peerName ?? helloName, config: config, isUsb: connection.isUsbTunnel || isMediaOverTcp,
@@ -321,7 +283,7 @@ actor HostSession {
         report(.streaming(mode: mode, width: width, height: height, info: info))
     }
 
-    private static func pumpFrames(_ encoder: VideoEncoder, counter: FrameCounter, to channel: UdpMediaChannel) async {
+    static func pumpFrames(_ encoder: VideoEncoder, counter: FrameCounter, to channel: UdpMediaChannel) async {
         do {
             for try await frame in encoder.frames {
                 try await channel.sendFrame(frame.data, frameNo: counter.next(), ptsMs: frame.ptsMs, isKeyframe: frame.isKeyframe)
@@ -334,6 +296,9 @@ actor HostSession {
     // MARK: Dọn dẹp
 
     private func teardown() async {
+        videoRetryTask?.cancel()
+        videoRetryTask = nil
+        await withVideoLock { ended = true }
         isMediaOverTcp = false
         framePumpTask?.cancel()
         framePumpTask = nil
@@ -352,6 +317,7 @@ actor HostSession {
         viewerReady = false
         await input?.shutdown()
         input = nil
+        await shutdownWindowControl()
         stopAudio()
         await pipeline?.stop()
         pipeline = nil
@@ -363,7 +329,7 @@ actor HostSession {
     }
 }
 
-private final class FrameCounter: @unchecked Sendable {
+final class FrameCounter: @unchecked Sendable {
     private let lock = NSLock()
     private var value: UInt32 = 0
 

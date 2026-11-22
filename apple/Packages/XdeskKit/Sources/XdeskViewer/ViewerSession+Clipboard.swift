@@ -8,8 +8,9 @@ extension ViewerSession {
     func offeredCaps(tunnel: Bool) -> Capabilities {
         var caps: Capabilities = [
             .h264, .hevc, .hotReconfigure, .videoPause,
-            .fileTransfer, .remoteUnlock, .mediaKeys, .multiDisplay,
+            .fileTransfer, .remoteUnlock, .mediaKeys, .multiDisplay, .windowControl,
         ]
+        if unlockSigner != nil { caps.insert(.unlockAttestation) }
         if clipboardConfig != nil { caps.insert(.clipboard) }
         if audioConfig != nil { caps.formUnion([.audioPCM, .audioAACELD]) }
         if tunnel { caps.insert(.mediaOverTcp) }

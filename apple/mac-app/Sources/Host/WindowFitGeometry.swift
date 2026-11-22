@@ -29,6 +29,8 @@ struct WindowFrameLedger<Key: Hashable> {
         if originals[key] == nil { originals[key] = frame }
     }
 
+    mutating func forget(_ key: Key) { originals[key] = nil }
+
     /// Lấy toàn bộ khung gốc để khôi phục và xoá sổ.
     mutating func drain() -> [(key: Key, frame: CGRect)] {
         defer { originals.removeAll() }

@@ -206,6 +206,96 @@
       "error" : "malformedJSON",
       "json" : "{\"chunk\":\"AA==\",\"id\":1,\"name\":\"a\",\"t\":\"file.data\"}",
       "name" : "file-data-missing-is-last"
+    },
+    {
+      "error" : "invalidField",
+      "json" : "{\"alg\":\"rsa\",\"id\":1,\"pub\":\"BFFcPW6545a5BNP+yn9U/c0MwemXvzddylFa0KbDtANfRTa+OlDzGPv5pUdZAqIhUCvvDVfgjFOyzApW8X2fk1Q=\",\"t\":\"unlock.key\"}",
+      "name" : "unlock-key-unknown-alg"
+    },
+    {
+      "error" : "invalidField",
+      "json" : "{\"alg\":\"p256-ecdsa-sha256\",\"id\":1,\"pub\":\"AAAA\",\"t\":\"unlock.key\"}",
+      "name" : "unlock-key-short-pub"
+    },
+    {
+      "error" : "malformedJSON",
+      "json" : "{\"alg\":\"p256-ecdsa-sha256\",\"id\":1,\"t\":\"unlock.key\"}",
+      "name" : "unlock-key-missing-pub"
+    },
+    {
+      "error" : "invalidField",
+      "json" : "{\"id\":1,\"nonce\":\"AAAA\",\"t\":\"system.unlock.challenge\",\"ttlMs\":30000}",
+      "name" : "unlock-challenge-short-nonce"
+    },
+    {
+      "error" : "malformedJSON",
+      "json" : "{\"id\":1,\"nonce\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\",\"t\":\"system.unlock.challenge\"}",
+      "name" : "unlock-challenge-missing-ttl"
+    },
+    {
+      "error" : "malformedJSON",
+      "json" : "{\"id\":1,\"ok\":true,\"t\":\"system.lock.result\"}",
+      "name" : "system-lock-result-missing-message"
+    },
+    {
+      "error" : "malformedJSON",
+      "json" : "{\"id\":1,\"t\":\"host.state\",\"videoAvailable\":false}",
+      "name" : "host-state-missing-locked"
+    },
+    {
+      "error" : "invalidField",
+      "json" : "{\"id\":1,\"sig\":\"AAAA\",\"t\":\"system.unlock\"}",
+      "name" : "system-unlock-garbage-sig"
+    },
+    {
+      "error" : "malformedJSON",
+      "json" : "{\"id\":1,\"t\":\"window.pick\",\"x\":1}",
+      "name" : "window-pick-missing-y"
+    },
+    {
+      "error" : "malformedJSON",
+      "json" : "{\"id\":1,\"t\":\"window.selected\"}",
+      "name" : "window-selected-missing-ok"
+    },
+    {
+      "error" : "invalidField",
+      "json" : "{\"frame\":{\"h\":10,\"w\":0,\"x\":0,\"y\":0},\"id\":1,\"ok\":true,\"t\":\"window.selected\",\"windowId\":1}",
+      "name" : "window-selected-zero-width-frame"
+    },
+    {
+      "error" : "malformedJSON",
+      "json" : "{\"id\":1,\"op\":\"rotate\",\"t\":\"window.adjust\",\"windowId\":1}",
+      "name" : "window-adjust-unknown-op"
+    },
+    {
+      "error" : "malformedJSON",
+      "json" : "{\"id\":1,\"op\":\"preset\",\"preset\":\"top\",\"t\":\"window.adjust\",\"windowId\":1}",
+      "name" : "window-adjust-unknown-preset"
+    },
+    {
+      "error" : "malformedJSON",
+      "json" : "{\"dx\":1,\"dy\":1,\"id\":1,\"op\":\"move\",\"t\":\"window.adjust\"}",
+      "name" : "window-adjust-missing-window-id"
+    },
+    {
+      "error" : "invalidField",
+      "json" : "{\"dx\":1,\"id\":1,\"op\":\"move\",\"t\":\"window.adjust\",\"windowId\":1}",
+      "name" : "window-adjust-move-missing-dy"
+    },
+    {
+      "error" : "invalidField",
+      "json" : "{\"h\":0,\"id\":1,\"op\":\"resize\",\"t\":\"window.adjust\",\"w\":300,\"windowId\":1}",
+      "name" : "window-adjust-resize-zero-height"
+    },
+    {
+      "error" : "invalidField",
+      "json" : "{\"h\":300,\"id\":1,\"op\":\"resize\",\"t\":\"window.adjust\",\"w\":-5,\"windowId\":1}",
+      "name" : "window-adjust-resize-negative-width"
+    },
+    {
+      "error" : "invalidField",
+      "json" : "{\"id\":1,\"op\":\"preset\",\"t\":\"window.adjust\",\"windowId\":1}",
+      "name" : "window-adjust-preset-missing-preset"
     }
   ],
   "messages" : [
@@ -628,7 +718,142 @@
       "json" : "{\"chunk\":\"SGVsbG8=\",\"id\":50,\"isLast\":true,\"name\":\"báo cáo.pdf\",\"t\":\"file.data\"}",
       "name" : "file-data-legacy",
       "type" : "file.data"
+    },
+    {
+      "frameHex" : "00000087027b226964223a33382c22736967223a224d4559434951444137386b7275754d4a783147476f6d6135482f5a7149564b33536b4670616778455567496c4374373556774968414e76786c44767549645668796966436e48596c6237675a4c64375879457378394132507239724e50375077222c2274223a2273797374656d2e756e6c6f636b227d",
+      "id" : 38,
+      "json" : "{\"id\":38,\"sig\":\"MEYCIQDA78kruuMJx1GGoma5H/ZqIVK3SkFpagxEUgIlCt75VwIhANvxlDvuIdVhyifCnHYlb7gZLd7XyEsx9A2Pr9rNP7Pw\",\"t\":\"system.unlock\"}",
+      "name" : "system-unlock-signed",
+      "type" : "system.unlock"
+    },
+    {
+      "frameHex" : "0000006d027b226964223a33392c226e6f6e6365223a2241414543417751464267634943516f4c4441304f4478415245684d554652595847426b61477877644868383d222c2274223a2273797374656d2e756e6c6f636b2e6368616c6c656e6765222c2274746c4d73223a33303030307d",
+      "id" : 39,
+      "json" : "{\"id\":39,\"nonce\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\",\"t\":\"system.unlock.challenge\",\"ttlMs\":30000}",
+      "name" : "system-unlock-challenge",
+      "type" : "system.unlock.challenge"
+    },
+    {
+      "frameHex" : "00000048027b226964223a35322c226d657373616765223a22c490c3a3206b686fc3a1204d6163222c226f6b223a747275652c2274223a2273797374656d2e6c6f636b2e726573756c74227d",
+      "id" : 52,
+      "json" : "{\"id\":52,\"message\":\"Đã khoá Mac\",\"ok\":true,\"t\":\"system.lock.result\"}",
+      "name" : "system-lock-result-ok",
+      "type" : "system.lock.result"
+    },
+    {
+      "frameHex" : "0000008f027b226964223a35332c226d657373616765223a224d6163206368e1bb892074e1baaf74206dc3a06e2068c3ac6e6820e280942062e1baad74202759c3aa752063e1baa775206de1baad74206b68e1baa975272074726f6e672043c3a06920c491e1bab774204d6163222c226f6b223a66616c73652c2274223a2273797374656d2e6c6f636b2e726573756c74227d",
+      "id" : 53,
+      "json" : "{\"id\":53,\"message\":\"Mac chỉ tắt màn hình — bật 'Yêu cầu mật khẩu' trong Cài đặt Mac\",\"ok\":false,\"t\":\"system.lock.result\"}",
+      "name" : "system-lock-result-display-only",
+      "type" : "system.lock.result"
+    },
+    {
+      "frameHex" : "00000040027b226964223a35342c226c6f636b6564223a747275652c2274223a22686f73742e7374617465222c22766964656f417661696c61626c65223a66616c73657d",
+      "id" : 54,
+      "json" : "{\"id\":54,\"locked\":true,\"t\":\"host.state\",\"videoAvailable\":false}",
+      "name" : "host-state-video-unavailable",
+      "type" : "host.state"
+    },
+    {
+      "frameHex" : "00000040027b226964223a35352c226c6f636b6564223a66616c73652c2274223a22686f73742e7374617465222c22766964656f417661696c61626c65223a747275657d",
+      "id" : 55,
+      "json" : "{\"id\":55,\"locked\":false,\"t\":\"host.state\",\"videoAvailable\":true}",
+      "name" : "host-state-video-available",
+      "type" : "host.state"
+    },
+    {
+      "frameHex" : "00000096027b22616c67223a22703235362d65636473612d736861323536222c226964223a35312c22707562223a22424646635057363534356135424e502b796e39552f63304d77656d58767a6464796c4661304b624474414e665254612b4f6c447a475076357055645a4171496855437676445666676a464f797a417057385832666b31513d222c2274223a22756e6c6f636b2e6b6579227d",
+      "id" : 51,
+      "json" : "{\"alg\":\"p256-ecdsa-sha256\",\"id\":51,\"pub\":\"BFFcPW6545a5BNP+yn9U/c0MwemXvzddylFa0KbDtANfRTa+OlDzGPv5pUdZAqIhUCvvDVfgjFOyzApW8X2fk1Q=\",\"t\":\"unlock.key\"}",
+      "name" : "unlock-key",
+      "type" : "unlock.key"
+    },
+    {
+      "frameHex" : "0000002e027b226964223a36302c2274223a2277696e646f772e7069636b222c2278223a3431322e352c2279223a3330307d",
+      "id" : 60,
+      "json" : "{\"id\":60,\"t\":\"window.pick\",\"x\":412.5,\"y\":300}",
+      "name" : "window-pick",
+      "type" : "window.pick"
+    },
+    {
+      "frameHex" : "0000009b027b22617070223a22536166617269222c226672616d65223a7b2268223a3438302c2277223a3634302c2278223a3130302c2279223a38302e357d2c226964223a36312c226f6b223a747275652c22726573697a61626c65223a747275652c2274223a2277696e646f772e73656c6563746564222c227469746c65223a225472616e67206368e1bba7222c2277696e646f774964223a313034327d",
+      "id" : 61,
+      "json" : "{\"app\":\"Safari\",\"frame\":{\"h\":480,\"w\":640,\"x\":100,\"y\":80.5},\"id\":61,\"ok\":true,\"resizable\":true,\"t\":\"window.selected\",\"title\":\"Trang chủ\",\"windowId\":1042}",
+      "name" : "window-selected-ok",
+      "type" : "window.selected"
+    },
+    {
+      "frameHex" : "00000084027b22617070223a224dc3a1792074c3ad6e68222c226672616d65223a7b2268223a3334302c2277223a3233302c2278223a32302c2279223a32307d2c226964223a36322c226f6b223a747275652c22726573697a61626c65223a66616c73652c2274223a2277696e646f772e73656c6563746564222c2277696e646f774964223a377d",
+      "id" : 62,
+      "json" : "{\"app\":\"Máy tính\",\"frame\":{\"h\":340,\"w\":230,\"x\":20,\"y\":20},\"id\":62,\"ok\":true,\"resizable\":false,\"t\":\"window.selected\",\"windowId\":7}",
+      "name" : "window-selected-not-resizable",
+      "type" : "window.selected"
+    },
+    {
+      "frameHex" : "00000057027b226964223a36332c226d657373616765223a224b68c3b46e672063c3b32063e1bbad612073e1bb9520e1bb9f20c491c3a279222c226f6b223a66616c73652c2274223a2277696e646f772e73656c6563746564227d",
+      "id" : 63,
+      "json" : "{\"id\":63,\"message\":\"Không có cửa sổ ở đây\",\"ok\":false,\"t\":\"window.selected\"}",
+      "name" : "window-selected-failure",
+      "type" : "window.selected"
+    },
+    {
+      "frameHex" : "0000004d027b226478223a2d31322e352c226479223a33302c226964223a36342c226f70223a226d6f7665222c2274223a2277696e646f772e61646a757374222c2277696e646f774964223a313034327d",
+      "id" : 64,
+      "json" : "{\"dx\":-12.5,\"dy\":30,\"id\":64,\"op\":\"move\",\"t\":\"window.adjust\",\"windowId\":1042}",
+      "name" : "window-adjust-move",
+      "type" : "window.adjust"
+    },
+    {
+      "frameHex" : "0000004e027b2268223a3630302e352c226964223a36352c226f70223a22726573697a65222c2274223a2277696e646f772e61646a757374222c2277223a3830302c2277696e646f774964223a313034327d",
+      "id" : 65,
+      "json" : "{\"h\":600.5,\"id\":65,\"op\":\"resize\",\"t\":\"window.adjust\",\"w\":800,\"windowId\":1042}",
+      "name" : "window-adjust-resize",
+      "type" : "window.adjust"
+    },
+    {
+      "frameHex" : "0000004c027b226964223a36362c226f70223a22707265736574222c22707265736574223a2266696c6c222c2274223a2277696e646f772e61646a757374222c2277696e646f774964223a313034327d",
+      "id" : 66,
+      "json" : "{\"id\":66,\"op\":\"preset\",\"preset\":\"fill\",\"t\":\"window.adjust\",\"windowId\":1042}",
+      "name" : "window-adjust-preset-fill",
+      "type" : "window.adjust"
+    },
+    {
+      "frameHex" : "0000004c027b226964223a36362c226f70223a22707265736574222c22707265736574223a226c656674222c2274223a2277696e646f772e61646a757374222c2277696e646f774964223a313034327d",
+      "id" : 66,
+      "json" : "{\"id\":66,\"op\":\"preset\",\"preset\":\"left\",\"t\":\"window.adjust\",\"windowId\":1042}",
+      "name" : "window-adjust-preset-left",
+      "type" : "window.adjust"
+    },
+    {
+      "frameHex" : "0000004d027b226964223a36362c226f70223a22707265736574222c22707265736574223a227269676874222c2274223a2277696e646f772e61646a757374222c2277696e646f774964223a313034327d",
+      "id" : 66,
+      "json" : "{\"id\":66,\"op\":\"preset\",\"preset\":\"right\",\"t\":\"window.adjust\",\"windowId\":1042}",
+      "name" : "window-adjust-preset-right",
+      "type" : "window.adjust"
+    },
+    {
+      "frameHex" : "0000004e027b226964223a36362c226f70223a22707265736574222c22707265736574223a2263656e746572222c2274223a2277696e646f772e61646a757374222c2277696e646f774964223a313034327d",
+      "id" : 66,
+      "json" : "{\"id\":66,\"op\":\"preset\",\"preset\":\"center\",\"t\":\"window.adjust\",\"windowId\":1042}",
+      "name" : "window-adjust-preset-center",
+      "type" : "window.adjust"
+    },
+    {
+      "frameHex" : "0000004f027b226964223a36362c226f70223a22707265736574222c22707265736574223a22726573746f7265222c2274223a2277696e646f772e61646a757374222c2277696e646f774964223a313034327d",
+      "id" : 66,
+      "json" : "{\"id\":66,\"op\":\"preset\",\"preset\":\"restore\",\"t\":\"window.adjust\",\"windowId\":1042}",
+      "name" : "window-adjust-preset-restore",
+      "type" : "window.adjust"
     }
   ],
+  "unlockAttestation" : {
+    "algorithm" : "p256-ecdsa-sha256",
+    "domain" : "xdesk v1 unlock",
+    "hostKey" : "ERERERERERERERERERERERERERERERERERERERERERE=",
+    "nonce" : "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+    "publicKey" : "BFFcPW6545a5BNP+yn9U/c0MwemXvzddylFa0KbDtANfRTa+OlDzGPv5pUdZAqIhUCvvDVfgjFOyzApW8X2fk1Q=",
+    "signature" : "MEYCIQDA78kruuMJx1GGoma5H/ZqIVK3SkFpagxEUgIlCt75VwIhANvxlDvuIdVhyifCnHYlb7gZLd7XyEsx9A2Pr9rNP7Pw",
+    "viewerKey" : "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI="
+  },
   "version" : 1
 }

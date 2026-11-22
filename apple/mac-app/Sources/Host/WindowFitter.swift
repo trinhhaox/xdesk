@@ -19,6 +19,8 @@ final class WindowFitter {
     private let isEnabled: () -> Bool
     private var ledger = WindowFrameLedger<UInt>()
     private var elements: [UInt: AXWindow] = [:]
+    /// Cửa sổ người dùng đã tự chỉnh từ điện thoại ("Chỉnh cửa sổ"): không co lại và không khôi phục về khung gốc.
+    private var userAdjusted: Set<UInt> = []
     private var users = 0
     private var displayID: CGDirectDisplayID?
     private var pollTask: Task<Void, Never>?
@@ -32,11 +34,18 @@ final class WindowFitter {
         }
     }
 
+    /// Người dùng tự chỉnh cửa sổ `key` (`AXWindow.key`): bỏ khỏi danh sách khôi phục và không bao giờ co lại nữa.
+    func markUserAdjusted(_ key: UInt) {
+        userAdjusted.insert(key)
+        ledger.forget(key)
+        elements[key] = nil
+    }
+
     /// Gọi TRƯỚC khi đổi màn hình Mac: macOS tự kẹp cửa sổ vào desktop mới nên khung gốc phải ghi nhận trước đó.
     func prepare() {
         guard isEnabled(), AccessibilityPermission.isGranted else { return }
         for app in NSWorkspace.shared.runningApplications where app.activationPolicy == .regular && app.processIdentifier != getpid() {
-            for window in AXWindow.windows(ofPid: app.processIdentifier) where window.isFittable {
+            for window in AXWindow.windows(ofPid: app.processIdentifier) where window.isFittable && !userAdjusted.contains(window.key) {
                 guard let frame = window.frame else { continue }
                 ledger.remember(window.key, frame: frame)
                 elements[window.key] = window
@@ -89,6 +98,7 @@ final class WindowFitter {
         var restored = 0
         for entry in ledger.drain() where elements[entry.key]?.set(frame: entry.frame) == true { restored += 1 }
         elements.removeAll()
+        userAdjusted.removeAll()
         if restored > 0 { log.notice("khôi phục \(restored) cửa sổ về khung gốc") }
     }
 
@@ -118,7 +128,7 @@ final class WindowFitter {
         let others = Self.otherScreenRects(except: displayID)
         var fitted = 0
         for app in NSWorkspace.shared.runningApplications where app.activationPolicy == .regular && app.processIdentifier != getpid() {
-            for window in AXWindow.windows(ofPid: app.processIdentifier) where window.isFittable {
+            for window in AXWindow.windows(ofPid: app.processIdentifier) where window.isFittable && !userAdjusted.contains(window.key) {
                 guard let frame = window.frame, !others.contains(where: { $0.contains(CGPoint(x: frame.midX, y: frame.midY)) }) else { continue }
                 if onlyNew, ledger.contains(window.key) { continue }
                 ledger.remember(window.key, frame: frame)
@@ -142,7 +152,8 @@ final class WindowFitter {
         NSScreen.screens.first { ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value == displayID } ?? NSScreen.main
     }
 
-    private static func targetRect(displayID: CGDirectDisplayID) -> CGRect? {
+    /// Vùng hiển thị (trừ menu bar/Dock) của màn hình `displayID`, toạ độ AX.
+    static func targetRect(displayID: CGDirectDisplayID) -> CGRect? {
         guard let screen = screen(for: displayID), let primary = NSScreen.screens.first else { return nil }
         return WindowFitGeometry.axRect(fromVisibleFrame: screen.visibleFrame, primaryHeight: primary.frame.height)
     }

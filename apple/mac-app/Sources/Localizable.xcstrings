@@ -2236,6 +2236,46 @@
           }
         }
       }
+    },
+    "Đặt lại khoá": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reset key"
+          }
+        }
+      }
+    },
+    "Mở khoá Mac": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unlock Mac"
+          }
+        }
+      }
+    },
+    "Khoá Face ID/vân tay của một điện thoại đã đổi. Vào Cài đặt > Thiết bị và bấm \"Đặt lại khoá\" nếu bạn tin tưởng thiết bị.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A phone's Face ID/fingerprint key changed. Open Settings > Devices and click \"Reset key\" if you trust the device."
+          }
+        }
+      }
+    },
+    "Chưa đăng ký khoá — bấm Đặt lại khoá rồi mở khoá từ điện thoại trong 5 phút": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No key enrolled — click Reset key, then unlock from the phone within 5 minutes"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

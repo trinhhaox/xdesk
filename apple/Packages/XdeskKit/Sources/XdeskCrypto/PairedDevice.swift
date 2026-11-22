@@ -58,6 +58,8 @@ public struct PairedDevice: Codable, Sendable, Equatable {
     public var permissions: DevicePermissions
     /// Địa chỉ `host:port` gần nhất kết nối được (viewer lưu cho host đã biết); chỉ để gợi ý, không dùng để xác thực.
     public var lastAddress: String?
+    /// Khoá P-256 (X9.63, 65 byte) của khoá sinh trắc học trên điện thoại, đăng ký lần đầu (TOFU); chỉ ghi khi có.
+    public internal(set) var unlockKey: [UInt8]?
 
     public init(
         name: String, publicKey: [UInt8], role: DeviceRole, createdAt: Date,
@@ -72,7 +74,7 @@ public struct PairedDevice: Codable, Sendable, Equatable {
         self.permissions = permissions
     }
 
-    private enum CodingKeys: String, CodingKey { case id, name, pub, role, createdAt, lastSeen, permissions, lastAddress }
+    private enum CodingKeys: String, CodingKey { case id, name, pub, role, createdAt, lastSeen, permissions, lastAddress, unlockKey }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -90,6 +92,12 @@ public struct PairedDevice: Codable, Sendable, Equatable {
         lastSeen = try c.decodeIfPresent(Date.self, forKey: .lastSeen)
         permissions = try c.decode(DevicePermissions.self, forKey: .permissions)
         lastAddress = try c.decodeIfPresent(String.self, forKey: .lastAddress)
+        if let encoded = try c.decodeIfPresent(String.self, forKey: .unlockKey) {
+            guard let raw = Base64URL.decode(encoded), UnlockKeyFormat.isValid(raw) else {
+                throw DecodingError.dataCorruptedError(forKey: .unlockKey, in: c, debugDescription: "unlockKey must be X9.63 P-256")
+            }
+            unlockKey = raw
+        }
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -102,5 +110,7 @@ public struct PairedDevice: Codable, Sendable, Equatable {
         try c.encodeIfPresent(lastSeen, forKey: .lastSeen)
         try c.encode(permissions, forKey: .permissions)
         try c.encodeIfPresent(lastAddress, forKey: .lastAddress)
+        // Chỉ ghi khi đã đăng ký để file cũ giữ nguyên HMAC.
+        if let unlockKey { try c.encode(Base64URL.encode(unlockKey), forKey: .unlockKey) }
     }
 }

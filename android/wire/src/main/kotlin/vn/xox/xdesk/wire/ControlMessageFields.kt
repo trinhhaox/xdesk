@@ -73,7 +73,14 @@ internal object ControlMessageFields {
                 m.allow?.let { f["allow"] = JsonBool(it) }
             }
             ControlMessage.SystemLock -> Unit
-            is ControlMessage.SystemUnlock -> m.token?.let { f["token"] = str(it) }
+            is ControlMessage.SystemLockResult -> { f["ok"] = JsonBool(m.ok); f["message"] = str(m.message) }
+            is ControlMessage.HostState -> { f["videoAvailable"] = JsonBool(m.videoAvailable); f["locked"] = JsonBool(m.locked) }
+            is ControlMessage.SystemUnlock -> {
+                m.token?.let { f["token"] = str(it) }
+                m.sig?.let { f["sig"] = str(it) }
+            }
+            is ControlMessage.SystemUnlockChallenge -> { f["nonce"] = str(m.nonce); f["ttlMs"] = num(m.ttlMs) }
+            is ControlMessage.UnlockKey -> { f["alg"] = str(m.alg); f["pub"] = str(m.pub) }
             is ControlMessage.SystemUnlockResult -> {
                 f["ok"] = JsonBool(m.ok)
                 f["message"] = str(m.message)
@@ -124,6 +131,8 @@ internal object ControlMessageFields {
                 m.reason?.let { f["reason"] = str(it) }
                 m.resolved?.let { f["resolved"] = JsonBool(it) }
             }
+            is ControlMessage.WindowPick, is ControlMessage.WindowSelected, is ControlMessage.WindowAdjust ->
+                ControlWindowFields.write(m, f)
             is ControlMessage.Unknown -> Unit
         }
     }
@@ -159,7 +168,11 @@ internal object ControlMessageFields {
             r.string("requestId"), r.optString("agentName"), r.optString("summary"), r.optI64("expiresAt"), r.optBool("allow"),
         )
         "system.lock" -> ControlMessage.SystemLock
-        "system.unlock" -> ControlMessage.SystemUnlock(r.optString("token"))
+        "system.lock.result" -> ControlMessage.SystemLockResult(r.bool("ok"), r.string("message"))
+        "host.state" -> ControlMessage.HostState(r.bool("videoAvailable"), r.bool("locked"))
+        "system.unlock" -> ControlMessage.SystemUnlock(r.optString("token"), r.optString("sig"))
+        "system.unlock.challenge" -> ControlMessage.SystemUnlockChallenge(r.string("nonce"), r.u32("ttlMs"))
+        "unlock.key" -> ControlMessage.UnlockKey(r.string("alg"), r.string("pub"))
         "system.unlock.result" -> ControlMessage.SystemUnlockResult(r.bool("ok"), r.string("message"))
         "media.key" -> ControlMessage.MediaKey(r.enum("key", MediaKeyKind.entries.toTypedArray()) { it.wire })
         "display.list" -> ControlMessage.DisplayList(
@@ -188,6 +201,7 @@ internal object ControlMessageFields {
         "agent.help" -> ControlMessage.AgentHelp(
             r.string("requestId"), r.optString("reason"), r.optBool("resolved"),
         )
+        "window.pick", "window.selected", "window.adjust" -> ControlWindowFields.read(type, r)
         else -> ControlMessage.Unknown(type)
     }
 }

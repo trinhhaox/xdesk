@@ -20,6 +20,13 @@ struct AXWindow {
 
     var currentSize: CGSize? { size(kAXSizeAttribute) }
 
+    var title: String? { string(kAXTitleAttribute) }
+
+    /// Cửa sổ có thể đổi kích thước (thuộc tính `AXSize` ghi được).
+    var isResizable: Bool { isSettable(kAXSizeAttribute) }
+
+    var isMinimized: Bool { bool(kAXMinimizedAttribute) == true }
+
     /// Đặt vị trí rồi kích thước rồi vị trí lại (đổi kích thước có thể bị macOS dịch cửa sổ).
     @discardableResult
     func set(frame: CGRect) -> Bool {
@@ -40,15 +47,15 @@ struct AXWindow {
         return list.map(AXWindow.init)
     }
 
-    private func attribute(_ name: String) -> CFTypeRef? {
+    func attribute(_ name: String) -> CFTypeRef? {
         var value: CFTypeRef?
         return AXUIElementCopyAttributeValue(element, name as CFString, &value) == .success ? value : nil
     }
 
-    private func string(_ name: String) -> String? { attribute(name) as? String }
+    func string(_ name: String) -> String? { attribute(name) as? String }
     private func bool(_ name: String) -> Bool? { attribute(name) as? Bool }
 
-    private func isSettable(_ name: String) -> Bool {
+    func isSettable(_ name: String) -> Bool {
         var settable: DarwinBoolean = false
         return AXUIElementIsAttributeSettable(element, name as CFString, &settable) == .success && settable.boolValue
     }

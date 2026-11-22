@@ -106,8 +106,8 @@ struct DeviceStoresTests {
         #expect(json.contains(Base64URL.encode(key)))
         #expect(!json.contains("lastSeen"))
 
-        try storage.write(Data(#"{"schemaVersion":2,"devices":[]}"#.utf8))
-        #expect(throws: IdentityStoreError.unsupportedSchema(2)) { _ = try PairedDevicesStore(storage: storage, macKey: macKey) }
+        try storage.write(Data(#"{"schemaVersion":3,"devices":[]}"#.utf8))
+        #expect(throws: IdentityStoreError.unsupportedSchema(3)) { _ = try PairedDevicesStore(storage: storage, macKey: macKey) }
         try storage.write(Data("not json".utf8))
         #expect(throws: IdentityStoreError.corrupt) { _ = try PairedDevicesStore(storage: storage, macKey: macKey) }
     }

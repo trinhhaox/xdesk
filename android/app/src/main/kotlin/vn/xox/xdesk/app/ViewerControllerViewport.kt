@@ -29,16 +29,19 @@ fun ViewerController.switchWorkMode(next: WorkMode) {
     val currentScreen = negotiatedScreenMode ?: container.display.mode
     activeWorkMode = next
     val neededScreen = next.screenMode
+    val target = session?.connectedTarget ?: lastTarget
     if (neededScreen == null) {
-        if (!wasControl) session?.setVideoPaused(true)
+        // Vào chế độ điều khiển: trả Mac về màn hình thật (chiếu gốc, không màn hình ảo).
+        if (!wasControl) {
+            session?.setVideoPaused(true)
+            target?.let { reconfigureOrRestart(it) }
+        }
         return
     }
-    if (neededScreen != currentScreen) {
-        container.display.selectMode(neededScreen)
-        val target = session?.connectedTarget ?: lastTarget ?: return
-        reconfigureOrRestart(target)
-    } else if (wasControl) {
-        session?.setVideoPaused(false)
+    if (neededScreen != currentScreen) container.display.selectMode(neededScreen)
+    if (neededScreen != currentScreen || wasControl) {
+        target?.let { reconfigureOrRestart(it) } ?: return
+        if (wasControl) session?.setVideoPaused(false)
     }
 }
 

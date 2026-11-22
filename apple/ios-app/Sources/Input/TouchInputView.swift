@@ -23,6 +23,8 @@ final class TouchInputView: UIView {
 
     /// Kích thước màn hình host theo điểm (`DisplayConfig` w/h ÷ scale); đổi delta chuẩn hoá thành pixel cuộn.
     var hostPoints = CGSize(width: 1, height: 1) { didSet { if oldValue != hostPoints { engineStale = true } } }
+    /// `display.config.scale`: kích thước video (px) ÷ scale = hệ toạ độ của `window.pick`/`window.adjust`.
+    var configScale = 1.0
     var pointer = PointerSettings() { didSet { if oldValue != pointer { engineStale = true } } }
     /// Bản sao "Giống màn hình Mac": kích thước Mac lấy từ video (không phải từ cấu hình) và video có thể zoom/kéo.
     var nativeMac = false { didSet { if oldValue != nativeMac { engineStale = true } } }
@@ -137,6 +139,13 @@ final class TouchInputView: UIView {
             viewWidth: Float(bounds.width), viewHeight: Float(bounds.height),
             contentWidth: Float(content.width), contentHeight: Float(content.height)
         )
+    }
+
+    /// Hệ toạ độ chỉnh cửa sổ (luồng video đang xem ÷ scale) + phép đổi từ view qua letterbox/zoom hiện tại.
+    func windowSpace() -> WindowSpace? {
+        guard let mapper = mapper(), configScale > 0 else { return nil }
+        let size = renderer.videoSize.map { CGSize(width: $0.width / configScale, height: $0.height / configScale) } ?? hostPoints
+        return WindowSpace(wireWidth: size.width, wireHeight: size.height, mapper: mapper, viewport: viewport)
     }
 
     /// Trackpad chỉ cần độ dời nên không ép vào khung video; trực tiếp bỏ qua chạm ngoài khung.

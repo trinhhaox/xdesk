@@ -22,6 +22,20 @@
         "vi" : { "stringUnit" : { "state" : "translated", "value" : "Đã ghép" } }
       }
     },
+    "Đã huỷ xác thực mở khoá Mac" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Mac unlock cancelled" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Đã huỷ xác thực mở khoá Mac" } }
+      }
+    },
+    "Không xác thực được để mở khoá Mac" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Could not authenticate to unlock the Mac" } },
+        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Không xác thực được để mở khoá Mac" } }
+      }
+    },
     "Host đã ngắt kết nối" : {
       "extractionState" : "manual",
       "localizations" : {

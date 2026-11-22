@@ -103,6 +103,19 @@ private func entropyBitsPerByte(_ bytes: [UInt8]) -> Double {
         await channel.close()
     }
 
+    /// Host khoá màn hình không phát khung hình nào (`host.state videoAvailable:false`): keepalive probe hai chiều phải giữ liên kết sống.
+    @Test(.timeLimit(.minutes(1))) func probeKeepaliveAloneKeepsTheLinkAliveWithoutAnyVideoFrame() async throws {
+        let (host, viewer) = try await connected()
+        await host.setLinkTimeout(ms: 3500)
+        await viewer.setLinkTimeout(ms: 3500)
+        let lostHost = Task { await (try? collect(host, count: 1, timeout: .seconds(8)) { if case .linkLost = $0 { true } else { nil } }) }
+        let lostViewer = Task { await (try? collect(viewer, count: 1, timeout: .seconds(8)) { if case .linkLost = $0 { true } else { nil } }) }
+        // Cả hai collect đều hết giờ (throw Timeout → nil) vì không bên nào báo linkLost dù không có khung hình suốt 8 s > 3.5 s.
+        #expect(await lostHost.value == nil)
+        #expect(await lostViewer.value == nil)
+        await host.close(); await viewer.close()
+    }
+
     @Test(.timeLimit(.minutes(1))) func epochGapBeyondLookaheadRecoversThroughResync() async throws {
         let (host, viewer) = try await connected()
         for _ in 0..<(Int(DatagramReceiver.maxEpochLookahead) + 2) { try await host.rekeyNow() }

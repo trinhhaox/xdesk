@@ -20,6 +20,7 @@ final class VideoHostView: UIView {
     private static let focusMargin: Float = 64
     private var zoomController: VideoZoomController?
     private let zoomState: VideoZoomState
+    private let windowOverlay: WindowAdjustOverlayView
 
     /// Bản sao "Giống màn hình Mac": bật zoom/kéo và lấy kích thước Mac từ video. Tắt = về vừa khung.
     var zoomEnabled: Bool {
@@ -30,8 +31,23 @@ final class VideoHostView: UIView {
         }
     }
 
-    init(videoLayer: CALayer, touchView: TouchInputView, controller: TextComposerController, zoomState: VideoZoomState) {
+    /// Chỉnh cửa sổ: lớp phủ nhận chạm thay cho `touchView` và cử chỉ zoom tạm tắt.
+    var windowAdjustActive = false {
+        didSet {
+            guard oldValue != windowAdjustActive else { return }
+            windowOverlay.isHidden = !windowAdjustActive
+            touchView.isUserInteractionEnabled = !windowAdjustActive
+            zoomController?.suspended = windowAdjustActive
+            windowOverlay.redraw()
+        }
+    }
+
+    init(
+        videoLayer: CALayer, touchView: TouchInputView, controller: TextComposerController, zoomState: VideoZoomState,
+        windowAdjust: WindowAdjustController
+    ) {
         self.zoomState = zoomState
+        windowOverlay = WindowAdjustOverlayView(controller: windowAdjust) { [weak touchView] in touchView?.windowSpace() }
         self.videoLayer = videoLayer
         self.touchView = touchView
         self.controller = controller
@@ -42,6 +58,7 @@ final class VideoHostView: UIView {
         configureCursor()
         addSubview(container)
         addSubview(touchView)
+        addSubview(windowOverlay)
         addSubview(composer)
         touchView.onCursor = { [weak self] in self?.showCursor($0) }
         touchView.onSequenceEnded = { [weak self] in self?.applyPan(duration: 0.2, options: .curveEaseInOut) }
@@ -65,6 +82,7 @@ final class VideoHostView: UIView {
         videoLayer.frame = container.bounds
         CATransaction.commit()
         touchView.frame = bounds
+        windowOverlay.frame = bounds
         zoomController?.reclamp()
     }
 

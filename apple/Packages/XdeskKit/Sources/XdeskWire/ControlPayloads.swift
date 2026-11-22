@@ -221,9 +221,11 @@ public struct SystemLock: Codable, Sendable, Equatable {
 }
 
 /// Yêu cầu đánh thức/mở khoá màn hình Mac từ xa.
+/// Không có `sig` → xin thử thách; có `sig` (base64 DER ECDSA) → trả lời thử thách (xem `UnlockAttestation`).
 public struct SystemUnlock: Codable, Sendable, Equatable {
     public var token: String?
-    public init(token: String? = nil) { self.token = token }
+    public var sig: String?
+    public init(token: String? = nil, sig: String? = nil) { self.token = token; self.sig = sig }
 }
 
 /// Kết quả đánh thức / mở khoá màn hình Mac từ xa.

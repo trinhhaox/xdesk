@@ -31,6 +31,8 @@ final class HostController {
     private static let allowTailscaleKey = "xdesk.host.allowTailscale"
 
     let audioOptions = HostAudioOptions()
+    /// Giới hạn mở khoá theo thiết bị, chia sẻ giữa mọi phiên để ngắt/kết nối lại không làm mới hạn mức.
+    private let unlockLimits = UnlockRateLimits()
     let windowFit = WindowFitter()
     /// "Tự co giãn cửa sổ ứng dụng cho vừa màn hình" (Bản sao fitDevice/touch): mặc định bật.
     private(set) var fitWindows = WindowFitter.isEnabledByUser
@@ -213,6 +215,12 @@ final class HostController {
             extendSideLookup: { [weak self] in await self?.extendSide ?? .right },
             remoteUnlockEnabled: remoteUnlockEnabled,
             remoteUnlockLookup: { [weak self] in await self?.canRemoteUnlock ?? false },
+            unlockLimits: unlockLimits,
+            hostStaticKey: { [weak self] in await self?.security.hostPublicKey },
+            unlockKeyLookup: { [weak self] key in await self?.security.unlockKey(forViewerKey: key) },
+            unlockKeyEnroll: { [weak self] viewerKey, unlockKey in
+                await self?.security.enrollUnlockKey(viewerKey: viewerKey, unlockKey: unlockKey) ?? .notPermitted
+            },
             onTransferProgress: { [weak self] progress in Task { @MainActor in self?.activeFileTransfer = progress } },
             onFileReceived: { [weak self] completion in
                 Task { @MainActor in

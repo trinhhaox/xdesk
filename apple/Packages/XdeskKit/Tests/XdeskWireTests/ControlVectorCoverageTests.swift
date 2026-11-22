@@ -9,7 +9,8 @@ struct ControlVectorCoverageTests {
         "video.pause", "video.resume", "net.report", "bitrate.set", "clip.offer", "clip.pull", "clip.data",
         "control.state", "ping", "pong", "bye", "input.text", "rekey", "rekey.resync", "pair.result", "agent.approve",
         "system.lock", "system.unlock", "system.unlock.result", "media.key", "display.list", "file.offer", "file.data",
-        "file.start", "file.chunk", "file.done", "file.cancel", "agent.help",
+        "file.start", "file.chunk", "file.done", "file.cancel", "agent.help", "system.unlock.challenge", "unlock.key", "system.lock.result",
+        "host.state", "window.pick", "window.selected", "window.adjust",
     ]
 
     @Test func everyKnownTypeHasAVector() throws {

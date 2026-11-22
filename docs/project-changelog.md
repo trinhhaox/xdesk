@@ -4,6 +4,20 @@
 
 ## Chưa phát hành
 
+## 0.2.1-beta (2026-11-23)
+
+Chi tiết: `docs/release-notes/0.2.1-beta.md`.
+- Bàn phím Mac đầy đủ trên điện thoại (HID thật, phím bổ trợ dính/khoá/giữ, lặp phím, lớp `fn`); giao diện Bàn phím / Slide & Số mới cho dọc và ngang, thanh trên một hàng; bàn phím số gửi HID keypad.
+- Chế độ điều khiển dùng màn hình gốc của Mac (không màn hình ảo, không co cửa sổ, xoay điện thoại không đổi `display.config`).
+- Chỉnh cửa sổ Mac từ điện thoại: capability bit 14 `windowControl`, message `window.pick` / `window.selected` / `window.adjust` (move, resize, preset fill/left/right/center/restore), host dùng AX, cửa sổ chỉnh tay không bị WindowFitter co/khôi phục.
+- Android: giải mã audio trên luồng riêng (`AsyncAudioSink`) — trước đó decoder AAC chặn luồng UDP, host cắt phiên sau 10 s qua Tailscale; bộ đệm jitter tự tăng tới 200 ms.
+- ABR: trần 5 Mb/s khi RTT > 80 ms (relay).
+- Khoá Mac bằng `SACLockScreenImmediate`; sửa nhận diện màn hình khoá (`kCGSSessionOnConsoleKey`); thử lại video lỗi khi Mac còn khoá thì giữ phiên.
+- Nút "Đặt lại khoá" có đếm ngược cửa sổ đăng ký 5 phút.
+- `xcodebuild test` dùng Xdesk.app làm test host giờ chạy app rỗng (không mở Keychain, không chia sẻ cổng 47800).
+
+- Mac ngủ/khoá màn hình không còn làm rớt phiên: lệnh khoá từ xa tắt màn hình khiến SCStream dừng và host gửi `bye` (điện thoại rớt rồi kết nối lại liên tục, kết nối lại thì tạo màn hình ảo hỏng). Giờ host giữ phiên ở trạng thái "chưa có hình" (kênh điều khiển, keepalive UDP, input, khoá/mở khoá, clipboard vẫn chạy), gửi message mới `host.state {videoAvailable, locked}` (host→viewer, không cần cap), tự bật lại video bằng keyframe khi màn hình thức/mở khoá (`screensDidWake`, `sessionDidBecomeActive`, `com.apple.screenIsUnlocked` + poll dự phòng 3 s). iOS/Android hiện lớp phủ "Mac đang khoá" kèm nút "Mở khoá Mac" và "Ngắt kết nối". Lỗi capture thật (không do ngủ/khoá) vẫn kết thúc phiên như cũ.
+- Mở khoá Mac bằng Face ID/vân tay giờ gắn với chữ ký mật mã của điện thoại (capability bit 13 `unlockAttestation`): điện thoại giữ khoá P-256 (iOS Secure Enclave `userPresence`, Android AndroidKeyStore + BiometricPrompt CryptoObject), Mac phát nonce dùng một lần 30 s và chỉ gõ mật khẩu khi chữ ký khớp khoá đã đăng ký (TOFU, lưu trong bản ghi thiết bị có HMAC). Viewer cũ hoặc thiết bị chưa đăng ký khoá chỉ đánh thức màn hình, không gõ mật khẩu. Tắt quyền "Mở khoá Mac" hoặc bấm "Đặt lại khoá" ở Cài đặt › Thiết bị để đăng ký lại khoá. Message mới `unlock.key`, `system.unlock.challenge`, trường `sig` của `system.unlock`; spec `control-messages.md`, vector `control-frames.json`. Chữ ký gắn khoá tĩnh Noise của host và viewer, viewer chỉ ký sau khi người dùng bấm mở khoá, khoá chỉ đăng ký trong 5 phút sau khi bật quyền/"Đặt lại khoá" trên Mac (thiết bị đã bật quyền từ trước phải đặt lại khoá một lần); Mac và điện thoại hiện dấu vân tay khoá để đối chiếu. Thêm `system.lock.result` (báo "Mac chỉ tắt màn hình" khi không khoá được), giới hạn tần suất mở khoá theo thiết bị, và chỉ coi Mac đã khoá khi phiên đang ở console. **Hạ cấp xuống bản trước không được hỗ trợ**: file danh sách thiết bị có khoá ghi `schemaVersion` 2 nên bản cũ từ chối đọc (giữ nguyên file). Cần thử trên máy thật (Secure Enclave/AndroidKeyStore không chạy được trên simulator).
 - Mac tự chạy `adb reverse tcp:47800 tcp:<cổng host>` khi có điện thoại Android cắm cáp (đã bật USB debugging) trong lúc đang phát: cứ 4 giây xem `adb devices`, rút cáp rồi cắm lại thì làm lại; không có `adb` thì bỏ qua. Media Android qua cáp đi bằng MediaOverTcp. Mã: `apple/mac-app/Sources/UsbTunnel/AdbReverseWatcher.swift`; mô tả: `protocol/spec/framing.md`, `docs/audio-and-usb.md`.
 - `make test-ios` giờ chạy test thật trên iOS Simulator (`xcodebuild test`, chọn máy bằng `IOS_SIM_ID=<udid>`, mặc định iPhone đầu tiên còn dùng được) thay vì chỉ `build-for-testing`.
 - Quyền truyền tệp riêng cho từng thiết bị: gửi/nhận tệp (`file.*`) tách khỏi quyền điều khiển (`input`) thành quyền riêng, bật/tắt theo từng thiết bị đã ghép. Đang được hoàn thiện song song; không đổi định dạng wire.

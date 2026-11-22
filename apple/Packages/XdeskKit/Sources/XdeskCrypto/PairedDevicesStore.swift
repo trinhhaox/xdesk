@@ -8,6 +8,11 @@ import Foundation
 /// và `integrityFailure == true` (fail-closed: không thiết bị nào được uỷ quyền, UI phải báo cho người dùng).
 public actor PairedDevicesStore {
     public static let schemaVersion = 1
+    /// File có bản ghi `unlockKey` ghi `schemaVersion` 2: bản cũ (chỉ hiểu 1) gặp file này sẽ ném `unsupportedSchema` và giữ nguyên file,
+    /// thay vì ghi lại bản ghi thiếu `unlockKey` làm sai HMAC rồi cách ly file. Hạ cấp xuống bản cũ vì vậy không được hỗ trợ.
+    public static let unlockKeySchemaVersion = 2
+    /// Cửa sổ cho phép đăng ký khoá mở khoá sau khi người dùng bật quyền "Mở khoá Mac" hoặc bấm "Đặt lại khoá".
+    public static let unlockEnrollmentWindow: TimeInterval = 300
 
     private struct FileContents: Codable {
         var schemaVersion: Int
@@ -25,6 +30,8 @@ public actor PairedDevicesStore {
     public private(set) var integrityNoticePending = false
     private var needsQuarantine = false
     private var observers: [UUID: AsyncStream<Change>.Continuation] = [:]
+    /// Hạn của cửa sổ đăng ký khoá theo thiết bị; chỉ trong bộ nhớ (khởi động lại = đóng, fail-closed).
+    private var enrollmentDeadlines: [String: Date] = [:]
 
     public enum Change: Sendable, Equatable {
         case added(String)
@@ -44,7 +51,7 @@ public actor PairedDevicesStore {
         guard let data = try storage.read() else { return }
         var contents: FileContents
         do { contents = try Self.decoder.decode(FileContents.self, from: data) } catch { throw IdentityStoreError.corrupt }
-        guard contents.schemaVersion == Self.schemaVersion else { throw IdentityStoreError.unsupportedSchema(contents.schemaVersion) }
+        guard [Self.schemaVersion, Self.unlockKeySchemaVersion].contains(contents.schemaVersion) else { throw IdentityStoreError.unsupportedSchema(contents.schemaVersion) }
         guard Set(contents.devices.map(\.id)).count == contents.devices.count else { throw IdentityStoreError.corrupt }
         let mac = contents.mac.flatMap(Base64URL.decode)
         contents.mac = nil
@@ -114,9 +121,54 @@ public actor PairedDevicesStore {
 
     public func setPermissions(id: String, _ permissions: DevicePermissions) throws {
         guard var device = byId[id] else { return }
+        // Tắt quyền mở khoá = thu hồi khoá sinh trắc học; lần bật lại sẽ đăng ký khoá mới.
+        if device.permissions.unlock, !permissions.unlock {
+            device.unlockKey = nil
+            enrollmentDeadlines[id] = nil
+        }
+        if !device.permissions.unlock, permissions.unlock { openUnlockEnrollment(id: id) }
         device.permissions = permissions
         try commit(device)
         notify(.permissionsChanged(id))
+    }
+
+    /// Kết quả đăng ký khoá mở khoá của điện thoại (TOFU, fail-closed).
+    public enum UnlockKeyEnrollment: Sendable, Equatable {
+        case enrolled
+        case alreadyEnrolled
+        /// Thiết bị đã có một khoá khác; giữ khoá cũ, cần người dùng đặt lại trên Mac.
+        case mismatch
+        case notPermitted
+        /// Chưa có thao tác của người dùng trên Mac (bật quyền / "Đặt lại khoá") trong 5 phút gần đây.
+        case windowClosed
+        case invalidKey
+    }
+
+    /// Mở cửa sổ đăng ký khoá 5 phút cho thiết bị (gọi khi người dùng Mac bật quyền hoặc đặt lại khoá).
+    public func openUnlockEnrollment(id: String) {
+        enrollmentDeadlines[id] = now().addingTimeInterval(Self.unlockEnrollmentWindow)
+    }
+
+    /// Chỉ đăng ký khi thiết bị đang có quyền `unlock`, chưa có khoá và cửa sổ đăng ký đang mở. Khoá khác khoá đã lưu không bao giờ ghi đè.
+    public func enrollUnlockKey(id: String, key: [UInt8]) throws -> UnlockKeyEnrollment {
+        guard UnlockKeyFormat.isValid(key) else { return .invalidKey }
+        guard var device = byId[id], device.permissions.unlock else { return .notPermitted }
+        if let existing = device.unlockKey { return ConstantTime.equals(existing, key) ? .alreadyEnrolled : .mismatch }
+        guard let deadline = enrollmentDeadlines[id], now() <= deadline else { return .windowClosed }
+        enrollmentDeadlines[id] = nil
+        device.unlockKey = key
+        try commit(device)
+        return .enrolled
+    }
+
+    /// "Đặt lại khoá": xoá khoá đã đăng ký (nếu có) và mở cửa sổ 5 phút để `unlock.key` kế tiếp đăng ký lại.
+    public func clearUnlockKey(id: String) throws {
+        guard var device = byId[id] else { return }
+        if device.unlockKey != nil {
+            device.unlockKey = nil
+            try commit(device)
+        }
+        if device.permissions.unlock { openUnlockEnrollment(id: id) }
     }
 
     public func setLastAddress(id: String, _ address: String) throws {
@@ -141,7 +193,8 @@ public actor PairedDevicesStore {
     }
 
     private func save() throws {
-        var contents = FileContents(schemaVersion: Self.schemaVersion, devices: devices, mac: nil)
+        let version = devices.contains { $0.unlockKey != nil } ? Self.unlockKeySchemaVersion : Self.schemaVersion
+        var contents = FileContents(schemaVersion: version, devices: devices, mac: nil)
         let canonical = try Self.encoder.encode(contents)
         contents.mac = Base64URL.encode(PairedDevicesIntegrity.mac(for: canonical, key: macKey))
         if needsQuarantine {

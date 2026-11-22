@@ -10,7 +10,8 @@ extension HostSession {
         if permissions.fileTransfer { caps.insert(.fileTransfer) }
         if pasteboard != nil, permissions.clipboard { caps.insert(.clipboard) }
         if permissions.audio { caps.formUnion([.audioPCM, .audioAACELD]) }
-        if permissions.unlock, remoteUnlockSettingSnapshot { caps.insert(.remoteUnlock) }
+        if permissions.unlock, remoteUnlockSettingSnapshot { caps.formUnion([.remoteUnlock, .unlockAttestation]) }
+        if permissions.input, AccessibilityPermission.isGranted { caps.insert(.windowControl) }
         if connection.isUsbTunnel || connection.isLoopback { caps.insert(.mediaOverTcp) }
         return caps
     }

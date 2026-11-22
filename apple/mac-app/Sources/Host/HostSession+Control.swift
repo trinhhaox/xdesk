@@ -30,10 +30,14 @@ extension HostSession {
                 if permissions.input { onAgentAnswer(answer.requestId, answer.allow ?? false) }
             case .agentHelp(let help) where help.isResolved:
                 if permissions.input { onAgentHelp(help.requestId, true) }
+            case .windowPick(let pick): await handleWindowPick(pick)
+            case .windowAdjust(let adjust): await handleWindowAdjust(adjust)
             case .systemLock:
                 await handleSystemLock()
-            case .systemUnlock:
-                await handleSystemUnlock()
+            case .systemUnlock(let request):
+                await handleSystemUnlock(request)
+            case .unlockKey(let key):
+                await handleUnlockKey(key)
             case .fileStart(let start):
                 await handleFileStart(start)
             case .fileChunk(let header):

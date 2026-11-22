@@ -13,7 +13,10 @@ sealed interface ViewerAuth {
 }
 
 /** Kết quả bước kết nối + xác thực: kênh đã mã hoá, chưa hello/welcome. */
-class ConnectedHost(val connection: ControlConnection, val target: ViewerTarget, val hostId: String)
+class ConnectedHost(
+    val connection: ControlConnection, val target: ViewerTarget, val hostId: String,
+    val hostKey: ByteArray, val hostName: String,
+)
 
 /** Mở TCP (thử lần lượt các địa chỉ), chọn kiểu bắt tay, ghi nhận host vào danh sách đã biết. */
 class ViewerConnector(private val trust: ViewerTrust, private val deviceName: String, private val nowMs: () -> Long) {
@@ -50,7 +53,7 @@ class ViewerConnector(private val trust: ViewerTrust, private val deviceName: St
         if (outcome.method != PairMethod.RECONNECT) trust.knownHosts.add(outcome.hostName, outcome.hostKey, nowMs())
         trust.knownHosts.markSeen(id, nowMs())
         trust.knownHosts.setLastAddress(id, target.address)
-        return ConnectedHost(conn, target, id)
+        return ConnectedHost(conn, target, id, outcome.hostKey, outcome.hostName)
     }
 
     private fun authMode(conn: ControlConnection, target: ViewerTarget, auth: ViewerAuth): ViewerAuthMode = when (auth) {
