@@ -161,6 +161,47 @@ struct DeviceStoresTests {
         #expect(!failure3)
         #expect(await store3.devices.first?.permissions.unlock == true)
     }
+
+    @Test func fileTransferDefaultsOffAndLegacyRecordsDecodeFailClosed() throws {
+        #expect(!DevicePermissions.default.fileTransfer)
+        let legacy = Data(#"{"view":true,"input":true,"clipboard":true,"audio":true,"unlock":true}"#.utf8)
+        let decoded = try JSONDecoder().decode(DevicePermissions.self, from: legacy)
+        #expect(!decoded.fileTransfer && decoded.input && decoded.unlock)
+        let encodedOff = try String(data: JSONEncoder().encode(decoded), encoding: .utf8) ?? ""
+        #expect(!encodedOff.contains("fileTransfer"))
+        var on = decoded
+        on.fileTransfer = true
+        let roundTrip = try JSONDecoder().decode(DevicePermissions.self, from: JSONEncoder().encode(on))
+        #expect(roundTrip.fileTransfer)
+    }
+
+    @Test func fileTransferPermissionKeepsLegacyAndNewHmacValid() async throws {
+        let storage = InMemoryPairedDevicesStorage()
+        let key = [UInt8](repeating: 5, count: 32)
+        let store1 = try PairedDevicesStore(storage: storage, macKey: macKey, now: { [t0] in t0 })
+        let added = try await store1.add(name: "iPad", publicKey: key, role: .viewer)
+        #expect(!(try fileText(storage)).contains("\"fileTransfer\""))
+
+        let store2 = try PairedDevicesStore(storage: storage, macKey: macKey)
+        #expect(await !store2.integrityFailure)
+        #expect(await store2.devices.first?.permissions.fileTransfer == false)
+
+        var perms = added.permissions
+        perms.fileTransfer = true
+        try await store2.setPermissions(id: added.id, perms)
+        #expect((try fileText(storage)).contains("\"fileTransfer\""))
+        let store3 = try PairedDevicesStore(storage: storage, macKey: macKey)
+        #expect(await !store3.integrityFailure)
+        #expect(await store3.devices.first?.permissions.fileTransfer == true)
+
+        // Đổi tay cờ fileTransfer trong file đã ký phải bị phát hiện (không tự bật/tắt quyền được).
+        let original = try fileText(storage)
+        let tampered = original.replacingOccurrences(of: "\"fileTransfer\" : true", with: "\"fileTransfer\" : false")
+        #expect(tampered != original)
+        try storage.write(Data(tampered.utf8))
+        let store4 = try PairedDevicesStore(storage: storage, macKey: macKey)
+        #expect(await store4.integrityFailure)
+    }
 }
 
 func fileText(_ storage: InMemoryPairedDevicesStorage) throws -> String {

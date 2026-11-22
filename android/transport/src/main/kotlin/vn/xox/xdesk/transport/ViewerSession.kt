@@ -52,6 +52,7 @@ class ViewerSession(
     private var clipboardSync: ClipboardSync? = null
     @Volatile private var activeSendingFileId: String? = null
     private val cancelledFileIds = Collections.synchronizedSet(HashSet<String>())
+    @Volatile private var hostDeniedSending = false
     private val fileReceiver = FileTransferReceiver(fileTempDir, onFileProgress, onFileReceived, onFileError)
     private var streamId = 0
     private val metrics = SessionMetrics()
@@ -229,15 +230,7 @@ class ViewerSession(
 
     fun sendFile(name: String, totalBytes: Long, openStream: () -> InputStream?, onFinished: (Boolean, String?) -> Unit = { _, _ -> }) {
         val conn = connection ?: return onFinished(false, "Chưa kết nối tới Mac")
-        if (!supportsFileTransfer) {
-            val bytes = try {
-                openStream()?.use { it.readBytes() }
-            } catch (e: Exception) {
-                return onFinished(false, e.message)
-            } ?: return onFinished(false, "Không đọc được tệp")
-            sendFileLegacy(name, bytes, onFinished)
-            return
-        }
+        if (!supportsFileTransfer) return onFinished(false, FileTransferDenial.MESSAGE)
         runIo {
             val id = UUID.randomUUID().toString()
             activeSendingFileId = id
@@ -254,40 +247,20 @@ class ViewerSession(
                         onProgress = onFileProgress,
                     )
                 }
-                onFinished(completed, if (completed) null else "cancelled")
+                onFinished(completed, if (completed) null else if (hostDeniedSending) FileTransferDenial.MESSAGE else "cancelled")
             } catch (e: Exception) {
                 onFileProgress(null)
                 onFinished(false, e.message)
             } finally {
                 if (activeSendingFileId == id) activeSendingFileId = null
                 cancelledFileIds.remove(id)
+                hostDeniedSending = false
             }
         }
     }
 
     fun sendFile(name: String, bytes: ByteArray) {
         sendFile(name, bytes.size.toLong(), { ByteArrayInputStream(bytes) })
-    }
-
-    private fun sendFileLegacy(name: String, bytes: ByteArray, onFinished: (Boolean, String?) -> Unit) {
-        runIo {
-            try {
-                val chunkSize = 32 * 1024
-                val totalChunks = ((bytes.size + chunkSize - 1) / chunkSize).coerceAtLeast(1)
-                connection?.send(ControlMessage.FileOffer(name, bytes.size.toLong(), ""))
-                for (seq in 0 until totalChunks) {
-                    val start = seq * chunkSize
-                    val end = minOf(start + chunkSize, bytes.size)
-                    val chunk = bytes.copyOfRange(start, end)
-                    val base64 = java.util.Base64.getEncoder().encodeToString(chunk)
-                    val isLast = (seq == totalChunks - 1)
-                    connection?.send(ControlMessage.FileData(name, base64, isLast))
-                }
-                onFinished(true, null)
-            } catch (e: Exception) {
-                onFinished(false, e.message)
-            }
-        }
     }
 
     /** Chủ động đọc clipboard Android hiện tại và gửi sang Mac (trả về `.Disabled` nếu chưa cấp quyền clipboard). */
@@ -365,6 +338,7 @@ class ViewerSession(
             is ControlMessage.FileDone -> fileReceiver.handleDone(message)
             is ControlMessage.FileCancel -> {
                 if (activeSendingFileId == message.id) {
+                    if (message.reason == FileTransferDenial.REASON) hostDeniedSending = true
                     cancelledFileIds.add(message.id)
                 } else {
                     fileReceiver.handleCancel(message)

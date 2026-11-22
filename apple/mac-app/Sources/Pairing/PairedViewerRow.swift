@@ -23,6 +23,7 @@ struct PairedViewerRow: View {
                 toggle("Điều khiển", \.input)
                 toggle("Clipboard", \.clipboard)
                 toggle("Âm thanh", \.audio)
+                toggle("Gửi/nhận tệp", \.fileTransfer)
                 toggle("Mở khoá Mac", \.unlock)
             }
             .toggleStyle(.checkbox).font(.callout)

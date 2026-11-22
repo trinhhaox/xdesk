@@ -105,6 +105,29 @@ class ControlVectorsTest {
     }
 
     @Test
+    fun everyKnownTypeHasAVector() {
+        val known = setOf(
+            "hello", "welcome", "reject", "display.config", "display.reconfigure", "display.ready", "keyframe.request",
+            "video.pause", "video.resume", "net.report", "bitrate.set", "clip.offer", "clip.pull", "clip.data",
+            "control.state", "ping", "pong", "bye", "input.text", "rekey", "rekey.resync", "pair.result", "agent.approve",
+            "system.lock", "system.unlock", "system.unlock.result", "media.key", "display.list", "file.offer", "file.data",
+            "file.start", "file.chunk", "file.done", "file.cancel", "agent.help",
+        )
+        val covered = v.list("messages").map { it.str("type") }.toSet()
+        assertEquals(emptySet(), known - covered, "thiếu vector")
+        assertEquals(emptySet(), covered - known - "future.thing", "type lạ trong vector")
+    }
+
+    @Test
+    fun fileMessagesUseTransferIdKeyNotEnvelopeId() {
+        val start = ControlMessageCodec.decode(
+            """{"id":7,"name":"a.txt","size":3,"t":"file.start","transferId":"abc"}""".toByteArray(),
+        )
+        assertEquals(7L, start.id)
+        assertEquals(ControlMessage.FileStart("abc", "a.txt", 3), start.message)
+    }
+
+    @Test
     fun inputTextLimitIsEnforced() {
         val big = ControlMessage.InputText("a".repeat(4097))
         assertEquals("invalidField", errorOf { ControlMessageCodec.encode(ControlEnvelope(1, big)) })

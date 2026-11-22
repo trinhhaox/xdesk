@@ -43,9 +43,7 @@ extension HostSession {
             case .fileCancel(let cancel):
                 await handleFileCancel(cancel)
             case .fileOffer(let offer):
-                await handleFileOffer(offer)
-            case .fileData(let data):
-                await handleFileData(data)
+                await handleLegacyFileOffer(offer)
             case .bye: return
             default: break
             }

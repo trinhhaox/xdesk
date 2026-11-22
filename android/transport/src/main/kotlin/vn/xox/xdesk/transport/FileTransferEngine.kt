@@ -266,3 +266,9 @@ object FileTransferSender {
         return total
     }
 }
+
+/** Host từ chối truyền tệp vì thiết bị không (còn) có quyền: gửi `file.cancel` với `reason` này. */
+object FileTransferDenial {
+    const val REASON = "permission"
+    const val MESSAGE = "Mac chưa cho phép thiết bị này gửi/nhận tệp. Hãy bật \"Gửi/nhận tệp\" trong Xdesk trên Mac, tab Thiết bị."
+}

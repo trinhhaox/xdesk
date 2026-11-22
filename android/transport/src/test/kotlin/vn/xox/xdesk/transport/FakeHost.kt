@@ -31,7 +31,11 @@ import vn.xox.xdesk.wire.ControlMessageCodec
 import vn.xox.xdesk.wire.MediaPacket
 
 /** Host giả (responder Noise thật, JVM) cho test state machine của viewer qua TCP/UDP loopback. */
-class FakeHost(val identity: DeviceIdentity = DeviceIdentity.generate()) : Closeable {
+class FakeHost(
+    val identity: DeviceIdentity = DeviceIdentity.generate(),
+    /** Khả năng host chịu cấp cho viewer (giao với cap viewer đề nghị); mặc định cấp hết. */
+    private val grantedCaps: Long = -1L,
+) : Closeable {
     val token = ByteArray(32).also(SecureRandom()::nextBytes)
     val knownViewers = CopyOnWriteArrayList<ByteArray>()
     val received = CopyOnWriteArrayList<ControlMessage>()
@@ -122,7 +126,7 @@ class FakeHost(val identity: DeviceIdentity = DeviceIdentity.generate()) : Close
             if (message == ControlMessage.Rekey) { rx.rekey(); continue }
             received += message
             when (message) {
-                is ControlMessage.Hello -> send(ControlMessage.Welcome("1.0", "s-test", message.caps), envelope.id)
+                is ControlMessage.Hello -> send(ControlMessage.Welcome("1.0", "s-test", message.caps and grantedCaps), envelope.id)
                 is ControlMessage.DisplayConfig -> {
                     send(ControlMessage.DisplayReady(udpPort, 1), envelope.id)
                     if (revokeAfterReady) send(ControlMessage.Reject(ControlMessage.Reject.REASON_REVOKED))

@@ -25,6 +25,9 @@ import XdeskCrypto
         #expect(all.permissions.view && !all.permissions.input && all.permissions.clipboard && all.permissions.audio)
         all.input = false
         #expect(all.permissions.view)
+        #expect(!draft.fileTransfer && !draft.permissions.fileTransfer)
+        all.fileTransfer = true
+        #expect(all.permissions.fileTransfer)
     }
 
     @Test func countdownClampsAndFormats() {

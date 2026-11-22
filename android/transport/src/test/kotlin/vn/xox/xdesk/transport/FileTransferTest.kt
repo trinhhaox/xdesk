@@ -100,4 +100,25 @@ class FileTransferEngineTest {
             session.disconnect()
         }
     }
+
+    @Test
+    fun sendFileIsRefusedWithoutHostFileTransferCapability() {
+        val restricted = FakeHost(grantedCaps = vn.xox.xdesk.wire.Capabilities.FILE_TRANSFER.inv())
+        val restrictedStore = FileKnownHostStore(createTempFile("hosts-ft-denied", ".txt").toFile().also { it.deleteOnExit() })
+        val session = ViewerSession(ViewerTrust(DeviceIdentity.generate(), restrictedStore), "Android-ft-denied", {})
+        try {
+            val auth = ViewerAuth.Qr(PairingURI(restricted.identity.publicKey, restricted.token, listOf("127.0.0.1:${restricted.port}")))
+            assertTrue(session.connect(listOf(ViewerTarget("127.0.0.1", restricted.port)), config, auth))
+            assertFalse(session.supportsFileTransfer)
+
+            var finished: Pair<Boolean, String?>? = null
+            session.sendFile("blocked.bin", 3L, { ByteArrayInputStream(byteArrayOf(1, 2, 3)) }) { ok, err -> finished = ok to err }
+            assertEquals(false to FileTransferDenial.MESSAGE, finished)
+            Thread.sleep(100)
+            assertTrue(restricted.received.none { it is ControlMessage.FileStart || it is ControlMessage.FileOffer })
+        } finally {
+            session.disconnect()
+            restricted.close()
+        }
+    }
 }

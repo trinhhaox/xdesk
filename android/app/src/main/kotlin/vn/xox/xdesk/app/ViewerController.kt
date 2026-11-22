@@ -74,6 +74,8 @@ class ViewerController(
         private set
     var audioAvailable by mutableStateOf(false)
         private set
+    /** Mac chỉ bật khả năng truyền tệp khi thiết bị được cấp quyền "Gửi/nhận tệp"; thiếu thì ẩn nút gửi tệp. */
+    val fileTransferAvailable: Boolean get() = streaming && session?.supportsFileTransfer == true
     var audioMuted by mutableStateOf(false)
         private set
     var hostDisplays by mutableStateOf<List<DisplayInfo>>(emptyList())

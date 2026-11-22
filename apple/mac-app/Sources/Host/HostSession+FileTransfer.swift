@@ -3,13 +3,6 @@ import os
 import XdeskTransport
 import XdeskWire
 
-struct ActiveFileTransfer: Sendable {
-    let fileName: String
-    let fileURL: URL
-    let fileHandle: FileHandle
-    var receivedChunks: UInt32 = 0
-}
-
 extension HostSession {
     private static let transferLog = Logger(subsystem: "vn.xox.xdesk", category: "file-transfer")
 
@@ -24,22 +17,38 @@ extension HostSession {
     // MARK: Streaming BULK 2 chiều
 
     func handleIncomingBulk(_ chunk: [UInt8]) async {
-        if await fileReceiver.handleBulk(chunk) { return }
+        // Frame BULK ngay sau `file.chunk` luôn thuộc về truyền tệp (kể cả khi bị từ chối/huỷ): nhận hoặc bỏ, không đẩy sang clipboard.
+        if expectingFileBulk {
+            expectingFileBulk = false
+            _ = await fileReceiver.handleBulk(chunk)
+            return
+        }
         await clipboard?.handleBulk(chunk)
     }
 
     func handleFileStart(_ start: FileStart) async {
-        guard permissions.input else { return }
+        guard await refreshFileTransferAllowed() else {
+            await denyFileTransfer(id: start.id, name: start.name)
+            return
+        }
         await fileReceiver.handleStart(start)
     }
 
+    /// Mỗi mảnh đọc cờ đồng bộ (watcher làm mới mỗi 0,5 s) để không tốn một lần nhảy actor cho mỗi 64 KiB.
     func handleFileChunk(_ header: FileChunk) async {
-        guard permissions.input else { return }
+        expectingFileBulk = true
+        guard negotiatedCaps.contains(.fileTransfer), fileGate.allowed else {
+            await denyFileTransfer(id: header.id, name: nil)
+            return
+        }
         await fileReceiver.handleChunkHeader(header)
     }
 
     func handleFileDone(_ done: FileDone) async {
-        guard permissions.input else { return }
+        guard await refreshFileTransferAllowed() else {
+            await denyFileTransfer(id: done.id, name: nil)
+            return
+        }
         await fileReceiver.handleDone(done)
     }
 
@@ -52,7 +61,11 @@ extension HostSession {
     }
 
     func sendFileToViewer(url: URL) async {
-        guard permissions.input else { return }
+        let fileName = FileTransferNaming.sanitizedName(url.lastPathComponent)
+        guard await refreshFileTransferAllowed() else {
+            onFileFailed(fileName, Self.fileDeniedLocalMessage)
+            return
+        }
         let transferId = UUID().uuidString
         activeSendingFileId = transferId
         defer {
@@ -67,13 +80,14 @@ extension HostSession {
                 url: url,
                 connection: connection,
                 isCancelled: { [fileCancelToken] in fileCancelToken.isCancelled(transferId) },
+                cancelReason: { [fileGate] in fileGate.allowed ? "cancelled" : FileTransferDenial.reason },
                 onProgress: onTransferProgress
             )
         } catch is CancellationError {
             onTransferProgress(nil)
         } catch {
             onTransferProgress(nil)
-            onFileFailed(FileTransferNaming.sanitizedName(url.lastPathComponent), error.localizedDescription)
+            onFileFailed(fileName, error.localizedDescription)
             Self.transferLog.error("Gửi tệp sang viewer lỗi: \(error.localizedDescription, privacy: .public)")
         }
     }
@@ -87,51 +101,11 @@ extension HostSession {
         onTransferProgress(nil)
     }
 
-    // MARK: Tương thích ngược client cũ (`file.offer` / `file.data` Base64)
+    // MARK: Đường `file.offer` / `file.data` (Base64) cũ — đã bỏ
 
-    func handleFileOffer(_ offer: FileOffer) async {
-        guard permissions.input else { return }
-        let cleanName = FileTransferNaming.sanitizedName(offer.name)
-        let targetURL = FileTransferNaming.uniqueURL(directory: Self.downloadsDirectory, preferredName: cleanName)
-
-        FileManager.default.createFile(atPath: targetURL.path, contents: nil)
-        guard let handle = try? FileHandle(forWritingTo: targetURL) else {
-            Self.transferLog.error("Không thể mở file để ghi: \(targetURL.path, privacy: .public)")
-            return
-        }
-
-        fileTransfers[cleanName] = ActiveFileTransfer(
-            fileName: targetURL.lastPathComponent,
-            fileURL: targetURL,
-            fileHandle: handle
-        )
-        Self.transferLog.notice("Bắt đầu nhận tệp (legacy): \(targetURL.lastPathComponent, privacy: .public) (\(offer.size) bytes)")
-    }
-
-    func handleFileData(_ chunk: FileData) async {
-        let cleanName = FileTransferNaming.sanitizedName(chunk.name)
-        guard permissions.input, var transfer = fileTransfers[cleanName] else { return }
-        guard let data = Data(base64Encoded: chunk.chunk) else { return }
-
-        do {
-            try transfer.fileHandle.seekToEnd()
-            try transfer.fileHandle.write(contentsOf: data)
-            transfer.receivedChunks += 1
-            fileTransfers[cleanName] = transfer
-
-            if chunk.isLast {
-                try? transfer.fileHandle.close()
-                fileTransfers.removeValue(forKey: cleanName)
-                onFileReceived(FileTransferCompletion(
-                    id: cleanName,
-                    fileName: transfer.fileName,
-                    url: transfer.fileURL,
-                    size: (try? FileManager.default.attributesOfItem(atPath: transfer.fileURL.path)[.size] as? NSNumber)?.uint64Value ?? 0
-                ))
-                Self.transferLog.notice("Đã nhận xong tệp: \(transfer.fileName, privacy: .public) tại \(transfer.fileURL.path, privacy: .public)")
-            }
-        } catch {
-            Self.transferLog.error("Lỗi ghi dữ liệu tệp: \(error.localizedDescription, privacy: .public)")
-        }
+    /// Không client nào còn gửi `file.offer`; trả lý do rõ ràng thay vì nhận tệp.
+    func handleLegacyFileOffer(_ offer: FileOffer) async {
+        _ = try? await connection.send(.fileCancel(FileCancel(id: offer.name, reason: FileTransferDenial.unsupportedReason)))
+        log.notice("Từ chối file.offer (đường cũ không còn được hỗ trợ)")
     }
 }

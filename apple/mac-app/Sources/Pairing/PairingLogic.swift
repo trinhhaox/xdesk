@@ -32,9 +32,10 @@ struct ApprovalDraft: Equatable {
     var input = DevicePermissions.default.input
     var clipboard = DevicePermissions.default.clipboard
     var audio = DevicePermissions.default.audio
+    var fileTransfer = DevicePermissions.default.fileTransfer
 
     var permissions: DevicePermissions {
-        DevicePermissions(view: true, input: input, clipboard: clipboard, audio: audio)
+        DevicePermissions(view: true, input: input, clipboard: clipboard, audio: audio, fileTransfer: fileTransfer)
     }
 }
 

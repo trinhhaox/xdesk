@@ -41,6 +41,7 @@ struct SasConfirmView: View {
                 Toggle("Điều khiển (chuột, bàn phím)", isOn: $draft.input)
                 Toggle("Clipboard", isOn: $draft.clipboard)
                 Toggle("Âm thanh", isOn: $draft.audio)
+                Toggle("Gửi/nhận tệp", isOn: $draft.fileTransfer)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 2)

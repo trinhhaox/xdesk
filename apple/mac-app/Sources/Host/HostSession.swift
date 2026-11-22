@@ -39,7 +39,9 @@ actor HostSession {
     /// Tên thiết bị viewer tự khai trong Hello (dự phòng khi chưa có peer đã xác thực).
     private var helloName = ""
     /// Quyền của thiết bị đã ghép (plaintext Debug: mặc định). `view` tắt → từ chối phiên; `input` tắt → bỏ input.
-    private(set) var permissions = DevicePermissions.default
+    private(set) var permissions = DevicePermissions.default {
+        didSet { fileGate.set(permissions.fileTransfer) }
+    }
     var bitrate = BitrateController(initialKbps: HostSession.initialBitrateKbps)
     private var tasks: [Task<Void, Never>] = []
     private var framePumpTask: Task<Void, Never>?
@@ -57,11 +59,14 @@ actor HostSession {
     let onFileFailed: @Sendable (String, String) -> Void
     var remoteUnlockSettingSnapshot: Bool
     private var unlockLimiter = RemoteUnlockRateLimiter()
-    private var negotiatedCaps: Capabilities = []
+    private(set) var negotiatedCaps: Capabilities = []
     var clipboard: ClipboardSync?
-    var fileTransfers: [String: ActiveFileTransfer] = [:]
     var activeSendingFileId: String?
     let fileCancelToken = HostFileCancelToken()
+    let fileGate = HostFileGate()
+    var lastDenyNoticeAt: ContinuousClock.Instant?
+    var expectingFileBulk = false
+    var filePermissionWatch: Task<Void, Never>?
     lazy var fileReceiver: FileTransferReceiver = FileTransferReceiver(
         directory: { Self.downloadsDirectory },
         onProgress: onTransferProgress,
@@ -115,6 +120,7 @@ actor HostSession {
             }
             negotiatedCaps = result.caps
             if result.caps.contains(.clipboard) { await startClipboard() }
+            if result.caps.contains(.fileTransfer) { startFilePermissionWatch() }
             try await startPipeline(result.display, caps: result.caps)
             try await controlLoop()
         } catch {
@@ -160,11 +166,7 @@ actor HostSession {
             )))
             return
         }
-        let livePerms: DevicePermissions = if let key = await connection.peer?.publicKey, let live = await permissionLookup(key) {
-            live
-        } else {
-            permissions
-        }
+        let livePerms = await livePermissions()
         let globalUnlock = await remoteUnlockLookup()
         guard RemoteUnlockPolicy.canUnlock(globalEnabled: globalUnlock, deviceAllowed: livePerms.unlock) else {
             if livePerms.input && !RemoteUnlockExecutor.isScreenLocked() {
@@ -337,6 +339,8 @@ actor HostSession {
         framePumpTask = nil
         tasks.forEach { $0.cancel() }
         tasks.removeAll()
+        filePermissionWatch?.cancel()
+        filePermissionWatch = nil
         await clipboard?.stop()
         clipboard = nil
         if let activeId = activeSendingFileId {

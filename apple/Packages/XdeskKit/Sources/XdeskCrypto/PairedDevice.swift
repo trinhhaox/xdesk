@@ -7,19 +7,22 @@ public struct DevicePermissions: Codable, Sendable, Equatable {
     public var audio: Bool
     /// Cho phép thiết bị gửi lệnh mở khoá máy Mac thật (mặc định TẮT, Fail-Closed).
     public var unlock: Bool
+    /// Cho phép gửi/nhận tệp 2 chiều với Mac (lưu vào ~/Downloads/Xdesk/). Mặc định TẮT, Fail-Closed.
+    public var fileTransfer: Bool
 
-    /// Thiết bị mới: xem + điều khiển bật; clipboard, âm thanh và mở khoá tắt tới khi người dùng bật.
-    public static let `default` = DevicePermissions(view: true, input: true, clipboard: false, audio: false, unlock: false)
+    /// Thiết bị mới: xem + điều khiển bật; clipboard, âm thanh, mở khoá và truyền tệp tắt tới khi người dùng bật.
+    public static let `default` = DevicePermissions(view: true, input: true, clipboard: false, audio: false, unlock: false, fileTransfer: false)
 
-    public init(view: Bool, input: Bool, clipboard: Bool, audio: Bool, unlock: Bool = false) {
+    public init(view: Bool, input: Bool, clipboard: Bool, audio: Bool, unlock: Bool = false, fileTransfer: Bool = false) {
         self.view = view
         self.input = input
         self.clipboard = clipboard
         self.audio = audio
         self.unlock = unlock
+        self.fileTransfer = fileTransfer
     }
 
-    private enum CodingKeys: String, CodingKey { case view, input, clipboard, audio, unlock }
+    private enum CodingKeys: String, CodingKey { case view, input, clipboard, audio, unlock, fileTransfer }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -28,6 +31,7 @@ public struct DevicePermissions: Codable, Sendable, Equatable {
         clipboard = try c.decode(Bool.self, forKey: .clipboard)
         audio = try c.decode(Bool.self, forKey: .audio)
         unlock = try c.decodeIfPresent(Bool.self, forKey: .unlock) ?? false
+        fileTransfer = try c.decodeIfPresent(Bool.self, forKey: .fileTransfer) ?? false
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -36,8 +40,9 @@ public struct DevicePermissions: Codable, Sendable, Equatable {
         try c.encode(input, forKey: .input)
         try c.encode(clipboard, forKey: .clipboard)
         try c.encode(audio, forKey: .audio)
-        // Chỉ ghi `unlock` khi true để giữ nguyên HMAC của các file `paired-devices.json` cũ.
+        // Chỉ ghi `unlock`/`fileTransfer` khi true để giữ nguyên HMAC của các file `paired-devices.json` cũ.
         if unlock { try c.encode(true, forKey: .unlock) }
+        if fileTransfer { try c.encode(true, forKey: .fileTransfer) }
     }
 }
 

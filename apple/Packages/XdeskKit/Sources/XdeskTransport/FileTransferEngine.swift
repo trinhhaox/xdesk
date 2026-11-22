@@ -71,6 +71,14 @@ public enum FileTransferNaming {
     }
 }
 
+/// Host từ chối truyền tệp vì thiết bị không (còn) có quyền: gửi `file.cancel` với `reason` này.
+public enum FileTransferDenial {
+    public static let reason = "permission"
+    /// Host không còn hỗ trợ đường `file.offer`/`file.data` cũ.
+    public static let unsupportedReason = "unsupported"
+    public static let message = "Mac chưa cho phép thiết bị này gửi/nhận tệp. Hãy bật \"Gửi/nhận tệp\" trong Xdesk trên Mac, tab Thiết bị."
+}
+
 /// Bộ nhận tệp streaming qua `file.start` + `[file.chunk, BULK]` + `file.done` (không giữ tệp trong RAM).
 public actor FileTransferReceiver {
     private struct Active {
@@ -190,11 +198,17 @@ public actor FileTransferReceiver {
         cleanup(id: cancel.id, notifyError: nil)
     }
 
-    public func cancelAll() {
+    public var hasActiveTransfers: Bool { !transfers.isEmpty }
+
+    /// Huỷ mọi tệp đang nhận (xoá tệp tạm); trả về id đã huỷ để bên gọi báo cho đối tác.
+    @discardableResult
+    public func cancelAll() -> [String] {
         pendingBulk = nil
-        for key in Array(transfers.keys) {
+        let ids = Array(transfers.keys)
+        for key in ids {
             cleanup(id: key, notifyError: nil)
         }
+        return ids
     }
 
     private func cleanup(id: String, notifyError: String?) {
@@ -213,6 +227,7 @@ public enum FileTransferSender {
         url: URL,
         connection: ControlConnection,
         isCancelled: @escaping @Sendable () async -> Bool = { false },
+        cancelReason: @escaping @Sendable () -> String = { "cancelled" },
         onProgress: @escaping @Sendable (FileTransferProgress?) -> Void = { _ in }
     ) async throws {
         let attrs = try FileManager.default.attributesOfItem(atPath: url.path)
@@ -231,7 +246,7 @@ public enum FileTransferSender {
         var sentBytes: UInt64 = 0
         while let data = try handle.read(upToCount: FileTransferLimits.chunkBytes), !data.isEmpty {
             if await isCancelled() {
-                _ = try? await connection.send(.fileCancel(FileCancel(id: id, reason: "cancelled")))
+                _ = try? await connection.send(.fileCancel(FileCancel(id: id, reason: cancelReason())))
                 onProgress(nil)
                 throw CancellationError()
             }

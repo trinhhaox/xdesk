@@ -269,7 +269,9 @@ struct StreamView: View {
             if model.session.clipboardAvailable {
                 item("Gửi clipboard sang Mac", "doc.on.clipboard", dismiss) { Task { await model.sendClipboardToMac() } }
             }
-            item("Gửi tệp sang Mac…", "arrow.up.doc", dismiss) { showFileImporter = true }
+            if model.session.supportsFileTransfer {
+                item("Gửi tệp sang Mac…", "arrow.up.doc", dismiss) { showFileImporter = true }
+            }
             Divider().background(Color.white.opacity(0.2)).padding(.vertical, 4)
             item("Ngắt kết nối", "xmark.circle", dismiss, tint: BrandPalette.danger) { Task { await model.disconnect() } }
         }

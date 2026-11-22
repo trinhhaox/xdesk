@@ -236,7 +236,9 @@ private fun floatingActions(
     if (controller.clipboardAvailable) {
         add(FloatingAction("Gửi clipboard sang Mac", XdeskIcons.Clipboard, "Gửi clipboard sang máy Mac", afterShortcuts = true, onClick = controller::sendClipboardToMac))
     }
-    add(FloatingAction("Gửi tệp sang Mac…", XdeskIcons.FileTransfer, "Gửi tệp sang máy Mac", afterShortcuts = true, onClick = onSendFile))
+    if (controller.fileTransferAvailable) {
+        add(FloatingAction("Gửi tệp sang Mac…", XdeskIcons.FileTransfer, "Gửi tệp sang máy Mac", afterShortcuts = true, onClick = onSendFile))
+    }
     add(FloatingAction("Ngắt kết nối", XdeskIcons.Stop, isDestructive = true, onClick = controller::disconnect))
 }
 

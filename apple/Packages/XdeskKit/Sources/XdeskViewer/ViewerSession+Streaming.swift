@@ -22,6 +22,7 @@ extension ViewerSession {
                 case .fileChunk(let header): await fileReceiver.handleChunkHeader(header)
                 case .fileDone(let done): await fileReceiver.handleDone(done)
                 case .fileCancel(let cancel):
+                    if cancel.reason == FileTransferDenial.reason { lastFileTransferError = FileTransferDenial.message }
                     if activeSendingFileId == cancel.id {
                         fileCancelToken.cancel(cancel.id)
                     } else {

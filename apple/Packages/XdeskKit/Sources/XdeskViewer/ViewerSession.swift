@@ -364,42 +364,33 @@ public final class ViewerSession {
         }
     }
 
+    /// Host chỉ bật `.fileTransfer` khi thiết bị được cấp quyền gửi/nhận tệp; thiếu cap thì không gửi gì (UI nên ẩn nút).
+    public var supportsFileTransfer: Bool { negotiatedCaps.contains(.fileTransfer) }
+
     public func sendFile(url: URL) async throws {
         guard let connection else { return }
-        if negotiatedCaps.contains(.fileTransfer) {
-            let transferId = UUID().uuidString
-            activeSendingFileId = transferId
-            defer {
-                activeSendingFileId = nil
-                fileCancelToken.clear(transferId)
+        guard supportsFileTransfer else { throw ViewerFileTransferError.notPermitted }
+        let transferId = UUID().uuidString
+        activeSendingFileId = transferId
+        defer {
+            activeSendingFileId = nil
+            fileCancelToken.clear(transferId)
+        }
+        try await FileTransferSender.sendFile(
+            id: transferId,
+            url: url,
+            connection: connection,
+            isCancelled: { [fileCancelToken] in fileCancelToken.isCancelled(transferId) },
+            onProgress: { [weak self] progress in
+                Task { @MainActor [weak self] in self?.activeFileTransfer = progress }
             }
-            try await FileTransferSender.sendFile(
-                id: transferId,
-                url: url,
-                connection: connection,
-                isCancelled: { [fileCancelToken] in fileCancelToken.isCancelled(transferId) },
-                onProgress: { [weak self] progress in
-                    Task { @MainActor [weak self] in self?.activeFileTransfer = progress }
-                }
-            )
-            return
-        }
-        let fileName = url.lastPathComponent
-        let data = try Data(contentsOf: url)
-        let chunkSize = 32 * 1024
-        let totalChunks = UInt32((data.count + chunkSize - 1) / chunkSize)
-
-        _ = try await connection.send(.fileOffer(FileOffer(name: fileName, size: UInt32(data.count))))
-
-        for seq in 0..<totalChunks {
-            let start = Int(seq) * chunkSize
-            let end = min(start + chunkSize, data.count)
-            let chunkData = data.subdata(in: start..<end)
-            let base64 = chunkData.base64EncodedString()
-            let isLast = (seq == totalChunks - 1)
-            _ = try await connection.send(.fileData(FileData(name: fileName, chunk: base64, isLast: isLast)))
-        }
+        )
     }
+}
+
+public enum ViewerFileTransferError: Error, LocalizedError {
+    case notPermitted
+    public var errorDescription: String? { FileTransferDenial.message }
 }
 
 final class FileCancelToken: @unchecked Sendable {
