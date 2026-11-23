@@ -130,7 +130,7 @@ final class WindowFitter {
         for app in NSWorkspace.shared.runningApplications where app.activationPolicy == .regular && app.processIdentifier != getpid() {
             for window in AXWindow.windows(ofPid: app.processIdentifier) where window.isFittable && !userAdjusted.contains(window.key) {
                 guard let frame = window.frame, !others.contains(where: { $0.contains(CGPoint(x: frame.midX, y: frame.midY)) }) else { continue }
-                if onlyNew, ledger.contains(window.key) { continue }
+                if onlyNew, ledger.contains(window.key), !WindowFitGeometry.needsRefit(frame, in: target) { continue }
                 ledger.remember(window.key, frame: frame)
                 elements[window.key] = window
                 if fit(window, into: target) { fitted += 1 }

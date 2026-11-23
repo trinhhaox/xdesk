@@ -3,12 +3,18 @@ import CoreGraphics
 /// Hình học thuần của "co giãn cửa sổ cho vừa màn hình" (toạ độ AX: gốc trên-trái, y hướng xuống).
 enum WindowFitGeometry {
     /// Khung cửa sổ lấp đầy `target`; cửa sổ không co nổi (kích thước tối thiểu `minSize` lớn hơn `target` theo trục nào)
-    /// thì giữ kích thước tối thiểu ở trục đó và căn giữa theo trục đó, phần thừa tràn đều hai phía.
+    /// thì giữ kích thước tối thiểu và **neo trên-trái**: thanh tiêu đề, nút đóng và phần đầu nội dung luôn nằm trong màn hình
+    /// (căn giữa làm mất cả hai mép trên màn hình điện thoại hẹp); phần thừa xem bằng "Chỉnh cửa sổ" hoặc kéo khung hình.
     static func frame(minSize: CGSize, in target: CGRect) -> CGRect {
-        let width = max(target.width, minSize.width), height = max(target.height, minSize.height)
-        let x = width > target.width ? target.midX - width / 2 : target.minX
-        let y = height > target.height ? target.midY - height / 2 : target.minY
-        return CGRect(x: x, y: y, width: width, height: height)
+        CGRect(x: target.minX, y: target.minY, width: max(target.width, minSize.width), height: max(target.height, minSize.height))
+    }
+
+    /// Cửa sổ đã co trước đó nhưng giờ lệch ra ngoài màn hình (app tự đổi khung, mở lại, kéo lệch): cần co lại.
+    /// Cửa sổ quá khổ đã neo trên-trái thì không tính là lệch, tránh co đi co lại mãi.
+    static func needsRefit(_ frame: CGRect, in target: CGRect, tolerance: CGFloat = 1) -> Bool {
+        if frame.minX < target.minX - tolerance || frame.minY < target.minY - tolerance { return true }
+        let fitsWidth = frame.width <= target.width + tolerance, fitsHeight = frame.height <= target.height + tolerance
+        return (fitsWidth && frame.maxX > target.maxX + tolerance) || (fitsHeight && frame.maxY > target.maxY + tolerance)
     }
 
     /// `visibleFrame` của NSScreen (gốc dưới-trái) → toạ độ AX; `primaryHeight` là chiều cao `NSScreen.screens[0]`.

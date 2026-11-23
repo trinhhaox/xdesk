@@ -4,6 +4,11 @@
 
 ## Chưa phát hành
 
+## 0.2.2-beta (2026-11-23, chỉ Mac)
+
+Chi tiết: `docs/release-notes/0.2.2-beta.md`.
+- WindowFitter: cửa sổ quá khổ neo góc trên-trái thay vì căn giữa; cửa sổ lệch khỏi màn hình được co/kéo lại ở mỗi lần quét; cửa sổ chỉnh tay vẫn bỏ qua.
+
 ## 0.2.1-beta (2026-11-23)
 
 Chi tiết: `docs/release-notes/0.2.1-beta.md`.
